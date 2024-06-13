@@ -1,0 +1,15 @@
+import random
+def town_name_gen():
+    particle1=["River","Little","Town","Deer","Riven","Spring","Clear","Lake","Mil","Green","Greens","Thorn","Bright","Wind","Win","North","East","West","South","Oak","Pine","Birch","Sea"]
+    particle2=["town","ton","rock","dale","del","send","springs","field","ham","ville","ford","ly","bury","burg","vale","hill","son","view","cliff","borough","mouth","port","broke","wood","bridge"]
+    townName=""
+    x=0
+    y=0
+    x=random.randint(0,len(particle1)-1)
+    y=random.randint(0,len(particle2)-1)
+    while(particle1[x]==particle2[y]):
+        x=random.randint(0,len(particle1)-1)
+        y=random.randint(0,len(particle2)-1)
+    townName=particle1[x]+particle2[y]
+    return townName
+print(town_name_gen())
