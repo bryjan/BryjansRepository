@@ -1,7 +1,7 @@
 import random
 def town_name_gen():
-    particle1=["River","Little","Town","Deer","Riven","Spring","Clear","Lake","Mil","Green","Greens","Thorn","Bright","Wind","Win","North","East","West","South","Oak","Pine","Birch","Sea"]
-    particle2=["town","ton","rock","dale","del","send","springs","field","ham","ville","ford","ly","bury","burg","vale","hill","son","view","cliff","borough","mouth","port","broke","wood","bridge"]
+    particle1=["River","Little","Town","Deer","Riven","Spring","Clear","Lake","Mil","Green","Greens","Thorn","Bright","Wind","Win","North","East","West","South","Oak","Pine","Birch","Sea","Cliff","Ports","Ports","Rock","Somer","Pem","Nor","New","Bridge","Smith","Haver","Shadow","Ash","Ux","Fox","Pel","Mans","Man","New","Earl","Gran","Ridge","Har","Ox","King","Kings","Star","Night","En","Wolf","Framing","Buck","Win","Stock","Bell","Coal","Marsh","Dan","Plain"]
+    particle2=["town","ton","rock","dale","del","send","springs","field","ham","ville","ford","ly","bury","burg","vale","hill","view","cliff","borough","mouth","port","broke","wood","bridge","by","den,"wich","chester","creek","worth","land","stock"]
     townName=""
     x=0
     y=0
