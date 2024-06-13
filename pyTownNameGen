@@ -12,4 +12,3 @@ def town_name_gen():
         y=random.randint(0,len(particle2)-1)
     townName=particle1[x]+particle2[y]
     return townName
-print(town_name_gen())
