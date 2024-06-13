@@ -7,7 +7,7 @@ def town_name_gen():
     y=0
     x=random.randint(0,len(particle1)-1)
     y=random.randint(0,len(particle2)-1)
-    while(particle1[x]==particle2[y]):
+    while(particle1[x].upper==particle2[y].upper):
         x=random.randint(0,len(particle1)-1)
         y=random.randint(0,len(particle2)-1)
     townName=particle1[x]+particle2[y]
