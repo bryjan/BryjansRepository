@@ -8,7 +8,10 @@ def town_name_gen():
     
     proParticle=str(random.choice(particle1))
     postParticle=str(random.choice(particle2))
-    
+
+    while proParticle.upper==postParticle.upper:
+        proParticle=str(random.choice(particle1))
+
     if proParticle[len(proParticle)-1]==postParticle[0]:
         postParticle=postParticle[1:]
     
