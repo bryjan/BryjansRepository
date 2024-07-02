@@ -1,0 +1,17 @@
+import gameClasses as C
+import TownNameGenerator as TNG
+import random
+
+#Terrain Tiles
+
+plains= C.TerrainTileType("_","green","plains")
+border= C.TerrainTileType("x","white","border")
+forest= C.TerrainTileType("t","green","forest")
+desert= C.TerrainTileType("~","yellow","desert")
+plains= C.TerrainTileType("_","green","plains")
+mountain= C.TerrainTileType("M","light_grey","mountain")
+water= C.TerrainTileType("~","blue","water")
+road= C.TerrainTileType("_","light_grey","road")
+town= C.TerrainTileType("T","red",TNG.town_name_gen())
+
+tile= C.TerrainTile(forest,1,1)
