@@ -1,0 +1,84 @@
+import random
+import colorama
+from termcolor import colored
+
+class TerrainTileType:
+    def __init__(self,tileChar,tileColor,tileName):
+        self.tileChar= str(tileChar)
+        self.tileColor= str(tileColor)
+        self.tileName= str(tileName)
+    
+    def __repr__(self):
+        return self.tileName
+        
+    def displayTile(self):
+        return print(colored(self.tileChar,self.tileColor),end='')
+        
+class TerrainTile:
+    def __init__(self,TerrainTileType,xPos,yPos):
+        self.terrainType= TerrainTileType
+        self.xPos=int(xPos)
+        self.yPos=int(yPos)
+        self.neighborList=[]
+    def __repr__(self):
+        return self.terrainType.tileName
+        
+    def displayTile(self):
+        self.terrainType.displayTile()
+  
+class Swords:
+   def __init__(self,rarity):
+    self.weaponLvl= 1
+    self.dmgRange= [3,9]
+    self.speed= 20
+    self.critChance= .2
+    self.critDmg= 1.5
+    self.attribute1=""
+    self.attribute1=""
+    self.attribute1=""
+    self.attribute1=""
+    self.rarityName= rarity.rarityName
+    self.dmgMod= rarity.dmgMod
+    self.speedMod= rarity.speedMod
+    self.critChanceMod= rarity.critChanceMod
+    self.critDamageMod= rarity.critDamageMod
+    self.attributes= rarity.attributes
+     
+   def rollStats(self,pLvl,eLvl,pLuck):
+     iLvl=pLvl+eLvl
+     iLvl=iLvl/2
+     modiList=[.15,.14,.13,.12,.11,.10,.08,.05,0,0,0]
+     iLvlModi=modiList[random.randint(0,len(modiList)-1)]
+     if random.randint(0,110)< 60+pLuck:
+       iLvlModi=iLvlModi*-1
+     iLvlModi=iLvlModi+1
+     self.weaponLvl=int(iLvl*iLvlModi)
+     
+     dmgModi=int(self.weaponLvl*.5)
+     
+     self.dmgRange[0]=self.dmgRange[0]+dmgModi
+     self.dmgRange[1]=self.dmgRange[1]+dmgModi
+     self.dmgRange[0]=int(self.dmgRange[0]*self.dmgMod)
+     self.dmgRange[1]=int(self.dmgRange[1]*self.dmgMod)  
+     self.speed= int(self.speed*self.speedMod)
+     self.critChance= round(self.critChanceMod + self.critChance, 2)
+     self.critDmg= round(self.critDamageMod + self.critDmg, 2)
+     
+   def displayStats(self):
+     print(str(self.rarityName)+ " Sword")
+     print("Weapon Level: "+ str(self.weaponLvl))
+     print("Damage: " +str(self.dmgRange[0])+ " - " +str(self.dmgRange[1])+ " ")
+     print("Speed: "+ str(self.speed))
+     print("Critical chance: "+ str(self.critChance)+ " | Critical Damage Bonus: "+ str(self.critDmg))
+
+class Rarity:
+  def __init__(self,rarity, damageModifier,  speedModifier, critChanceModifier, critDamageModifier, numAttributes):
+    self.rarityName= rarity
+    self.dmgMod= damageModifier
+    self.speedMod= speedModifier
+    self.critChanceMod= critChanceModifier
+    self.critDamageMod= critDamageModifier
+    self.attributes= numAttributes
+  
+  def __repr__(self):
+    return self.rarityName
