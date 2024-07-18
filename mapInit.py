@@ -2,73 +2,99 @@ import random as r
 import gameClasses as C
 import gameObjects as O
 
-#variable initialization
-mapArray=[]
-xRow=[]
-
-#TODO ensure odd 
-mapSize=21
-
-#to track (x,y) postitions
-x=0
-y=0
-
 #function to add a list of neighbors to a tile
-def updateNeighbors():
+
+def updateNeighbors(cell,mapArray):
+    cell.neighborList=[]
+    if cell.xPos>0 and cell.yPos>0 and cell.xPos<len(mapArray[0])-1 and cell.yPos<len(mapArray)-1:
+        cell.neighborList.append(mapArray[cell.yPos+1][cell.xPos-1])#north west
+        cell.neighborList.append(mapArray[cell.yPos+1][cell.xPos])#north
+        cell.neighborList.append(mapArray[cell.yPos+1][cell.xPos+1])#north east
+        cell.neighborList.append(mapArray[cell.yPos][cell.xPos-1])#west
+        cell.neighborList.append(mapArray[cell.yPos][cell.xPos+1])#east
+        cell.neighborList.append(mapArray[cell.yPos-1][cell.xPos-1])#south west
+        cell.neighborList.append(mapArray[cell.yPos-1][cell.xPos])#south
+        cell.neighborList.append(mapArray[cell.yPos-1][cell.xPos+1])#south east
+
+
+def updateNeighborsNeighbors(cell,mapArray):
+    for n in cell.neighborList:
+        updateNeighbors(n,mapArray)
+        
+def updateAllNeighbors(mapArray):
     for rows in mapArray:
         for i in rows:
-            i.neighborList=[]
-            if i.xPos>0 and i.yPos>0 and i.xPos<mapSize and i.yPos<mapSize:
-                i.neighborList.append(mapArray[i.xPos-1][i.yPos+1])#north west
-                i.neighborList.append(mapArray[i.xPos][i.yPos+1])#north
-                i.neighborList.append(mapArray[i.xPos+1][i.yPos+1])#north east
-                i.neighborList.append(mapArray[i.xPos-1][i.yPos])#west
-                i.neighborList.append(mapArray[i.xPos+1][i.yPos])#east
-                i.neighborList.append(mapArray[i.xPos-1][i.yPos-1])#south west
-                i.neighborList.append(mapArray[i.xPos][i.yPos-1])#south
-                i.neighborList.append(mapArray[i.xPos+1][i.yPos-1])#south east
+            updateNeighbors(i,mapArray)
 
 #initial map population
 #populates a list that will serve as a horizontal row then appends it to mapArray
-while y <= mapSize-1:
-    x=0
-    while x <= mapSize-1:
-        tile= C.TerrainTile(O.desert,x,y)
-        xRow.append(tile)
-        x+=1
-    mapArray.insert(0,xRow)
-    y+=1
+def mapInit(mapSize):
+    mapArray=[]
     xRow=[]
-y=0
-x=0
-
-#reduce mapSize by 1 to make counting from 0 easier
-mapSize-=1
-
-#TODO tile seeding and generation
-#Seed ratios|pains 10 in 100| forest 7 in 100
-mapSize-=1
-tileCount= mapSize*mapSize
-mapSize+=1
-
-#initial seeding
-l=0
-while l<= int(tileCount*.1):
-    mapArray[r.randint(1,mapSize-1)][r.randint(1,mapSize-1)].terrainType= O.plains
-    l+=1
-l=0
-updateNeighbors()
-#TODO simulate growth by making neighbors potentially switch
-
-#adding map borders
-for y in mapArray:
-    for x in y:
-        if x.yPos==0 or x.yPos==mapSize or x.xPos==0 or x.xPos==mapSize:
-            x.terrainType= O.border
-
-#for testing
-for y in mapArray:
-    for x in y:
-        x.displayTile()
-        print(" ",end='')
-    print()
+    y=0
+    while y <= mapSize-1:
+        x=0
+        while x <= mapSize-1:
+            cellName= str(x)+","+str(y)
+            xRow.append(C.Cell(O.desert,x,y,cellName))
+            x+=1
+        mapArray.insert(0,xRow)
+        y+=1
+        xRow=[]
+    updateAllNeighbors(mapArray)
+    
+    mapSize-=1
+    tileCount= mapSize*mapSize
+    mapSize+=1
+    
+    #initial seeding
+    l=0
+    while l<= int(tileCount*O.plainsParam.seedingRatio):
+        x=r.randint(1,mapSize-1)
+        y=r.randint(1,mapSize-1)
+        mapArray[y][x].terrainType= O.plains
+        updateNeighborsNeighbors(mapArray[y][x],mapArray)
+        l+=1
+    l=0
+    while l<= int(tileCount*O.forestParam.seedingRatio):
+        x=r.randint(1,mapSize-1)
+        y=r.randint(1,mapSize-1)
+        mapArray[y][x].terrainType= O.forest
+        updateNeighborsNeighbors(mapArray[y][x],mapArray)
+        l+=1
+        
+    #TODO simulate growth by making neighbors potentially switch
+    l=0
+    while l<O.plainsParam.genLoops:
+        for y in mapArray:
+            for x in y:
+                for n in x.neighborList:
+                    if n.terrainType==O.plains:
+                        if O.plainsParam.conversionRoll()==True:
+                            x.terrainType= O.plains
+                            updateNeighborsNeighbors(x,mapArray)
+        l+=1
+    l=0
+    while l<O.forestParam.genLoops:
+        for y in mapArray:
+            for x in y:
+                for n in x.neighborList:
+                    if n.terrainType==O.forest:
+                        if O.forestParam.conversionRoll()==True:
+                            x.terrainType= O.forest
+                            updateNeighborsNeighbors(x,mapArray)
+        l+=1
+                    
+    
+                    
+                
+                
+        
+    
+    #adding map borders
+    for y in mapArray:
+        for x in y:
+            if x.yPos==0 or x.yPos==mapSize-1 or x.xPos==0 or x.xPos==mapSize-1:
+                x.terrainType= O.border
+    #return map
+    return mapArray
