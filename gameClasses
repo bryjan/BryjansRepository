@@ -1,5 +1,5 @@
 import random as r
-import colorama
+#import colorama
 from termcolor import colored
 
 class TerrainTileType:
@@ -12,12 +12,22 @@ class TerrainTileType:
         return self.tileName
         
 class Cell:
-    def __init__(self,TerrainType,xPos,yPos,cellID):
+    def __init__(self,TerrainType,xPos,yPos):
         self.terrainType= TerrainType
         self.xPos=int(xPos)
         self.yPos=int(yPos)
         self.neighborList=[]
-        self.cellID=""
+        self.cellID=str(xPos)+","+str(yPos)
+        self.containObject= False
+
+    def checkContainObject(self,listOfObjects):
+
+        for t in listOfObjects:
+            if t.xPos== self.xPos and t.yPos== self.yPos:
+                self.containObject = True
+            else:
+                self.containObject = False
+
     def __repr__(self):
         return self.terrainType.tileName
         
@@ -38,18 +48,27 @@ class TerrainGenParams:
             return False
 class Mech:
     def __init__(self,mechClass,xlocation,ylocation,mechName):
-        self.maxHp=mechClass.maxHp
-        self.hp=maxHp
+        self.maxHp=mechClass.mechMaxhp
+        self.hp= self.maxHp
         self.name=mechName
+        self.xPos=int(xlocation)
+        self.yPos=int(ylocation)
+        self.mechClass=mechClass
+    def displayObject(self):
+        return print(colored(self.mechClass.symbol,self.mechClass.symbolcolor),end='')
         
 class MechClass:
-    def __init__(self,size,radarSig,limbList,hp):
+    def __init__(self,size,radarSig,limbList,hp,symbol,color):
         self.size=size
         self.radarDetected=radarSig/2
         self.radarSized=int(radarSig*.7)
         self.radarID=radarSig
         self.limbs=limbList
         self.mechMaxhp=hp
+        self.symbol=symbol
+        self.symbolcolor=color
+    def displayObject(self):
+        return print(colored(self.symbol,self.symbolcolor),end='')
             
 class MechLegs:
     def __init__(self,legName,speed,armor,hp,moduleList):
