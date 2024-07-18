@@ -1,0 +1,7 @@
+import main
+import gameObjects as O
+import gameClasses as O
+
+def radarScan(scanningObject,map):
+    initialPower= scanningObject.radarpower
+    return map
