@@ -3,10 +3,14 @@ import TownNameGenerator as TNG
 import random
 
 #Terrain Tiles
+blank= C.TerrainTileType(" ","black","blank")
 
 plains= C.TerrainTileType("_","green","plains")
+plainsParam= C.TerrainGenParams(plains,.005,7,12)
+
 border= C.TerrainTileType("x","white","border")
 forest= C.TerrainTileType("t","green","forest")
+forestParam= C.TerrainGenParams(forest, .008,4,15)
 desert= C.TerrainTileType("~","yellow","desert")
 plains= C.TerrainTileType("_","green","plains")
 mountain= C.TerrainTileType("M","light_grey","mountain")
@@ -14,4 +18,13 @@ water= C.TerrainTileType("~","blue","water")
 road= C.TerrainTileType("_","light_grey","road")
 town= C.TerrainTileType("T","red",TNG.town_name_gen())
 
-tile= C.TerrainTile(forest,1,1)
+#Mech modules
+#mobilityEngines= C.MechModules("mobility engines",1,.5,0)
+#Mech Limbs
+exosuitLegs= C.MechLegs("exosuitLegs",6,30,3,[])
+lancerPowerArmor=C.MechHull("Lancer power armor",30,2,4,60,[])
+lancerGreatHelm=C.MechHelm("Lancer great helm",12,0,6,4,40,[])
+lightChaingun=C.MechAtkArm("lightChaingun",.90,12,5,6,4,.03,3,25,[])
+lightChainSword=C.MechAtkArm("lightChainsword",.99,1,1,25,5,.75,5,25,[])
+#Mechs
+Lancer= C.MechClass("Small",15,[exosuitLegs,lancerPowerArmor,lancerGreatHelm,lightChaingun,lightChainSword],100)
