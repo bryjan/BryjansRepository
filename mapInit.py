@@ -35,8 +35,7 @@ def mapInit(mapSize):
     while y <= mapSize-1:
         x=0
         while x <= mapSize-1:
-            cellName= str(x)+","+str(y)
-            xRow.append(C.Cell(O.desert,x,y,cellName))
+            xRow.append(C.Cell(O.desert,x,y,))
             x+=1
         mapArray.insert(0,xRow)
         y+=1
