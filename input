@@ -1,0 +1,57 @@
+import gameObjects as o
+import gameClasses as c
+
+def playerinput(player,map,objectsList):
+
+    playersInput=""
+
+    print("Press ? for a list of commands")
+    playersInput = input("Enter command: ")
+
+    if playersInput=="?":
+        print("You can submit the following commands: ")
+        print("Any of the 'wasd' keys to move and 'qezc' to move diagonally")
+        return False
+    elif playersInput=="q" or playersInput=="w"or playersInput=="e"or playersInput=="a" or playersInput=="s" or playersInput=="d"or playersInput=="z"or playersInput=="x" or playersInput=="c":
+
+        plannedXpos=player.xPos
+        plannedYpos=player.yPos
+
+        if playersInput=="q":
+            plannedXpos=player.xPos-1
+            plannedYpos=player.yPos+1
+        if playersInput=="e":
+            plannedXpos=player.xPos+1
+            plannedYpos=player.yPos+1
+        if playersInput=="z":
+            plannedXpos=player.xPos-1
+            plannedYpos=player.yPos-1
+        if playersInput=="q":
+            plannedXpos=player.xPos+1
+            plannedYpos=player.yPos-1
+        if playersInput=="a":
+            plannedXpos=player.xPos-1
+        if playersInput=="w":
+            plannedYpos=player.yPos+1
+        if playersInput=="d":
+            plannedXpos=player.xPos+1
+        if playersInput=="s":
+            plannedYpos=player.yPos-1
+
+        for t in objectsList:
+            if t.xPos == plannedXpos and t.yPos == plannedYpos:
+                return False
+        if map[plannedYpos][plannedXpos].terrainType == o.border:
+            print("Return to the battlefield pilot!.")
+            return False
+        else:
+            player.xPos= plannedXpos
+            player.yPos= plannedYpos
+            print("Something blocks your way.")
+            return True
+
+
+    else:
+        print("Input not recognized")
+        return False
+
