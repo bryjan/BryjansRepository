@@ -1,4 +1,4 @@
-import random
+import random as r
 import colorama
 from termcolor import colored
 
@@ -11,74 +11,105 @@ class TerrainTileType:
     def __repr__(self):
         return self.tileName
         
-    def displayTile(self):
-        return print(colored(self.tileChar,self.tileColor),end='')
-        
-class TerrainTile:
-    def __init__(self,TerrainTileType,xPos,yPos):
-        self.terrainType= TerrainTileType
+class Cell:
+    def __init__(self,TerrainType,xPos,yPos,cellID):
+        self.terrainType= TerrainType
         self.xPos=int(xPos)
         self.yPos=int(yPos)
         self.neighborList=[]
+        self.cellID=""
     def __repr__(self):
         return self.terrainType.tileName
         
     def displayTile(self):
-        self.terrainType.displayTile()
-  
-class Swords:
-   def __init__(self,rarity):
-    self.weaponLvl= 1
-    self.dmgRange= [3,9]
-    self.speed= 20
-    self.critChance= .2
-    self.critDmg= 1.5
-    self.attribute1=""
-    self.attribute1=""
-    self.attribute1=""
-    self.attribute1=""
-    self.rarityName= rarity.rarityName
-    self.dmgMod= rarity.dmgMod
-    self.speedMod= rarity.speedMod
-    self.critChanceMod= rarity.critChanceMod
-    self.critDamageMod= rarity.critDamageMod
-    self.attributes= rarity.attributes
-     
-   def rollStats(self,pLvl,eLvl,pLuck):
-     iLvl=pLvl+eLvl
-     iLvl=iLvl/2
-     modiList=[.15,.14,.13,.12,.11,.10,.08,.05,0,0,0]
-     iLvlModi=modiList[random.randint(0,len(modiList)-1)]
-     if random.randint(0,110)< 60+pLuck:
-       iLvlModi=iLvlModi*-1
-     iLvlModi=iLvlModi+1
-     self.weaponLvl=int(iLvl*iLvlModi)
-     
-     dmgModi=int(self.weaponLvl*.5)
-     
-     self.dmgRange[0]=self.dmgRange[0]+dmgModi
-     self.dmgRange[1]=self.dmgRange[1]+dmgModi
-     self.dmgRange[0]=int(self.dmgRange[0]*self.dmgMod)
-     self.dmgRange[1]=int(self.dmgRange[1]*self.dmgMod)  
-     self.speed= int(self.speed*self.speedMod)
-     self.critChance= round(self.critChanceMod + self.critChance, 2)
-     self.critDmg= round(self.critDamageMod + self.critDmg, 2)
-     
-   def displayStats(self):
-     print(str(self.rarityName)+ " Sword")
-     print("Weapon Level: "+ str(self.weaponLvl))
-     print("Damage: " +str(self.dmgRange[0])+ " - " +str(self.dmgRange[1])+ " ")
-     print("Speed: "+ str(self.speed))
-     print("Critical chance: "+ str(self.critChance)+ " | Critical Damage Bonus: "+ str(self.critDmg))
+        return print(colored(self.terrainType.tileChar,self.terrainType.tileColor),end='')
 
-class Rarity:
-  def __init__(self,rarity, damageModifier,  speedModifier, critChanceModifier, critDamageModifier, numAttributes):
-    self.rarityName= rarity
-    self.dmgMod= damageModifier
-    self.speedMod= speedModifier
-    self.critChanceMod= critChanceModifier
-    self.critDamageMod= critDamageModifier
-    self.attributes= numAttributes
-  
-  def __repr__(self):
-    return self.rarityName
+class TerrainGenParams:
+    def __init__(self,terrainType,seedingRatio,genLoops,neighborConversionRate):
+        self.terrainType= terrainType
+        self.seedingRatio= seedingRatio
+        self.genLoops= genLoops
+        self.neighborConversionRate= neighborConversionRate
+    
+    def conversionRoll(self):
+        if r.randint(0,100)<= self.neighborConversionRate:
+            return True
+        else:
+            return False
+class Mech:
+    def __init__(self,mechClass,xlocation,ylocation,mechName):
+        self.maxHp=mechClass.maxHp
+        self.hp=maxHp
+        self.name=mechName
+        
+class MechClass:
+    def __init__(self,size,radarSig,limbList,hp):
+        self.size=size
+        self.radarDetected=radarSig/2
+        self.radarSized=int(radarSig*.7)
+        self.radarID=radarSig
+        self.limbs=limbList
+        self.mechMaxhp=hp
+            
+class MechLegs:
+    def __init__(self,legName,speed,armor,hp,moduleList):
+        self.name=legName
+        self.mp=speed
+        self.legArmor=armor
+        self.maxLegHp=hp
+        self.Leghp=hp
+        self.legModuleList=moduleList
+        
+class MechHull:
+    def __init__(self,hullName,pwrCapacity,pwrgen,armor,hp,moduleList):
+        self.name=hullName
+        self.pwrMax=pwrCapacity
+        self.pwr=pwrCapacity
+        self.pwrGen=pwrgen
+        self.hullArmor=armor
+        self.maxHullHp=hp
+        self.hullHp=hp
+        self.hullModuleList=moduleList
+
+class MechHelm:
+    def __init__(self,helmName,visualRange,radarStrength,actionPoints,armor,hp,moduleList):
+        self.name=helmName
+        self.visualView=visualRange
+        self.ap=actionPoints
+        self.helmArmor=armor
+        self.maxHelmHp=hp
+        self.helmHp=hp
+        self.helmModuleList=moduleList
+
+
+class MechAtkArm:
+    def __init__(self,armName,accuracy,range,attacks,damage,damageSpread,critChance,armor,hp,moduleList):
+        self.name=armName
+        self.accuracy=accuracy
+        self.range=range
+        self.attacks=attacks
+        self.damage=damage
+        self.damageRng=damageSpread
+        self.critChance=critChance
+        self.atkArmArmor=armor
+        self.maxatkArmHp=hp
+        self.atkArmHp=hp
+        self.atkArmModuleList=moduleList
+
+#class Pack:
+        
+#class MechModules:
+    #def __init__(self,moduleName,attributeMod,damagedAttribute,destroyedAttribute):
+        #self.name=moduleName
+        #self.status="Good"
+        #self.attributeMod=attributeMod
+        #self.dmgdAttribute=damagedAttribute
+        #self.destydAtrribute=destroyedAttribute
+        
+    #def applyAttribute(self):
+        #if self.status== "Good":
+            #return self.attribute
+        #elif self.status== "Damaged":
+            #return self.dmgdAttribute
+        #elif self.status== "Destoyed":
+            #return self.destydAtrribute
