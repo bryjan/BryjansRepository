@@ -1,20 +1,32 @@
 import mapInit as m
-import printMap as pm
+import printPlayerView as pv
+import gameClasses as c
+import gameObjects as o
+import printHUD as p
+import input as inp
 import termcolor
 
+gameObjectsList=[]
 map=[]
 mapSize=200
-windowSize=19
-viewxPos=5
-viewyPos=5
+windowSize=20
+initxPos=10
+inityPos=10
 game=True
+
+#placeholder
+playerMech=c.Mech(o.lancer,initxPos,inityPos,"Trident")
+enemy=c.Mech(o.mite,15,15,"Creep")
+gameObjectsList.append(playerMech)
+gameObjectsList.append(enemy)
 
 map=(m.mapInit(mapSize))
 while game == True:
-    #printHUD TODO
-    pm.printMap(windowSize,map,mapSize,viewxPos,viewyPos)
-    #printDialog TODO
-    #input TODO
-    #updateMap TODO
-    game= False #for testing
+    goodinput = False
+    while goodinput == False:
+        p.printHUD(playerMech,map)
+        pv.printPlayerView(windowSize,map,mapSize,playerMech,gameObjectsList)
+        #printDialog TODO
+        goodinput=inp.playerinput(playerMech,map,gameObjectsList)
+    #update TODO
 print("Game Over")
