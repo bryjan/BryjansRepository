@@ -1,0 +1,20 @@
+import mapInit as m
+import printMap as pm
+import termcolor
+
+map=[]
+mapSize=200
+windowSize=19
+viewxPos=5
+viewyPos=5
+game=True
+
+map=(m.mapInit(mapSize))
+while game == True:
+    #printHUD TODO
+    pm.printMap(windowSize,map,mapSize,viewxPos,viewyPos)
+    #printDialog TODO
+    #input TODO
+    #updateMap TODO
+    game= False #for testing
+print("Game Over")
