@@ -1,5 +1,5 @@
 import gameClasses as C
-import TownNameGenerator as TNG
+import TownNameGen as TNG
 import random
 
 #Terrain Tiles
@@ -21,10 +21,18 @@ town= C.TerrainTileType("T","red",TNG.town_name_gen())
 #Mech modules
 #mobilityEngines= C.MechModules("mobility engines",1,.5,0)
 #Mech Limbs
+
 exosuitLegs= C.MechLegs("exosuitLegs",6,30,3,[])
 lancerPowerArmor=C.MechHull("Lancer power armor",30,2,4,60,[])
 lancerGreatHelm=C.MechHelm("Lancer great helm",12,0,6,4,40,[])
 lightChaingun=C.MechAtkArm("lightChaingun",.90,12,5,6,4,.03,3,25,[])
 lightChainSword=C.MechAtkArm("lightChainsword",.99,1,1,25,5,.75,5,25,[])
+
+miteLegs=  C.MechLegs("mite legs",2,20,2,[])
+miteThorax= C.MechHull("mite thorax",99,99,3,40,[])
+miteHead= C.MechHelm("mite head",10,0,3,0,40,[])
+miteJaws= C.MechAtkArm("mite jaws",.70,1,1,15,5,.09,5,30,[])
+
 #Mechs
-Lancer= C.MechClass("Small",15,[exosuitLegs,lancerPowerArmor,lancerGreatHelm,lightChaingun,lightChainSword],100)
+lancer= C.MechClass("Small",15,[exosuitLegs,lancerPowerArmor,lancerGreatHelm,lightChaingun,lightChainSword],100,"x","white")
+mite= C.MechClass("Small",10,[miteLegs,miteThorax,miteHead,miteJaws],50,">","red")
