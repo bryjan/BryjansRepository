@@ -1,0 +1,4 @@
+import gameObjects
+import gameClasses
+def printHUD(player,map):
+    print("Coordinates: ("+str(player.xPos)+","+str(player.yPos)+") | Structural Integrity: "+str(int(float(player.maxHp/player.hp)*100))+"%")
