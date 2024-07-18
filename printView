@@ -1,0 +1,48 @@
+import gameClasses as c
+import gameObjects as o
+import termcolor as tc
+
+def printPlayerView(windowSize,mapArray,mapsize,mechofPOV,objectsList):
+    mapWindow=[]
+    #ensure window is odd.
+    if windowSize%2==0:
+        windowSize+=1
+    windowExtend=windowSize-1
+    windowExtend=int(windowExtend/2)
+    
+    xRow=[]
+    y=mechofPOV.yPos-windowExtend
+    while y <= mechofPOV.yPos+windowExtend:
+        x=mechofPOV.xPos-windowExtend
+        while x <= mechofPOV.xPos+windowExtend:
+            if y<0 or y>mapsize-1 or x<0 or x>mapsize-1:
+                xRow.append(c.Cell(o.blank,x,y,"NULL"))
+            else:
+                y+=1
+                xRow.append(mapArray[len(mapArray)-y][x])
+                y-=1
+            x+=1
+        mapWindow.insert(0,xRow)
+        y+=1
+        xRow=[]
+    y=0
+    x=0
+
+
+
+    for y in mapWindow:
+        for x in y:
+
+            displayT=True
+
+            for t in objectsList:
+                if x.yPos==t.yPos and x.xPos==t.xPos:
+                    displayT = False
+                    t.displayObject()
+                    print(end=" ")
+
+            if displayT == True:
+                x.displayTile()
+                print(end=" ")
+        print()
+    return
