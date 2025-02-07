@@ -19,10 +19,10 @@ class MatchInfo:
 
         self.blank = TerrainType("blank", " ", "black", size= 0, moveCostBySize = [], visualAbsorbtion = 9999, radarAbsorbtion = 9999, fireproof = True, passable = False)
         self.border = TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
-        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1, radarSig=9999, fireproof = True)
-        self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig=9999)
-        self.forest = TerrainType("forest", "t", "green", size= 2, moveCostBySize = [1,1,3,2,2,1,1], visualAbsorbtion = 5, radarAbsorbtion = 10, radarSig = 15)
-        self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig=9999, requireFloat = False, fireproof = True)
+        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
+        self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig = 9999)
+        self.forest = TerrainType("forest", "t", "green", size= 2, moveCostBySize = [1,1,3,2,2,1,1], visualAbsorbtion = 5, radarAbsorbtion = 10, radarSig = 80)
+        self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
 
     def spawnEntities(self):
         pass #TODO
@@ -217,8 +217,7 @@ class TerrainType:
                         for cell in changeQueue:
                             cell.terrain = self
                 changeQueue=[]
-
-            
+          
     def displayTerrain(self):
         if self.symbolAttribute != [] and self.symbolHighlight != "":
             return cprint(self.symbol,self.color,self.symbolHighlight,attrs=[self.symbolAttribute], end = " ")
@@ -231,9 +230,6 @@ class TerrainType:
 
         else:
             return print(colored(self.symbol,self.color), end = " ")
-
-class TerrainGenParam: #TODO class that set tiles with basic generation rules with their params
-    pass
 
 
 class Cell:
@@ -341,9 +337,11 @@ class Cell:
                 print(colored("?", "white"), end=" ")
                 return
         
-        if self.radarReturn == True:
+        if self.radarReturn == True and self.radarPower >= self.terrain.radarSig:
             print(colored("?", "white"), end=" ")
             return
+        else:
+            print(" ", end = " ")
     
     def roundRefresh(self): #TODO reset stats that refresh every round ex)radar and visual strength, radar sources then counting down cell effects
         pass
@@ -365,7 +363,7 @@ class Entity: #a character on the map
         self.mp = int(self.mechClass.mpMax)
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
-        self.radarPower = (self.mechClass.radarPower / (1 + (self.speed * .2 )))
+        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .2 ))
 
         
         self.moveDirection = "none"
@@ -418,13 +416,12 @@ class Entity: #a character on the map
                         dontCalcList.append(n)
 
     def getRadar(self, matchInfo):
-        mech = self
         map = matchInfo.map
-        startingCell = map[mech.pos[1]][mech.pos[0]]
-        if mech.radarPower <= 0:
+        startingCell = map[self.pos[1]][self.pos[0]]
+        if self.radarPower <= 0:
             return
    
-        startingCell.radarPower = int(mech.radarPower)
+        startingCell.radarPower = int(self.radarPower)
         self.radarIDlist.append(startingCell)
         startingCell.radarReturn = True
 
@@ -441,21 +438,21 @@ class Entity: #a character on the map
             radarLoss = int(closestNeighbor.terrain.radarAbsorb) + round(math.dist(startingCell.pos, cell.pos))
             cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
 
-        if cell.radarPower < 0:
-            cell.radarPower = 0
+            if cell.radarPower < 0:
+                cell.radarPower = 0
 
-        if cell.radarPower > 0:
-            n.radarReturn = True
-            for n in cell.nList:
-                if not (n in dontCalcList):
-                    calcList.append(n)
-                    dontCalcList.append(n)
+            if cell.radarPower > 0:
+                cell.radarReturn = True
+                for n in cell.nList:
+                    if (n not in dontCalcList):
+                        calcList.append(n)
+                        dontCalcList.append(n)
 
         for obj in matchInfo.entities: #passive radar and radar ID reports
             if map[obj.pos[1]][obj.pos[0]].radarPower >= obj.radarSig:
-                if obj.team != mech.team:
-                    if obj.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
-                        self.passiveRadarDetect(matchInfo, mech, obj)
+                if obj.team != self.team:
+                    if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
+                        self.passiveRadarDetect(matchInfo, self, obj)
                            
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
 
@@ -529,7 +526,7 @@ class Entity: #a character on the map
         self.getRadar(matchInfo)
 
 
-    def report(matchInfo, mech, message, teamReport = False, critical = False): #TODO add messages to a report log
+    def report(self, matchInfo, mech, message, teamReport = False, critical = False): #TODO add messages to a report log
         matchRound = matchInfo.matchRound
         critMessage = ""
         if critical == True:
@@ -589,6 +586,7 @@ class MechClass: #a constructed mech not a npc or player
         self.limbList.append(self.helm)
 
         #initialize limb passed stats
+        self.size = 0
         self.limbsCondition = 0
         self.radarSig = 0
         self.apMax = 0
@@ -606,6 +604,8 @@ class MechClass: #a constructed mech not a npc or player
         #retrieve limb passed stats
         for limb in self.limbList:
             self.limbsCondition += limb.limbCon
+            if limb.size > 0:
+                self.size = size
             if limb.baseRadarSig > 0:
                 self.radarSig = (limb.baseRadarSig * limb.multiRadarSig) + limb.bonusRadarSig
             if limb.baseAP > 0:
@@ -670,6 +670,8 @@ class MechPart: # super class to mech limbs
         self.hp = hp
 
         self.condition = self.baseArmor
+
+        self.size = 0
 
         self.baseAP = 0
         self.bonusAP = 0
@@ -775,9 +777,10 @@ class Legs(MechPart): #subclass mechpart
         
 
 class Hull(MechPart):
-    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, desc = ""):
+    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = ""):
         super().__init__(name, armor, hp, moduleList, desc = "")
         
+        self.size = size
         self.baseRadarSig = radarSig
         self.baseEnergy = pwrCapacity
         self.baseEnergyGen = pwrGen
