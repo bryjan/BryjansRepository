@@ -15,7 +15,7 @@ exosuitLegMotor = C.Module("Exosuit Leg Motors", "mp", 1,  [.5 , .8 , 1], desc= 
 greatHelm= C.Helm( "Great Helm", 5, 25, [], 6, 12, 50, desc = "A Lancer Power Armor Helm with a suite of sensor data displays inside")
 lancerPowerArmor= C.Hull( "Lancer Power Armor", 5, 25, [lightWeightFrame], 20, 1, 150, desc = "The namesake of the Lancer Class mechs. Not a true mech, but a very large set of power Armor. Extremely fast and agile compared to mechs of other classes, but lack data sensors, radar, and means of serious ranged damage.")
 lancerPowerArmorLegs= C.Legs( "Lancer Power Armor Legs", 5, 25, [exosuitLegMotor], 4, desc = "Exosuit powered legs covered in armor")
-godHelm= C.Helm( "God Helm", 5, 25,[radardetector], 10, 30, 100, desc = "Dev Tool")
+godHelm= C.Helm( "God Helm", 5, 25,[radardetector], 10, 30, 150, desc = "Dev Tool")
 godHull= C.Hull( "God Hull", 5, 25, [], 100, 10, 50, desc = "Dev Tool")
 kikiLegs= C.Legs( "God Legs", 5, 25, [exosuitLegMotor, lightWeightFrame], 10, desc = "Dev Tool")
 #MechClasses
