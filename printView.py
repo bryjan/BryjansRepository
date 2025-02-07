@@ -39,6 +39,6 @@ def printPOV(matchInfo, povX, povY):
             elif cell.radarReturn == True:
                     cell.displayRadarReturn(matchInfo)
             else:
-                 print(" ", end = "")
+                 print(" ", end = " ")
         print()
     return
