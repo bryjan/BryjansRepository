@@ -606,9 +606,9 @@ class MechClass: #a constructed mech not a npc or player
             if limb.baseRadarSig > 0:
                 self.radarSig = (limb.baseRadarSig * limb.multiRadarSig) + limb.bonusRadarSig
             if limb.baseAP > 0:
-                self.apMax = (limb.baseAP * limb.baseAP) + limb.bonusAP
+                self.apMax = (limb.baseAP * limb.multiAP) + limb.bonusAP
             if limb.baseMP > 0:
-                self.mpMax = (limb.baseMP * limb.baseMP) + limb.bonusMP
+                self.mpMax = (limb.baseMP * limb.multiMP) + limb.bonusMP
             if limb.baseEnergy > 0:
                 self.energyMax = (limb.baseEnergy * limb.multiEnergy) + limb.bonusEnergy
             if limb.baseEnergyGen > 0:
