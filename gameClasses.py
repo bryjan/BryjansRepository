@@ -565,16 +565,13 @@ class Pilot:
 
 
 class MechClass: #a constructed mech not a npc or player
-    def __init__(self, name, size, symbol, color, mechHull, mechHelm, mechLeg, limblist=[], description =""):
+    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=[], description =""):
 
         #basic details
         self.name = name
         self.symbol = symbol
         self.color = color
-        self.size = size
-        self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
-        self.sizeStr = self.sizeStrList[size]
-
+    
         #limb objects
         self.hull = mechHull
         self.helm = mechHelm
@@ -605,7 +602,7 @@ class MechClass: #a constructed mech not a npc or player
         for limb in self.limbList:
             self.limbsCondition += limb.limbCon
             if limb.size > 0:
-                self.size = size
+                self.size = limb.size
             if limb.baseRadarSig > 0:
                 self.radarSig = (limb.baseRadarSig * limb.multiRadarSig) + limb.bonusRadarSig
             if limb.baseAP > 0:
@@ -635,6 +632,9 @@ class MechClass: #a constructed mech not a npc or player
         self.condition = self.limbsCondition / len(self.limbList)
         self.ap = int(self.apMax)
         self.mp = int(self.mpMax)
+        
+        self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
+        self.sizeStr = self.sizeStrList[self.size]
 
         self.desc = description
 
