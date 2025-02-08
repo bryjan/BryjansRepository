@@ -19,5 +19,5 @@ godHelm= C.Helm( "God Helm", 5, 25,[radardetector], 10, 30, 150, desc = "Dev Too
 godHull= C.Hull( "God Hull", 5, 25, [], 100, 10, 50, desc = "Dev Tool")
 kikiLegs= C.Legs( "God Legs", 5, 25, [exosuitLegMotor, lightWeightFrame], 10, desc = "Dev Tool")
 #MechClasses
-lancer = C.MechClass("Lancer Type.A", 1 , "p", "dark_grey", lancerPowerArmor, greatHelm, lancerPowerArmorLegs, [], "")
-test = C.MechClass("Test", 2 , "@", "yellow", godHull, godHelm, kikiLegs,[],"")
+lancer = C.MechClass("Lancer Type.A" , "p", "dark_grey", lancerPowerArmor, greatHelm, lancerPowerArmorLegs, [], "")
+test = C.MechClass("Test" , "@", "yellow", godHull, godHelm, kikiLegs,[],"")
