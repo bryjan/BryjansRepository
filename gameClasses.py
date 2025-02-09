@@ -21,7 +21,8 @@ class MatchInfo:
         self.border = TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
         self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 3, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
         self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig = 9999)
-        self.forest = TerrainType("forest", "t", "green", size= 2, moveCostBySize = [1,1,3,2,2,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 80)
+        self.forest = TerrainType("forest", "t", "green", size= 3, moveCostBySize = [1,1,3,3,2,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 100)
+        self.suburb = TerrainType("suburbs", "H", "light_grey", size= 3, moveCostBySize = [1,1,3,3,4,1,1], visualAbsorbtion = 20, radarAbsorbtion = 40, radarSig = 80)
         self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
 
     def spawnEntities(self):
@@ -74,6 +75,7 @@ class MatchInfo:
         self.forest.basicTileGen(self.map,"Normal")
         self.desert.basicTileGen(self.map,"Light")
         self.randomRoadGen(self.map,"Normal")
+        self.suburb.associationTileGen(self.map, "Normal", [self.road, self.suburb])
 
     def redefineBorders(self):
         for y in self.map:
@@ -214,6 +216,35 @@ class TerrainType:
                                 flipRoll = True
                                 numTerrain += 1
                         if flipRoll is True:
+                            if (random.randint(1 , 100) + numTerrain < neighborConversionChance):
+                                changeQueue.append(cell)
+                        for cell in changeQueue:
+                            cell.terrain = self
+                changeQueue=[]
+
+    def associationTileGen(self, map, density, associatedTerrainList): # Places a terrain tile next to an associated tile
+        densityList = ["None","Light","Normal","Thick"]
+        if density not in densityList:
+            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
+            return
+        else:
+            densityMult = densityList.index(density)
+            neighborConversionChance = 5 #out of 100
+            genLoops = densityMult
+
+            i = 0
+            while i < genLoops:
+                i+=1
+                changeQueue=[] #using a neighbors terrain to determine if you flip will cause a slant if you make changes during the loop
+                for y in map[2:len(map)-2]:
+                    for cell in y[2:len(y)-2]:
+                        flipRoll = False
+                        numTerrain = 0
+                        for n in cell.nList:
+                            if n.terrain in associatedTerrainList:
+                                flipRoll = True
+                                numTerrain += 1 # more neighbors of associated type = greater chance of flipping. makes tighter groups
+                        if flipRoll is True and cell.terrain not in associatedTerrainList:
                             if (random.randint(1 , 100) + numTerrain < neighborConversionChance):
                                 changeQueue.append(cell)
                         for cell in changeQueue:
@@ -365,13 +396,13 @@ class Entity: #a character on the map
         self.mp = int(self.mechClass.mpMax)
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
-        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .2 ))
+        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
 
         
         self.moveDirection = "none"
         self.flying = self.mechClass.initFlying
         self.baseRadarSig = self.mechClass.radarSig
-        self.radarSig = (self.baseRadarSig / (1 + (self.speed * .3 )))
+        self.radarSig = (self.baseRadarSig / (1 + (self.speed * .2 )))
 
         self.visibleCells = []
         self.radarIDlist = [] #items in form of [location, size, direction, speed, objectSymbol, ObjectName] level of radar power reveals more info
@@ -394,7 +425,7 @@ class Entity: #a character on the map
         calcList = [] #cells queued to be calced
         dontCalcList= [startingCell] #cells exempt from calcs
         if startingCell not in self.visibleCells:
-                    self.visibleCells.append(startingCell)
+            self.visibleCells.append(startingCell)
     
         for n in startingCell.nList:
             dontCalcList.append(n)

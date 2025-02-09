@@ -1,4 +1,4 @@
-#TODO inputs
+#TODO move movement under the entity object and make sure movement costs are applied correctly
 import gameClasses as c
 
 def recieveInput(matchInfo):
