@@ -15,7 +15,7 @@ playerSquad = C.Squad("Player Squad",[playermech, mech],"Combat",playerControlle
 playerTeam = C.Team("Player Team",[playerSquad])
 
 enemymech = C.Entity(MO.lancer,P.enemypilot)
-enemymech2 = C.Entity(MO.lancer,P.enemypilot2)
+enemymech2 = C.Entity(MO.test,P.enemypilot2)
 enemySquad = C.Squad("Enemy Squad",[enemymech,enemymech2],"Combat")
 enemies = C.Team("Enemy Team",[enemySquad])
 
