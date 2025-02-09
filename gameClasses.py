@@ -19,9 +19,9 @@ class MatchInfo:
 
         self.blank = TerrainType("blank", " ", "black", size= 0, moveCostBySize = [], visualAbsorbtion = 9999, radarAbsorbtion = 9999, fireproof = True, passable = False)
         self.border = TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
-        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
+        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 3, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
         self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig = 9999)
-        self.forest = TerrainType("forest", "t", "green", size= 2, moveCostBySize = [1,1,3,2,2,1,1], visualAbsorbtion = 5, radarAbsorbtion = 10, radarSig = 80)
+        self.forest = TerrainType("forest", "t", "green", size= 2, moveCostBySize = [1,1,3,2,2,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 80)
         self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
 
     def spawnEntities(self):
@@ -449,14 +449,13 @@ class Entity: #a character on the map
                         dontCalcList.append(n)
 
         for obj in matchInfo.entities: #passive radar and radar ID reports
+            if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
+                obj.passiveRadarDetect(matchInfo, self)
             if map[obj.pos[1]][obj.pos[0]].radarPower >= obj.radarSig:
                 if obj.team != self.team:
-                    if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
-                        self.passiveRadarDetect(matchInfo, self, obj)
-                           
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
 
-    def passiveRadarDetect(self, matchInfo,emittor):
+    def passiveRadarDetect(self, matchInfo, emittor):
         map = matchInfo.map
         repCritical = False
         emittorCell = map[emittor.pos[1]][emittor.pos[0]]
@@ -505,7 +504,7 @@ class Entity: #a character on the map
         targetName = f""
         speed = f""
         if radarPower >= target.radarSig * 2:
-            targetName = f" Identified as {target.name},"
+            targetName = f" Identified as {target.mechClass.name},"
             speed = f"Moving at {target.speed} units a turn."
     
         size = "Unkown"
@@ -519,25 +518,25 @@ class Entity: #a character on the map
 
         message = f"{size} sized object detected on radar!{targetName} At {target.pos} {moveDirection}. {speed}" #constructing message
     
-        self.report(matchInfo, matchInfo.pov, message, critical=True)
+        self.report(matchInfo, message, critical=True)
     
     def getVisuals(self, matchInfo):
         self.getVis(matchInfo)
         self.getRadar(matchInfo)
 
 
-    def report(self, matchInfo, mech, message, teamReport = False, critical = False): #TODO add messages to a report log
+    def report(self, matchInfo, message, teamReport = False, critical = False): #TODO add messages to a report log
         matchRound = matchInfo.matchRound
         critMessage = ""
         if critical == True:
             critMessage = "CRITICAL MESSAGE! | "
-        report = f"{critMessage}Round: {matchRound}  |  {mech.pilot.name}:  {message}"
-        for rep in mech.squad.reportLog:
+        report = f"{critMessage}Round: {matchRound}  |  {self.pilot.name}:  {message}"
+        for rep in self.squad.reportLog:
             if rep[0] == report:
                 return
-        mech.squad.reportLog.insert(0,[report, critical, False]) #[report, critical?, already display?]
+        self.squad.reportLog.insert(0,[report, critical, False]) #[report, critical?, already display?]
         if teamReport == True:
-            mech.team.reportLog.insert(0,[report, critical, False])
+            self.team.reportLog.insert(0,[report, critical, False])
 
     def criticalReports(matchInfo):
         mech = matchInfo.pov
@@ -632,7 +631,6 @@ class MechClass: #a constructed mech not a npc or player
         self.condition = self.limbsCondition / len(self.limbList)
         self.ap = int(self.apMax)
         self.mp = int(self.mpMax)
-        
         self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
         self.sizeStr = self.sizeStrList[self.size]
 
