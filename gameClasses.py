@@ -71,8 +71,8 @@ class MatchInfo:
                 cell.refNeighbors(self.map)
 
     def basicTileInit(self):
-        self.desert.basicTileGen(self.map,"Light")
         self.forest.basicTileGen(self.map,"Normal")
+        self.desert.basicTileGen(self.map,"Light")
         self.randomRoadGen(self.map,"Normal")
 
     def redefineBorders(self):
@@ -191,28 +191,30 @@ class TerrainType:
             print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
             return
         else:
-            densityMult= densityList.index(density)
-            seedingChance = 1 #out of 100
-            neighborConversionChance = 50 #out of 100
-            for y in map[1:len(map)-1]:
+            densityMult = densityList.index(density)
+            seedingChance = 3 #out of 1000
+            neighborConversionChance = 25 #out of 100
+            for y in map[1 : len(map) - 1]:
                 for cell in y[1:len(y)-1]: #to avoid flipping border tiles
-                    if (random.randint(1,100)<seedingChance*densityMult):
+                    if (random.randint(1, 1000) <= seedingChance * densityMult):
                         cell.terrain = self
             
-            genLoops=densityMult
+            genLoops = densityMult
 
-            i=0
+            i = 0
             while i < genLoops:
                 i+=1
                 changeQueue=[] #using a neighbors terrain to determine if you flip will cause a slant if you make changes during the loop
                 for y in map[2:len(map)-2]:
                     for cell in y[2:len(y)-2]:
-                        flipRoll= False
+                        flipRoll = False
+                        numTerrain = 0
                         for n in cell.nList:
                             if n.terrain == self:
-                                flipRoll= True
+                                flipRoll = True
+                                numTerrain += 1
                         if flipRoll is True:
-                            if ((random.randint(1,100)+(i*8))<neighborConversionChance):
+                            if (random.randint(1 , 100) + numTerrain < neighborConversionChance):
                                 changeQueue.append(cell)
                         for cell in changeQueue:
                             cell.terrain = self
@@ -418,9 +420,9 @@ class Entity: #a character on the map
     def getRadar(self, matchInfo):
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
-        if self.radarPower <= 0:
+        if self.radarPower <= 0 or self.radarPower <= startingCell.radarPower: #checks if entity has radar, and that it would reveals new info, if not returns.
             return
-   
+
         startingCell.radarPower = int(self.radarPower)
         self.radarIDlist.append(startingCell)
         startingCell.radarReturn = True
@@ -429,24 +431,28 @@ class Entity: #a character on the map
         dontCalcList = [startingCell] #cells exempt from calcs
     
         for n in startingCell.nList:
-            dontCalcList.append(n)
             calcList.append(n)
         
         for cell in calcList:
-            dontCalcList.append(cell)
-            closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
-            radarLoss = int(closestNeighbor.terrain.radarAbsorb) + round(math.dist(startingCell.pos, cell.pos))
-            cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
+            if cell not in dontCalcList:
+                #print("calcd: " + str(cell.pos) + " | prevPower: " + str(cell.radarPower), end = " newPower:") #test
+                dontCalcList.append(cell)
+                closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
+                radarLoss = int(closestNeighbor.terrain.radarAbsorb) + round(math.dist(startingCell.pos, cell.pos))
+                weakerRadar = True
+                if cell.radarPower < int(closestNeighbor.radarPower) - radarLoss:
+                    weakerRadar = False
+                    cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
+                    #print(cell.radarPower)#test
 
-            if cell.radarPower < 0:
-                cell.radarPower = 0
+                if cell.radarPower < 0:
+                    cell.radarPower = 0
 
-            if cell.radarPower > 0:
-                cell.radarReturn = True
-                for n in cell.nList:
-                    if (n not in dontCalcList):
-                        calcList.append(n)
-                        dontCalcList.append(n)
+                if cell.radarPower > 0 and weakerRadar == False:
+                    cell.radarReturn = True
+                    for n in cell.nList:
+                        if (n not in dontCalcList):
+                            calcList.append(n)
 
         for obj in matchInfo.entities: #passive radar and radar ID reports
             if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
@@ -462,14 +468,14 @@ class Entity: #a character on the map
 
         if self.team.name == emittor.team.name:
             return
-        if self.pos.radarPower == 0:
+        if map[self.pos[1]][self.pos[0]].radarPower == 0:
             return
         if self.mechClass.passiveRadar == False:
             return
     
-        strength = self.pos.radarPower
-        direction = self.pos.refClosestNeighborTo(emittorCell.pos)
-        direction = self.pos.nList.index(direction)
+        strength = map[self.pos[1]][self.pos[0]].radarPower
+        direction = map[self.pos[1]][self.pos[0]].refClosestNeighborTo(emittorCell.pos)
+        direction = map[self.pos[1]][self.pos[0]].nList.index(direction)
     
         if strength >= self.radarSig * 2:
             status = "identified"
@@ -497,7 +503,7 @@ class Entity: #a character on the map
         elif direction == 0:
             direction = "south east"
 
-        self.report(matchInfo, self,"Getting pinged from the "+ direction +". At " +str(strength) + " strength, I'm " + status +".", critical = repCritical)
+        self.report(matchInfo,"Getting pinged from the "+ direction +". At " +str(strength) + " strength, I'm " + status +".", critical = repCritical)
     
     def radarReport(self, matchInfo, radarPower, target):
     
@@ -653,95 +659,86 @@ class MechPart: # super class to mech limbs
     def __init__ (self, name, armor, hp, moduleList, desc = ""):
 
         self.desc= desc
-
         self.name = name
+        self.size = 0
 
-        self.bonusArmor = 0
+        self.moduleStatsDict = {
+    "bonus hp": 0,
+    "multi hp": 1,
+    "bonus armor": 0,
+    "multi armor": 1,
+    "bonus ap": 0,
+    "multi ap": 1,
+    "bonus mp": 0,
+    "multi mp": 1,
+    "bonus energy": 0, #Total stored power
+    "multi energy": 1,
+    "bonus energyGen": 0, #power returned every round
+    "multi energyGen": 1,
+
+    "shareData": False,
+    "bonus visPower": 0, #Higher means it can see further. common tiles absorb 2 visual strength per tile. so 20 visual power = ~10tile view
+    "multi visPower": 1,
+    "bonus radarPower": 0, #Higher means it can see/detect further. common tiles absorb 2 radar strength per tile. so 200 visual power = ~100tile view
+    "multi radarPower": 1,
+    "bonus radarSig" : 0, #Determines how high enemy radar needs to be to detect something is there
+    "multi radarSig" : 1,
+    "passiveRadar": False, #Mech will report incoming radar strength and directions
+    "canFloat": False,
+    "canFly": False,
+    "initFly": False,
+}
+        
+        self.modsList = moduleList.copy()
+        self.updateModules()
+
+        self.bonusArmor = self.moduleStatsDict["bonus armor"]
         self.baseArmor = armor
-        self.multiArmor = 1
+        self.multiArmor = self.moduleStatsDict["multi armor"]
         self.armor = armor
         self.armorCon = (armor) / ((self.baseArmor * self.multiArmor) + self.bonusArmor)
 
-        self.bonusHP = 0
+        self.bonusHP = self.moduleStatsDict["bonus hp"]
         self.baseHP = hp
-        self.multiHP = 1
+        self.multiHP = self.moduleStatsDict["multi hp"]
         self.hp = hp
 
-        self.condition = self.baseArmor
-
-        self.size = 0
-
         self.baseAP = 0
-        self.bonusAP = 0
-        self.multiAP = 1
+        self.bonusAP = self.moduleStatsDict["bonus ap"]
+        self.multiAP = self.moduleStatsDict["multi ap"]
 
         self.baseMP = 0
-        self.bonusMP = 0
-        self.multiMP = 1
+        self.bonusMP = self.moduleStatsDict["bonus mp"]
+        self.multiMP = self.moduleStatsDict["multi mp"]
 
         self.baseEnergy = 0
-        self.bonusEnergy = 0
-        self.multiEnergy = 1
+        self.bonusEnergy = self.moduleStatsDict["bonus energy"]
+        self.multiEnergy = self.moduleStatsDict["multi energy"]
 
         self.baseEnergyGen = 0
-        self.bonusEnergyGen = 0
-        self.multiEnergyGen = 1
+        self.bonusEnergyGen = self.moduleStatsDict["bonus energyGen"]
+        self.multiEnergyGen = self.moduleStatsDict["multi energyGen"]
 
         self.baseVisPower = 0
-        self.bonusVisPower = 0
-        self.multiVisPower = 1
+        self.bonusVisPower = self.moduleStatsDict["bonus visPower"]
+        self.multiVisPower = self.moduleStatsDict["multi visPower"]
 
         self.baseRadarSig = 0
-        self.bonusRadarSig = 0
-        self.multiRadarSig = 1
+        self.bonusRadarSig = self.moduleStatsDict["bonus radarSig"]
+        self.multiRadarSig = self.moduleStatsDict["multi radarSig"]
 
         self.baseRadarPower = 0
-        self.bonusRadarPower = 0
-        self.multiRadarPower = 1
+        self.bonusRadarPower = self.moduleStatsDict["bonus radarPower"]
+        self.multiRadarPower = self.moduleStatsDict["multi radarPower"]
+        
+        self.shareData = self.moduleStatsDict["shareData"]
+        self.passiveRadar = self.moduleStatsDict["passiveRadar"]
+        self.canFloat = self.moduleStatsDict["canFloat"]
+        self.canFly = self.moduleStatsDict["canFly"]
+        self.initFly = self.moduleStatsDict["initFly"]
 
-        self.shareData = False
-        self.passiveRadar = False
-        self.canFloat = False
-        self.canFly = False
-        self.initFly = False
-
-        self.moduleStatsDict = {
-    "hp": self.baseHP,
-    "bonus hp": self.bonusHP,
-    "multi hp": self.multiHP,
-    "armor": self.baseArmor,
-    "bonus armor": self.bonusArmor,
-    "multi armor": self.multiArmor,
-    "ap": self.baseAP,
-    "bonus ap": self.bonusAP,
-    "multi ap": self.bonusAP,
-    "mp": self.baseMP,
-    "bonus mp": self.bonusMP,
-    "multi mp": self.multiMP,
-    "energy": self.baseEnergy, #Total stored power
-    "bonus energy": self.bonusEnergy, #Total stored power
-    "multi energy": self.multiEnergy,
-    "energyGen": self.baseEnergyGen, #power returned every round
-    "bonus energyGen": self.bonusEnergyGen, #power returned every round
-    "multi energyGen": self.multiEnergyGen,
-
-    "shareData": self.shareData,
-    "visPower": self.baseVisPower, #Higher means it can see further. common tiles absorb 2 visual strength per tile. so 20 visual power = ~10tile view
-    "bonus visPower": self.bonusVisPower, #Higher means it can see further. common tiles absorb 2 visual strength per tile. so 20 visual power = ~10tile view
-    "multi visPower": self.multiVisPower,
-    "radarPower": self.baseRadarPower, #Higher means it can see/detect further. common tiles absorb 2 radar strength per tile. so 200 visual power = ~100tile view
-    "bonus radarPower": self.bonusRadarPower, #Higher means it can see/detect further. common tiles absorb 2 radar strength per tile. so 200 visual power = ~100tile view
-    "multi radarPower": self.multiRadarPower,
-    "radarSig" : self.baseRadarSig, #Determines how high enemy radar needs to be to detect something is there
-    "bonus radarSig" : self.bonusRadarSig, #Determines how high enemy radar needs to be to detect something is there
-    "multi radarSig" : self.multiRadarSig,
-    "passiveRadar": self.passiveRadar, #Mech will report incoming radar strength and directions
-    "canFloat": self.canFloat,
-    "canFly": self.canFly,
-}
-
-        self.modsList = moduleList.copy()
-        self.updateModules()
+        self.hp = (self.baseHP * self. multiHP) + self.bonusHP
+        self.armor = (self.baseArmor * self. multiArmor) + self.bonusArmor
 
         self.startingArmor = int((self.baseArmor * self.multiArmor) + self.bonusArmor)
         self.armorCon = self.armor / self.startingArmor
