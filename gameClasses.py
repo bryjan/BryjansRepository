@@ -28,6 +28,23 @@ class MatchInfo:
     def spawnEntities(self):
         pass #TODO
 
+    def nextSquadTurn(self):
+        teamIndex = self.teamList.index(self.pov.team)
+        squadIndex = self.pov.team.squadsList.index(self.pov.squad)
+    
+        if squadIndex + 1 > len(self.pov.team.squadsList) - 1:
+            
+            nextSquadIndex = 0
+            nextTeamIndex = teamIndex + 1
+
+            if teamIndex + 1 > len(self.teamList) - 1:
+                
+                nextTeamIndex = 0
+            
+    
+        self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].squadList[0]
+        self.advTurn = True
+
     def nextMechinTeam(self):
         nextMechIndex = self.pov.squad.squadList.index(self.pov) + 1
     
@@ -412,6 +429,96 @@ class Entity: #a character on the map
     def __repr__(self):
         return self.pilot.name
     
+    def moveMech(self, matchInfo, input):
+        map = matchInfo.map
+        targetCell = matchInfo.map[self.pos[0]][self.pos[1]] #just to initialize to avoid error
+
+        if self.ap == 0 or self.mp == 0 or self.energy == 0:
+            print("You don't have the ability to move anymore this turn.")
+            matchInfo.advTurn = False
+            return
+    
+        match input:
+
+            case "q":
+                targetPos = [self.pos[0]-1, self.pos[1]+1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "w":
+                targetPos = [self.pos[0], self.pos[1]+1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "e":
+                targetPos = [self.pos[0]+1, self.pos[1]+1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "a":
+                targetPos = [self.pos[0]-1, self.pos[1]]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "s":
+                targetPos = [self.pos[0], self.pos[1]-1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "d":
+                targetPos = [self.pos[0] + 1, self.pos[1]]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "z":
+                targetPos = [self.pos[0] - 1, self.pos[1]-1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case "c":
+                targetPos = [self.pos[0] + 1, self.pos[1]-1]
+                targetCell = map[targetPos[1]][targetPos[0]]
+                moveCost = targetCell.terrain.moveCost[self.size]
+
+            case _:
+                print("Not a valid movement input.")
+                return
+
+        #checks for viability
+        if moveCost > self.energy:
+            print("Not enough energy to pass over this terrain.")
+
+        if targetCell.terrain.passable == False: #checks if it's passable terrain
+            print("This cell's terrain is impassable.")
+            return
+    
+        for obj in matchInfo.entities: #checks for other objects
+            if obj.pos == targetPos:
+                print("Something is in your way.")
+                return
+        
+        if self.energy < moveCost: #checks energy cost
+            name = targetCell.terrain.name
+            print(f"You don't have enough energy to travel over {name}, you need {moveCost}.")
+            return
+        
+        if self.flying == True: #checks for if their is enough energy to fly
+            flyMoveCost = self.size
+            if self.energy < flyMoveCost:
+                print(f"You need {moveCost} Energy to fly.")
+                return
+
+        if targetCell.terrain.requireFloat == True and self.float == False and self.flying == False: #checks for float conditions then flying
+            print("Your mech can't travel over water.")
+            return
+    
+        self.energy = int(self.energy - moveCost) #applies costs
+        self.ap -= 1
+        self.mp = int(self.mp - 1) 
+        self.pos = list(targetPos)
+        self.speed += 1
+        matchInfo.advTurn = True
+    
     def getVis(self, matchInfo):
         startingCell = matchInfo.map[self.pos[1]][self.pos[0]]
         startingCell.canSee = True
@@ -540,6 +647,8 @@ class Entity: #a character on the map
     
         targetName = f""
         speed = f""
+        moveDirection = f""
+
         if radarPower >= target.radarSig * 2:
             targetName = f" Identified as {target.mechClass.name},"
             speed = f"Moving at {target.speed} units a turn."

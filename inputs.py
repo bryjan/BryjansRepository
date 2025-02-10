@@ -1,5 +1,3 @@
-#TODO move movement under the entity object and make sure movement costs are applied correctly
-import gameClasses as c
 
 def recieveInput(matchInfo):
 
@@ -17,16 +15,25 @@ def recieveInput(matchInfo):
     
         case "?":
             return helpCommand(matchInfo)
+        
         case "rep":
             return printReportLogPrompt(matchInfo)
+        
         case "rep1":
             return printReportLog(matchInfo)
+        
         case "next" | "Next" | "NEXT":
-            return nextMech(matchInfo)
+            return matchInfo.nextMechinTeam()
+        
         case "q" | "w" | "e" | "a" | "s" | "d" | "z" | "c":
-            return moveMech(matchInfo, playerInput)
+            return matchInfo.pov.moveMech(matchInfo, playerInput)
+        
         case "r":
             return printUnreads(matchInfo)
+        
+        case "end" | "End":
+            return matchInfo.nextSquadTurn()
+
         case _:
             print("Input not recognized. Try again.")
             return
@@ -82,94 +89,4 @@ def helpCommand(matchInfo):
     print ("Type 'r' to see your team's unread reports, 'rep' will prompt you for page number for full the report log")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
-    
-def moveMech(matchInfo, input):
-    map = matchInfo.map
-    mech = matchInfo.pov
-    targetCell = matchInfo.map[mech.pos[0]][mech.pos[1]] #just to initialize to avoid error
-
-    if mech.ap == 0 or mech.mp == 0 or mech.energy == 0:
-        print("You don't have the ability to move anymore this turn.")
-        matchInfo.advTurn = False
-        return
-    
-    match input:
-
-        case "q":
-            targetPos = [mech.pos[0]-1,mech.pos[1]+1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "w":
-            targetPos = [mech.pos[0],mech.pos[1]+1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "e":
-            targetPos = [mech.pos[0]+1,mech.pos[1]+1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "a":
-            targetPos = [mech.pos[0]-1,mech.pos[1]]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "s":
-            targetPos = [mech.pos[0],mech.pos[1]-1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "d":
-            targetPos = [mech.pos[0]+1,mech.pos[1]]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "z":
-            targetPos = [mech.pos[0]-1,mech.pos[1]-1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-
-        case "c":
-            targetPos = [mech.pos[0]+1,mech.pos[1]-1]
-            targetCell = map[targetPos[1]][targetPos[0]]
-            moveCost = targetCell.terrain.moveCost[mech.size]
-        case _:
-            print("Not a valid movement input.")
-            return
-
-    #checks for viability
-
-    if targetCell.terrain.passable == False: #checks if it's passable terrain
-        print("This cell's terrain is impassable.")
-        return
-    
-    for obj in matchInfo.entities: #checks for other objects
-        if obj.pos == targetPos:
-            print("Something is in your way.")
-            return
-        
-    if mech.energy < moveCost: #checks energy cost
-        name = targetCell.terrain.name
-        print(f"You don't have enough energy to travel over {name}, you need {moveCost}.")
-        return
-        
-    if mech.flying == True: #checks for if their is enough energy to fly
-        flyMoveCost = mech.size
-        if mech.energy < flyMoveCost:
-            print(f"You need {moveCost} Energy to fly.")
-            return
-
-    if targetCell.terrain.requireFloat == True and mech.float == False and mech.flying == False: #checks for float conditions then flying
-        print("Your mech can't travel over water.")
-        return
-    
-    mech.energy = int(mech.energy - moveCost)
-    mech.ap -= 1
-    mech.mp = int(mech.mp-moveCost) #applies costs
-    mech.pos = list(targetPos)
-    mech.speed += 1
-    matchInfo.advTurn = True
-    
-        
 
