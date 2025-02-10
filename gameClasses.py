@@ -899,6 +899,35 @@ class MechPart: # super class to mech limbs
             if m.modType == 3:
                 self.moduleStatsDict[m.statKey] = m.statList[m.status]
 
+    def damage(self, dmgAmount, armorPiercing = False, armorDamage = 0):
+        
+        dmg = dmgAmount
+        if armorPiercing == False:
+            dmg = dmg - self.armor
+            if dmg < 0:
+                return
+        else:
+            dmg = dmg - (self.armor / 3)
+            if dmg < 0:
+                return
+            
+        armorPiercing = armorPiercing
+        armorDamage = armorDamage
+
+        self.hp = self.hp - dmg
+        self.armor = self.armor - armorDamage
+        if self.armor < 0:
+            self.armor = 0
+
+        if random.randint(0, self.hp) + dmgAmount > self.hp:
+            self.critical()
+
+    def critical (self):
+        dmgdMod = random.choice(self.modsList)
+        while dmgdMod.status == 0:
+            dmgdMod = random.choice(self.modsList)
+
+        dmgdMod.damage()
             
 
 class Legs(MechPart): #subclass mechpart
