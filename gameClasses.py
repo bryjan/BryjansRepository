@@ -62,6 +62,77 @@ class MatchInfo:
                 x.radarReturn = False
                 x.radarPower = 0
 
+    def explosion(self, location, radius, size, damage): #spawns explosions. for rockets/artillery
+        
+        pos = location #[x , y]
+        radius = radius #radius of explosion
+        size = size
+        dmg = damage
+
+        #calc effected entities
+        affectedEntities = []
+        for entity in self.entities:
+            if math.dist(pos, entity.pos) <= radius:
+                affectedEntities.append(entity)
+
+        #calc affected limbs by size difference between explosion and mech
+        calcList = []
+        affectedLimbs = 3
+        for entity in affectedEntities:
+            sizeDif = size - entity.size
+            calcList.append(entity, affectedLimbs + sizeDif)
+
+        #calc dmg
+        for entry in calcList:
+            while entry[1] > 0:
+                entry[0].damage("explosion")
+
+
+        #TODO chance to start fire
+
+    def calcLine(self, point1, point2):
+
+        x1, y1 = point1
+        x2, y2 = point2
+
+        slope = (y1 - y2) / (x1 - x2)
+        yIntercept = y1 - (slope * x1)
+
+        return [slope, yIntercept]
+
+    def ListInterceptingSquares(self, point1, point2):
+
+        interceptingCells = []
+        
+        if point1[0] == point2[0]:
+
+            for i in range(min(point1[1], point2[1]), max(point1[1], point2[1]) + 1):
+                interceptingCells.append(self.map[i][point1[0]])
+    
+            return interceptingCells
+
+        if point1[1] == point2[1]:
+
+            for i in range(min(point1[0], point2[0]), max(point1[0], point2[0]) + 1):
+                interceptingCells.append(self.map[point1[1]][i])
+
+            return interceptingCells
+
+        slope, intercept = self.calcLine(point1, point2)
+
+        if abs(slope) <= 1:
+            for i in range(min(point1[0], point2[0]), max(point1[0], point2[0]) + 1):
+                y = round((slope * i) + intercept)
+                interceptingCells.append(self.map[i][y])
+            return interceptingCells
+
+        elif abs(slope) > 1:
+            for i in range(min(point1[1], point2[1]), max(point1[1], point2[1]) + 1):
+                x = round((i - intercept) / slope)
+                interceptingCells.append(self.map[x][i])
+            return interceptingCells
+
+
     def mapInit(self): # runs all map init functions
         self.mapinitPop()
         self.basicTileInit()
@@ -120,16 +191,12 @@ class MatchInfo:
             activeCell = random.choice(activeCell.refPerpendicularNeigbors(targetCell.pos))
 
     def createStraightRoad(self, map, target1Pos, target2Pos): #makes a road between two points, with slight deviations
-        activeCell = map[target1Pos[1]][target1Pos[0]]
-        targetCell = map[target2Pos[1]][target2Pos[0]]
-        targetCell.terrain = self.road
-        activeCell.terrain = self.road
+        
+        roadList = self.ListInterceptingSquares(target1Pos, target2Pos)
 
-        while activeCell.pos != targetCell.pos and activeCell.pos[0] > 2 and activeCell.pos[0] < len(map)-2 and activeCell.pos[1] > 2 and activeCell.pos[1] < len(map)-2:
-            activeCell.terrain = self.road
-            activeCell = activeCell.refClosestNeighborTo(targetCell.pos)
-        if type(activeCell) == type(""): #for now idk why it keeps grabbing border tiles even after adding boundries
-            return
+        for cell in roadList:
+            cell.terrain = self.road
+        return
         
     def createHighway(self, map, target1Pos, target2Pos, AdjTarget1Pos = [], AdjTarget2Pos = []):
         
@@ -147,6 +214,7 @@ class MatchInfo:
         self.createStraightRoad(map,nextStartPos,nextEndPos)
 
     def randomRoadGen(self, map, density): #["None","Light","Normal","Thick"]
+        
         densityList=["None","Light","Normal","Thick"]
         if density not in densityList:
             print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
@@ -242,7 +310,7 @@ class TerrainType:
     def associationTileGen(self, map, density, associatedTerrainList): # Places a terrain tile next to an associated tile
         densityList = ["None","Light","Normal","Thick"]
         if density not in densityList:
-            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
+            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal', and 'Thick'")
             return
         else:
             densityMult = densityList.index(density)
@@ -400,7 +468,9 @@ class Entity: #a character on the map
     def __init__(self, mechClass, pilot):
         self.mechClass = copy.deepcopy(mechClass)
         self.pilot = copy.deepcopy(pilot) #a unique name, seperate from the name of the mech in the stats dictionary. eventually should be an object that levels up and adds perks
-        
+        for limb in self.mechClass.limbList:
+            limb.mech = self    
+
         self.name = self.pilot.name
         self.squad = ""
         self.team = ""
@@ -710,7 +780,7 @@ class Pilot:
 
 
 class MechClass: #a constructed mech not a npc or player
-    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=[], description =""):
+    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist = [], description = ""):
 
         #basic details
         self.name = name
@@ -725,6 +795,9 @@ class MechClass: #a constructed mech not a npc or player
         self.limbList = [self.legs, self.hull]
         for limb in limblist:
             self.limbList.append(limb)
+            limb.mechClass = self
+
+        self.mech = ""
         self.limbList.append(self.helm)
 
         #initialize limb passed stats
@@ -801,6 +874,7 @@ class MechPart: # super class to mech limbs
         self.desc= desc
         self.name = name
         self.size = 0
+        self.mechClass = ""
 
         self.moduleStatsDict = {
     "bonus hp": 0,
@@ -899,8 +973,9 @@ class MechPart: # super class to mech limbs
             if m.modType == 3:
                 self.moduleStatsDict[m.statKey] = m.statList[m.status]
 
-    def damage(self, dmgAmount, armorPiercing = False, armorDamage = 0):
+    def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
         
+        dmgSource = f"" + damageSource
         dmg = dmgAmount
         if armorPiercing == False:
             dmg = dmg - self.armor
@@ -920,13 +995,16 @@ class MechPart: # super class to mech limbs
             self.armor = 0
 
         if random.randint(0, self.hp) + dmgAmount > self.hp:
-            self.critical()
+            self.critical(matchInfo)
 
-    def critical (self):
+        self.mech.report(matchInfo, "I was hit by a " + dmgSource + "!", teamReport = False, critical = False)
+
+    def critical (self, matchInfo):
         dmgdMod = random.choice(self.modsList)
         while dmgdMod.status == 0:
             dmgdMod = random.choice(self.modsList)
 
+        self.mech.report(matchInfo, dmgdMod.name + " was damaged!", teamReport = False, critical = False)
         dmgdMod.damage()
             
 
