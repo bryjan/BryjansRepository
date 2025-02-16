@@ -33,16 +33,18 @@ class MatchInfo:
         squadIndex = self.pov.team.squadsList.index(self.pov.squad)
     
         if squadIndex + 1 > len(self.pov.team.squadsList) - 1:
-            
+            self.clearVisuals()
             nextSquadIndex = 0
             nextTeamIndex = teamIndex + 1
 
-            if teamIndex + 1 > len(self.teamList) - 1:
-                
+            if teamIndex + 1 > len(self.teamList) - 1: #start of new round
+                self.matchRound += 1
+                #TODO refresh round stats
                 nextTeamIndex = 0
             
     
         self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].squadList[0]
+        self.pov.squad.squadView(self)
         self.advTurn = True
 
     def nextMechinTeam(self):
@@ -62,6 +64,8 @@ class MatchInfo:
                 x.radarReturn = False
                 x.radarPower = 0
 
+    
+    
     def explosion(self, location, radius, size, damage): #spawns explosions. for rockets/artillery
         
         pos = location #[x , y]
@@ -460,6 +464,7 @@ class Cell:
             return
         else:
             print(" ", end = " ")
+            return
     
     def roundRefresh(self): #TODO reset stats that refresh every round ex)radar and visual strength, radar sources then counting down cell effects
         pass
@@ -664,7 +669,8 @@ class Entity: #a character on the map
 
         for obj in matchInfo.entities: #passive radar and radar ID reports
             if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
-                obj.passiveRadarDetect(matchInfo, self)
+                if obj.team != self.team:
+                    obj.passiveRadarDetect(matchInfo, self)
             if map[obj.pos[1]][obj.pos[0]].radarPower >= obj.radarSig:
                 if obj.team != self.team:
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
@@ -676,7 +682,7 @@ class Entity: #a character on the map
 
         if self.team.name == emittor.team.name:
             return
-        if map[self.pos[1]][self.pos[0]].radarPower == 0:
+        if map[self.pos[1]][self.pos[0]].radarPower < 25:
             return
         if self.mechClass.passiveRadar == False:
             return
@@ -711,7 +717,7 @@ class Entity: #a character on the map
         elif direction == 0:
             direction = "south east"
 
-        self.report(matchInfo,"Getting pinged from the "+ direction +". At " +str(strength) + " strength, I'm " + status +".", critical = repCritical)
+        return self.report(matchInfo,"Getting pinged from the " + direction + ". At " + str(strength) + " strength, I'm " + status +".", critical = repCritical)
     
     def radarReport(self, matchInfo, radarPower, target):
     
