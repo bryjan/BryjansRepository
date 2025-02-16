@@ -1,3 +1,4 @@
+import printView as pv
 
 def recieveInput(matchInfo):
 
@@ -33,6 +34,9 @@ def recieveInput(matchInfo):
         
         case "end" | "End":
             return matchInfo.nextSquadTurn()
+            
+        case "look" | "l":
+            return pv.lookAt(matchInfo)
 
         case _:
             print("Input not recognized. Try again.")
