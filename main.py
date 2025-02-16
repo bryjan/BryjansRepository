@@ -10,7 +10,7 @@ game = True
 
 
 playermech= C.Entity(MO.test,P.testpilot)
-mech= C.Entity(MO.test,P.testpilot2)
+mech= C.Entity(MO.lancer,P.testpilot2)
 playerSquad = C.Squad("Player Squad",[playermech, mech],"Combat",playerControlled= True)
 playerTeam = C.Team("Player Team",[playerSquad])
 
@@ -26,7 +26,7 @@ while game is True:
     match = True
     matchInfo.mapInit()
 
-    for team in  matchInfo.teamList:
+    for team in  matchInfo.teamList: 
         for squad in team.squadsList:
             if squad.playerControlled == True:
                 matchInfo.playerSquad = squad
@@ -34,19 +34,21 @@ while game is True:
                 matchInfo.entities.append(mech)
             squad.spawnSquad(matchInfo.map,[r.randint(1,len(matchInfo.map)-1), r.randint(1,len(matchInfo.map)-1)])
             
-            
 
     while match is True:
         round = True
-        for mech in matchInfo.entities: #apply sensor data for all objects and refresh round based stats
-            mech.getVisuals(matchInfo) 
-        matchInfo.clearVisuals()
-        
-        while round is True:
-            matchInfo.pov = matchInfo.playerSquad.squadList[0]
-            matchInfo.pov.squad.squadView(matchInfo) #apply sensor data for all objects and refresh round based stats
+        for team in  matchInfo.teamList:
+            for squad in team.squadsList: #apply sensor data for all objects
+                if squad.playerControlled != True:
+                    squad.squadView(matchInfo)
+                    matchInfo.clearVisuals()
+        matchInfo.pov = matchInfo.playerSquad.squadList[0]
+        matchInfo.pov.squad.squadView(matchInfo)
+        while round == True:
+            
             action = False
             while action is False:
+                
                 matchInfo.pov.getVisuals(matchInfo)
                 ph.displayHUD(matchInfo)
                 pv.printPOV(matchInfo, matchInfo.pov.pos[0], matchInfo.pov.pos[1])
@@ -56,6 +58,5 @@ while game is True:
                     ph.displayHUD(matchInfo)
                     pv.printPOV(matchInfo, matchInfo.pov.pos[0], matchInfo.pov.pos[1])
                     pi.recieveInput(matchInfo)
-            #enemies turn
 
     print("Game Over")
