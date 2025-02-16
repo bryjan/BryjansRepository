@@ -1,5 +1,6 @@
 import gameClasses as C
 import termcolor
+import printHUD as ph
 
 def printPOV(matchInfo, povX, povY):
 
@@ -42,3 +43,12 @@ def printPOV(matchInfo, povX, povY):
                  print(" ", end = " ")
         print()
     return
+    
+def lookAt(matchInfo): #TODO parse text to make input smoother
+    
+    x = int(input("View coordinates X: "))
+    y = int(input("View coordinates Y: "))
+    ph.displayHUD(matchInfo)
+    printPOV(matchInfo, x, y)
+        
+    return input("Press enter to return")
