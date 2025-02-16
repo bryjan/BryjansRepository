@@ -1,4 +1,5 @@
 import math
+import functions as f
 import copy
 import random
 from termcolor import colored, cprint #print(colored(string, color as string),attrs=[bold,dark,underline,blink,reverse,concealed],end='')
@@ -43,17 +44,17 @@ class MatchInfo:
                 nextTeamIndex = 0
             
     
-        self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].squadList[0]
-        self.pov.squad.squadView(self)
+        self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
+        self.pov.squad.roundRefresh(self)
         self.advTurn = True
 
     def nextMechinTeam(self):
-        nextMechIndex = self.pov.squad.squadList.index(self.pov) + 1
+        nextMechIndex = self.pov.squad.mechList.index(self.pov) + 1
     
-        if nextMechIndex > len(self.pov.squad.squadList)-1:
+        if nextMechIndex > len(self.pov.squad.mechList)-1:
             nextMechIndex = 0
     
-        self.pov = self.pov.squad.squadList[nextMechIndex]
+        self.pov = self.pov.squad.mechList[nextMechIndex]
         self.advTurn = False
 
     def clearVisuals(self):
@@ -490,19 +491,43 @@ class Entity: #a character on the map
         self.visPower = self.mechClass.visPower
         self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
 
-        
-        self.moveDirection = "none"
+        self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
         self.baseRadarSig = self.mechClass.radarSig
         self.radarSig = (self.baseRadarSig / (1 + (self.speed * .2 )))
 
         self.visibleCells = []
         self.radarIDlist = [] #items in form of [location, size, direction, speed, objectSymbol, ObjectName] level of radar power reveals more info
-        self.radarReturn = [self.pos, self.mechClass.size, self.moveDirection, self.speed, self.mechClass.symbol, self.mechClass.name]
+
+        #ai flags
+        self.travelSpeed = max(self.mechClass.apMax, self.mechClass.mpMax)
+        self.needrest = False
   
 
     def __repr__(self):
         return self.pilot.name
+    
+    def roundRefresh(self, matchInfo):
+
+        #basic stats
+        self.turnStartPos = list(self.pos)
+        self.speed = 0
+
+        self.ap = int(self.mechClass.apMax)
+        self.mp = int(self.mechClass.mpMax)
+
+        self.energy += self.mechClass.energyGen
+        if self.energy > self.mechClass.energyMax:
+            self.energy = int(self.mechClass.energyMax)
+
+        #get visuals
+        self.getVisuals(matchInfo)
+
+        #ai flags calc
+        if self.ap == 0 or self.mp == 0 or self.energy <= (self.mechClass.energyMax * .4):
+            self.needrest = True
+
+
     
     def moveMech(self, matchInfo, input):
         map = matchInfo.map
@@ -633,7 +658,7 @@ class Entity: #a character on the map
     def getRadar(self, matchInfo):
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
-        if self.radarPower <= 0 or self.radarPower <= startingCell.radarPower: #checks if entity has radar, and that it would reveals new info, if not returns.
+        if self.radarPower <= 0: #checks if entity has radar.
             return
 
         startingCell.radarPower = int(self.radarPower)
@@ -652,16 +677,13 @@ class Entity: #a character on the map
                 dontCalcList.append(cell)
                 closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
                 radarLoss = int(closestNeighbor.terrain.radarAbsorb) + round(math.dist(startingCell.pos, cell.pos))
-                weakerRadar = True
-                if cell.radarPower < int(closestNeighbor.radarPower) - radarLoss:
-                    weakerRadar = False
-                    cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
-                    #print(cell.radarPower)#test
+                cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
+                #print(cell.radarPower)#test
 
                 if cell.radarPower < 0:
                     cell.radarPower = 0
 
-                if cell.radarPower > 0 and weakerRadar == False:
+                if cell.radarPower > 0:
                     cell.radarReturn = True
                     for n in cell.nList:
                         if (n not in dontCalcList):
@@ -679,18 +701,17 @@ class Entity: #a character on the map
         map = matchInfo.map
         repCritical = False
         emittorCell = map[emittor.pos[1]][emittor.pos[0]]
+        direction = f.neswDirection(self.pos, emittorCell.pos)
 
         if self.team.name == emittor.team.name:
             return
-        if map[self.pos[1]][self.pos[0]].radarPower < 25:
+        if map[self.pos[1]][self.pos[0]].radarPower < 50:
             return
         if self.mechClass.passiveRadar == False:
             return
     
         strength = map[self.pos[1]][self.pos[0]].radarPower
-        direction = map[self.pos[1]][self.pos[0]].refClosestNeighborTo(emittorCell.pos)
-        direction = map[self.pos[1]][self.pos[0]].nList.index(direction)
-    
+
         if strength >= self.radarSig * 2:
             status = "identified"
             repCritical = True
@@ -699,48 +720,37 @@ class Entity: #a character on the map
             repCritical = True
         else:
             status = "undetected"
-    
-        if direction == 7:
-            direction = "north west"
-        elif direction == 6:
-            direction = "north"
-        elif direction == 5:
-            direction = "north east"
-        elif direction == 4:
-            direction = "west"
-        elif direction == 3:
-            direction = "east"
-        elif direction == 2:
-            direction = "sout west"
-        elif direction == 1:
-            direction = "south"
-        elif direction == 0:
-            direction = "south east"
 
-        return self.report(matchInfo,"Getting pinged from the " + direction + ". At " + str(strength) + " strength, I'm " + status +".", critical = repCritical)
+        return self.report(matchInfo,"Getting pinged from the " + direction + ". At " + str(strength) + " strength, I'm " + status + ".", critical = repCritical)
     
     def radarReport(self, matchInfo, radarPower, target):
+
+        if radarPower < target.radarSig:
+            return
     
         targetName = f""
         speed = f""
         moveDirection = f""
+        size = "Unkown"
+
+        if target.speed == 0:
+            moveDirection = f", not moving"
+        else:
+            moveDir = f.neswDirection(target.turnStartPos, target.pos)
+            moveDirection = f", moving {moveDir}"
 
         if radarPower >= target.radarSig * 2:
             targetName = f" Identified as {target.mechClass.name},"
-            speed = f"Moving at {target.speed} units a turn."
+            speed = f" Moving at {target.speed} units a turn."
     
-        size = "Unkown"
         if radarPower >= target.radarSig * 1.5:
             size = target.sizeStr.capitalize()
             if target.speed == 0:
-                moveDirection = f"not moving"
-        else:
-            moveDir = target.moveDirection
-            moveDirection = f"moving {moveDir}"
-
-        message = f"{size} sized object detected on radar!{targetName} At {target.pos} {moveDirection}. {speed}" #constructing message
+                moveDirection = f", not moving"
+            
+        message = f"{size} sized object detected on radar!{targetName} At {target.pos}{moveDirection}.{speed}" #constructing message
     
-        self.report(matchInfo, message, critical=True)
+        self.report(matchInfo, message, critical = True)
     
     def getVisuals(self, matchInfo):
         self.getVis(matchInfo)
@@ -751,8 +761,8 @@ class Entity: #a character on the map
         matchRound = matchInfo.matchRound
         critMessage = ""
         if critical == True:
-            critMessage = "CRITICAL MESSAGE! | "
-        report = f"{critMessage}Round: {matchRound}  |  {self.pilot.name}:  {message}"
+            critMessage = "CRITICAL MESSAGE!| "
+        report = f"{critMessage}Round: {matchRound} |  {self.pilot.name}: {message}"
         for rep in self.squad.reportLog:
             if rep[0] == report:
                 return
@@ -967,9 +977,6 @@ class MechPart: # super class to mech limbs
 
         self.limbCon = (self.armorCon * .3) + (self.hpCon * .7)
 
-    def roundRefresh(self):
-        pass
-
     def updateModules(self):
         for m in self.modsList:
             if m.modType == 1:
@@ -1075,7 +1082,9 @@ class Module: #supposed to be superclass but couldn't figure it out
 class Squad:
     def __init__(self, squadName, squadList, squadRole, playerControlled = False):
         self.name = squadName 
-        self.squadList = squadList #in order of command
+        self.mechList = squadList #in order of command
+        self.squadLead = self.mechList[0]
+
         self.role = squadRole
         self.playerControlled = playerControlled
         self.macroObjective = ""
@@ -1086,24 +1095,29 @@ class Squad:
         self.effectiveness = 100
         self.reportLog = []
 
-        for mech in self.squadList:
+        for mech in self.mechList:
             mech.squad = self
 
+    def roundRefresh(self, matchInfo):
+        matchInfo.clearVisuals()
+        for entity in self.mechList:
+            entity.roundRefresh(matchInfo)
+    
     def squadView(self, matchInfo):
-        for entity in self.squadList:
+        for entity in self.mechList:
             entity.getVisuals(matchInfo)
 
 
     def calcEffectiveness(self):
         status = 0
-        for mech in self.squadList:
+        for mech in self.mechList:
             status += (mech.condition)
 
-        self.effectiveness = (status/len(self.squadList))*100
+        self.effectiveness = (status/len(self.mechList))*100
 
     def spawnSquad(self, map, spawnPosition):
 
-        mechs = self.squadList
+        mechs = self.mechList
         
         xMinPos = int(spawnPosition[0]-2) #creating a starting range of 5x5 that a mech could spawn
         while  xMinPos < 1:
@@ -1154,5 +1168,5 @@ class Team:
 
         for squads in self.squadsList:
             squads.team = self.name
-            for mech in squads.squadList:
+            for mech in squads.mechList:
                 mech.team = self

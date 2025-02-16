@@ -30,7 +30,7 @@ while game is True:
         for squad in team.squadsList:
             if squad.playerControlled == True:
                 matchInfo.playerSquad = squad
-            for mech in squad.squadList:
+            for mech in squad.mechList:
                 matchInfo.entities.append(mech)
             squad.spawnSquad(matchInfo.map,[r.randint(1,len(matchInfo.map)-1), r.randint(1,len(matchInfo.map)-1)])
             
@@ -40,10 +40,9 @@ while game is True:
         for team in  matchInfo.teamList:
             for squad in team.squadsList: #apply sensor data for all objects
                 if squad.playerControlled != True:
-                    squad.squadView(matchInfo)
-                    matchInfo.clearVisuals()
-        matchInfo.pov = matchInfo.playerSquad.squadList[0]
-        matchInfo.pov.squad.squadView(matchInfo)
+                    squad.roundRefresh(matchInfo)
+        matchInfo.pov = matchInfo.playerSquad.mechList[0] #end on player squad as they go first
+        matchInfo.pov.squad.roundRefresh(matchInfo)
         while round == True:
             
             action = False
