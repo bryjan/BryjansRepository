@@ -1,4 +1,5 @@
 import printView as pv
+import functions as f
 
 def recieveInput(matchInfo):
 
@@ -37,11 +38,93 @@ def recieveInput(matchInfo):
             
         case "look" | "l":
             return pv.lookAt(matchInfo)
+        
+        case "fire" | "Fire":
+            return gunMenu(matchInfo)
+        
+        case "f" | "F":
+            return fire(matchInfo)
 
         case _:
             print("Input not recognized. Try again.")
             return
     
+
+def fire(matchInfo):
+    mech = matchInfo.pov
+    gunList = mech.mechClass.gunList
+    for limb in gunList:
+        if limb.defaultGun == True:
+            gun = limb
+
+    if len(gunList) == 0:
+        print("You have no weapons.")
+        return
+    targetPos = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at") #TODO give option to cancel
+    gun.shootAt(matchInfo, targetPos)
+
+def gunMenu(matchInfo): #TODO add ability to exit
+
+    mech = matchInfo.pov
+    gunList = mech.mechClass.gunList
+
+    if len(gunList) == 1:
+        gunList[0].defaultGun = True
+        print(gunList[0].printShortDesc())
+        print("You only have one weapon availble to (f)ire. It is set to your default weapon.")
+        return
+    elif len(gunList) == 0:
+        print("You have no weapons.")
+        return
+
+
+    menuWidth = 0
+    for limb in gunList:
+        limb.defaultGun = False
+        if len(limb.printShortDesc()) > menuWidth:
+            menuWidth = len(limb.printShortDesc())
+    menuWidth += 4
+    
+    menuDivider = ""
+    i = 1
+    while i <= menuWidth:
+        i+=1
+        menuDivider = f"{menuDivider}-" 
+
+    print("Select a weapon to (f)ire by default.")
+    for limb in gunList:
+        print(menuDivider)
+        print(f"{limb.printShortDesc()} | {gunList.index(limb) + 1}")
+    print(menuDivider)
+
+    #get default gun choice from menu
+    #TODO add ability to pull a weapon's long description
+    playerInput = ""
+    playerInput = input("Choose default gun: ")
+    while len(playerInput) == 0:
+        playerInput = input("Choose default gun: ")
+        print()
+
+    if playerInput[0] == " ": #cleans up input from accidental spaces
+        playerInput.pop(0)
+    if playerInput[:-0] == " ":
+        playerInput.pop(len(playerInput)-1)
+
+    try:
+        playerInput = int(playerInput)
+    except:
+        print("Please enter an integer.")
+        gunMenu(matchInfo)
+
+    if int(playerInput) < 0 or int(playerInput) > len(gunList) + 1:
+        print("Please enter an integer listed in the menu.")
+        gunMenu(matchInfo)
+    else:
+        gunList[playerInput - 1].defaultGun = True
+        print(f"{gunList[playerInput].name} set to (f)ire by default")
+        return
+
+
 def nextMech(matchInfo):
     matchInfo.nextMechinTeam()
 
@@ -87,7 +170,7 @@ def printUnreads(matchInfo):
             return
     print()
 
-def helpCommand(matchInfo):
+def helpCommand(matchInfo): #TODO update with all commands
     print ("Here are the list of commands available to you:")
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to see your team's unread reports, 'rep' will prompt you for page number for full the report log")

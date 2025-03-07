@@ -63,3 +63,55 @@ def neswDirection(pointA, pointB):
 
     return direction
 
+def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inputQuery is a string of why they are entering coords
+    playerInput= ""
+    coordinate = []
+    xyMax = len(matchInfo.map) - 1
+
+    playerInput = input(inputQuery + '(eg. "xCoord,yCoord", or "x" to exit): ')
+    while len(playerInput) == 0:
+        playerInput = input(inputQuery + '(eg. "xCoord,yCoord", or "x" to exit): ')
+
+    if playerInput == "x": #exit
+        return
+
+    seperatorCount = 0
+    acceptedChars = ["1","2","3","4","5","6","7","8","9","0",","]
+    for char in playerInput: #cleans up input
+        if char == ",":
+            seperatorCount += 1
+
+        if char not in acceptedChars : 
+            playerInput = playerInput.replace(char,"")
+
+    #print("Test.... coord recieves as " + playerInput) #test
+
+    if seperatorCount != 1:
+        print("Did not use ',' to seperate coords, or used too many")
+        return getCoordinateInput(matchInfo, inputQuery)
+
+    if len(playerInput) < 3:
+        print("Invalid Input")
+        return getCoordinateInput(matchInfo, inputQuery)
+
+    try:
+        axisCoord = ""
+        for char in playerInput: #seperates x and y using ',' as a seperator
+            if char != ",": 
+                axisCoord += char
+            else:
+                coordinate.append(int(str(axisCoord)))
+                axisCoord = ""
+        coordinate.append(int(str(axisCoord)))
+    except:
+        print("Invalid Input")
+        return getCoordinateInput(matchInfo, inputQuery)
+
+
+    for axis in coordinate:
+        if axis > xyMax or axis < 0:
+            print(str(coordinate) + " is not in the map.")
+            return getCoordinateInput(matchInfo, inputQuery)
+
+    return coordinate
+

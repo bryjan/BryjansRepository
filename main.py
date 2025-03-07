@@ -33,7 +33,6 @@ while game is True:
             for mech in squad.mechList:
                 matchInfo.entities.append(mech)
             squad.spawnSquad(matchInfo.map,[r.randint(1,len(matchInfo.map)-1), r.randint(1,len(matchInfo.map)-1)])
-            
 
     while match is True:
         round = True

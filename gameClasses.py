@@ -24,7 +24,7 @@ class MatchInfo:
         self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig = 9999)
         self.forest = TerrainType("forest", "t", "green", size= 3, moveCostBySize = [1,1,3,3,2,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 100)
         self.suburb = TerrainType("suburbs", "H", "light_grey", size= 3, moveCostBySize = [1,1,3,3,4,1,1], visualAbsorbtion = 20, radarAbsorbtion = 40, radarSig = 80)
-        self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
+        self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 1, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
 
     def spawnEntities(self):
         pass #TODO
@@ -809,16 +809,21 @@ class MechClass: #a constructed mech not a npc or player
         self.legs = mechLeg
         #limbs roughly organized by height off ground
         self.limbList = [self.legs, self.hull]
+        self.gunList = []
         for limb in limblist:
             self.limbList.append(limb)
             limb.mechClass = self
+            if limb.isGun == True:
+                self.gunList.append(limb)
+        if len(self.gunList) == 1:
+            self.gunList[0].defaultGun = True
 
         self.mech = ""
         self.limbList.append(self.helm)
 
         #initialize limb passed stats
         self.size = 0
-        self.limbsCondition = 0
+        self.limbsConditionList = []
         self.radarSig = 0
         self.apMax = 0
         self.mpMax = 0
@@ -834,7 +839,7 @@ class MechClass: #a constructed mech not a npc or player
 
         #retrieve limb passed stats
         for limb in self.limbList:
-            self.limbsCondition += limb.limbCon
+            self.limbsConditionList.append(limb.limbCon)
             if limb.size > 0:
                 self.size = limb.size
             if limb.baseRadarSig > 0:
@@ -863,7 +868,7 @@ class MechClass: #a constructed mech not a npc or player
                 self.initFlying = limb.initFly
 
         self.energy = int(self.energyMax)
-        self.condition = self.limbsCondition / len(self.limbList)
+        self.condition = sum(self.limbsConditionList) / len(self.limbList)
         self.ap = int(self.apMax)
         self.mp = int(self.mpMax)
         self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
@@ -891,6 +896,7 @@ class MechPart: # super class to mech limbs
         self.name = name
         self.size = 0
         self.mechClass = ""
+        self.isGun = False
 
         self.moduleStatsDict = {
     "bonus hp": 0,
@@ -917,6 +923,10 @@ class MechPart: # super class to mech limbs
     "canFloat": False,
     "canFly": False,
     "initFly": False,
+
+    "projectileCount": 0,
+    "accuracyPenalty": 0,
+    
 }
         
         self.modsList = moduleList.copy()
@@ -967,14 +977,19 @@ class MechPart: # super class to mech limbs
         self.canFly = self.moduleStatsDict["canFly"]
         self.initFly = self.moduleStatsDict["initFly"]
 
-        self.hp = (self.baseHP * self. multiHP) + self.bonusHP
-        self.armor = (self.baseArmor * self. multiArmor) + self.bonusArmor
+        #TODO find a better way to force every limb to have gun stats
+        self.projectileCount = self.moduleStatsDict["projectileCount"]
+        self.accuracyPenalty = self.moduleStatsDict["accuracyPenalty"]
+
+        self.hp = int((self.baseHP * self. multiHP) + self.bonusHP)
+        self.armor = int((self.baseArmor * self. multiArmor) + self.bonusArmor)
 
         self.startingArmor = int((self.baseArmor * self.multiArmor) + self.bonusArmor)
         self.armorCon = self.armor / self.startingArmor
         self.startingHP = int((self.baseHP * self.multiHP) + self.bonusHP)
         self.hpCon = self.hp / self.startingHP
 
+        #TODO limbcondition not updating
         self.limbCon = (self.armorCon * .3) + (self.hpCon * .7)
 
     def updateModules(self):
@@ -988,7 +1003,7 @@ class MechPart: # super class to mech limbs
 
     def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
         
-        dmgSource = f"" + damageSource
+        dmgSource = f"" + damageSource.name
         dmg = dmgAmount
         if armorPiercing == False:
             dmg = dmg - self.armor
@@ -1003,6 +1018,9 @@ class MechPart: # super class to mech limbs
         armorDamage = armorDamage
 
         self.hp = self.hp - dmg
+        if self.hp < 0:
+            self.hp = 0
+
         self.armor = self.armor - armorDamage
         if self.armor < 0:
             self.armor = 0
@@ -1013,6 +1031,8 @@ class MechPart: # super class to mech limbs
         self.mech.report(matchInfo, "I was hit by a " + dmgSource + "!", teamReport = False, critical = False)
 
     def critical (self, matchInfo):
+        if len(self.modsList) == 0:
+            return
         dmgdMod = random.choice(self.modsList)
         while dmgdMod.status == 0:
             dmgdMod = random.choice(self.modsList)
@@ -1046,6 +1066,78 @@ class Helm(MechPart):
         self.baseAP = ap
         self.baseVisPower = visualPower
         self.baseRadarPower = radarPower
+
+class WeaponLimb(MechPart):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, desc = ""):
+        super().__init__(name, armor, hp, moduleList, desc = "")
+        
+        self.desc = desc
+        self.isGun = True
+        self.defaultGun = False
+        self.projectileCount = projectileCount
+        self.dmg = damage
+        self.accuracy = accuracy #affected by visAbsorb of tiles, higher means more accuracy
+        self.soundReport = soundRep #the distance the weapon can be heard from
+        self.maxCharges = charges
+        self.charges = charges #amount of ammo carried
+        self.apCost = apCost
+        self.energyCost = energyCost
+        self.speedPenalty = speedPenalty
+        self.piercing = armorPiercing
+        self.armorDamage = armorDamage
+        self.accuracyPenalty = 1
+
+    def shootAt(self, matchInfo, pos):
+
+        #check if enough resources
+        if self.charges - 1 < 0:
+            print("Out of ammo!")
+            return
+        if matchInfo.pov.ap - self.apCost < 0:
+            print("Out of action points!")
+            return
+        if matchInfo.pov.energy - self.energyCost < 0:
+            print("Not enough energy to fire!")
+            return
+
+        self.charges -= 1
+        matchInfo.pov.ap -= self.apCost
+        matchInfo.pov.energy -= self.energyCost
+
+        #Calculates shot based on terrain between you and target, ignores the tile you're standing on and directly infront
+        path = matchInfo.ListInterceptingSquares(matchInfo.pov.pos, pos)
+        removeList = matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]].nList
+        removeList.append(matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]])
+
+        for cell in removeList:
+            if cell in path:
+                path.remove(cell)
+
+        accuracyRequired = 0
+        for n in path:
+            accuracyRequired += n.terrain.visAbsorb
+
+        i = 1
+        while i <= self.projectileCount:
+            i += 1
+            shotDeviation = 1
+            if matchInfo.pov.speed > 0:
+                shotDeviation = 1 + ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed ) / 100) #move speed inaccuracy penalty
+            shotAccuracy = self.accuracy * shotDeviation
+            shotAccuracy = self.accuracy * self.accuracyPenalty
+            
+            if shotAccuracy < accuracyRequired:
+                print("Shot missed!")
+            else:
+                print("Shot hit!")
+                for mech in matchInfo.entities:
+                    if mech.pos == pos:
+                        #TODO add system to target specific limbs or make add weight table of limb chance to be hit
+                        random.choice(mech.mechClass.limbList).damage(matchInfo, self.dmg, matchInfo.pov, armorPiercing = self.piercing, armorDamage = self.armorDamage)
+
+    def printShortDesc(self):
+
+        return f"[{self.name} | Charges:({self.charges}/{self.maxCharges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
 
 class Module: #supposed to be superclass but couldn't figure it out
     def __init__(self, name, statKey, bonusType, statChangeList, desc = ""): #[destroyed bonus, damaged bonus, good bonus]
