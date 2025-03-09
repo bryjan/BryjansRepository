@@ -2,12 +2,11 @@ import termcolor
 
 def displayHUD(matchInfo):
     mech = matchInfo.pov
-    hpRatio = mech.mechClass.condition
-    hpPercent= round(hpRatio*100)
+    condPercent= round(mech.mechClass.condition)
 
     print()
     criticalReports(matchInfo)
-    print (mech.pilot.name + " | Coordinates: " + str(mech.pos) +" | Status: " + str(hpPercent) + "% | Current Tile: ", end =" ") 
+    print (mech.pilot.name + " | Coordinates: " + str(mech.pos) +" | Status: " + str(condPercent) + "% | Current Tile: ", end =" ") 
     matchInfo.map[mech.pos[1]][mech.pos[0]].terrain.displayTerrain()
     print()
     print("AP: "+ str(mech.ap) + "/" + str(mech.mechClass.apMax) + " | " + "MP: " + str(mech.mp)+"/"+str(mech.mechClass.mpMax) + " | " + "Energy: " + str(mech.energy) + "/" + str(mech.mechClass.energyMax) + " Regen:" + str(mech.mechClass.energyGen) + " Speed:" + str(mech.speed))

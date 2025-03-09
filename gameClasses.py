@@ -90,7 +90,7 @@ class MatchInfo:
         #calc dmg
         for entry in calcList:
             while entry[1] > 0:
-                entry[0].damage("explosion")
+                entry[0].damage(self, dmg, "explosion", armorDamage = 1 + sizeDif)
 
 
         #TODO chance to start fire
@@ -804,14 +804,17 @@ class MechClass: #a constructed mech not a npc or player
         self.color = color
     
         #limb objects
-        self.hull = mechHull
-        self.helm = mechHelm
-        self.legs = mechLeg
+        self.hull = copy.deepcopy(mechHull)
+        self.helm = copy.deepcopy(mechHelm)
+        self.legs = copy.deepcopy(mechLeg)
         #limbs roughly organized by height off ground
         self.limbList = [self.legs, self.hull]
         self.gunList = []
         for limb in limblist:
-            self.limbList.append(limb)
+            self.limbList.append(copy.deepcopy(limb))
+        self.limbList.append(self.helm)
+
+        for limb in self.limbList:
             limb.mechClass = self
             if limb.isGun == True:
                 self.gunList.append(limb)
@@ -819,7 +822,6 @@ class MechClass: #a constructed mech not a npc or player
             self.gunList[0].defaultGun = True
 
         self.mech = ""
-        self.limbList.append(self.helm)
 
         #initialize limb passed stats
         self.size = 0
@@ -868,7 +870,7 @@ class MechClass: #a constructed mech not a npc or player
                 self.initFlying = limb.initFly
 
         self.energy = int(self.energyMax)
-        self.condition = sum(self.limbsConditionList) / len(self.limbList)
+        self.condition = sum(self.limbsConditionList) / len(self.limbsConditionList) * 100
         self.ap = int(self.apMax)
         self.mp = int(self.mpMax)
         self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
@@ -892,10 +894,10 @@ class MechClass: #a constructed mech not a npc or player
 class MechPart: # super class to mech limbs
     def __init__ (self, name, armor, hp, moduleList, desc = ""):
 
-        self.desc= desc
+        self.desc = desc
         self.name = name
         self.size = 0
-        self.mechClass = ""
+        self.mechClass = 0
         self.isGun = False
 
         self.moduleStatsDict = {
@@ -990,7 +992,7 @@ class MechPart: # super class to mech limbs
         self.hpCon = self.hp / self.startingHP
 
         #TODO limbcondition not updating
-        self.limbCon = (self.armorCon * .3) + (self.hpCon * .7)
+        self.limbCon = round((self.armorCon * .25) + (self.hpCon * .75), 2)
 
     def updateModules(self):
         for m in self.modsList:
@@ -1002,37 +1004,66 @@ class MechPart: # super class to mech limbs
                 self.moduleStatsDict[m.statKey] = m.statList[m.status]
 
     def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
-        
-        dmgSource = f"" + damageSource.name
+
+        #no negative damage values
         dmg = dmgAmount
+        if dmgAmount < 0:
+            dmg = 0
+
+        armorDmg = armorDamage
+        if armorDamage < 0:
+            armorDmg = 0
+        
+        #damage source string for damage report
+        dmgSource = f"" + damageSource
+
+        #damage calc
         if armorPiercing == False:
             dmg = dmg - self.armor
             if dmg < 0:
                 return
         else:
-            dmg = dmg - (self.armor / 3)
+            dmg = round(dmg - (self.armor / 4))
             if dmg < 0:
                 return
-            
-        armorPiercing = armorPiercing
-        armorDamage = armorDamage
 
-        self.hp = self.hp - dmg
+        #applying damage
+        self.hp -= dmg
         if self.hp < 0:
             self.hp = 0
 
-        self.armor = self.armor - armorDamage
+        self.armor -= armorDmg
         if self.armor < 0:
             self.armor = 0
 
-        if random.randint(0, self.hp) + dmgAmount > self.hp:
+        #updating limb's condition
+        self.armorCon = self.armor / self.startingArmor
+        self.hpCon = self.hp / self.startingHP
+        self.limbCon = round((self.armorCon * .25) + (self.hpCon * .75), 2)
+        self.mechClass.limbsConditionList = []
+        for limb in self.mechClass.limbList:
+            self.mechClass.limbsConditionList.append(limb.limbCon)
+        self.mechClass.condition = round(sum(self.mechClass.limbsConditionList) / len(self.mechClass.limbList) * 100)
+
+
+        #determining if a module was damaged / crit
+        if random.randint(0, self.hp) + dmgAmount > self.hp + self.armor:
             self.critical(matchInfo)
 
+        #reporting damage
         self.mech.report(matchInfo, "I was hit by a " + dmgSource + "!", teamReport = False, critical = False)
 
     def critical (self, matchInfo):
+        #checking if there is modules to damage
         if len(self.modsList) == 0:
             return
+        totalStatus = 0
+        for mod in self.modsList:
+            totalStatus += mod.status
+        if totalStatus == 0:
+            return
+
+        #picking random module from limb
         dmgdMod = random.choice(self.modsList)
         while dmgdMod.status == 0:
             dmgdMod = random.choice(self.modsList)
@@ -1133,7 +1164,7 @@ class WeaponLimb(MechPart):
                 for mech in matchInfo.entities:
                     if mech.pos == pos:
                         #TODO add system to target specific limbs or make add weight table of limb chance to be hit
-                        random.choice(mech.mechClass.limbList).damage(matchInfo, self.dmg, matchInfo.pov, armorPiercing = self.piercing, armorDamage = self.armorDamage)
+                        random.choice(mech.mechClass.limbList).damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
     def printShortDesc(self):
 

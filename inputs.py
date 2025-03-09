@@ -53,13 +53,21 @@ def recieveInput(matchInfo):
 def fire(matchInfo):
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
-    for limb in gunList:
-        if limb.defaultGun == True:
-            gun = limb
 
     if len(gunList) == 0:
         print("You have no weapons.")
         return
+    
+    defaultGuns = 0
+    for limb in gunList:
+        if limb.defaultGun == True:
+            defaultGuns += 1
+            gun = limb
+
+    if defaultGuns < 1 or defaultGuns > 1:
+        print("Select a default weapon.")
+        return gunMenu(matchInfo)
+    
     targetPos = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at") #TODO give option to cancel
     gun.shootAt(matchInfo, targetPos)
 
@@ -112,17 +120,16 @@ def gunMenu(matchInfo): #TODO add ability to exit
 
     try:
         playerInput = int(playerInput)
+        if playerInput < 0 or playerInput > len(gunList) + 1:
+            print("Please enter an integer listed in the menu.")
+            gunMenu(matchInfo)
+        else:
+            gunList[playerInput - 1].defaultGun = True
+            print(f"{gunList[playerInput - 1].name} set to (f)ire by default")
+            return
     except:
         print("Please enter an integer.")
         gunMenu(matchInfo)
-
-    if int(playerInput) < 0 or int(playerInput) > len(gunList) + 1:
-        print("Please enter an integer listed in the menu.")
-        gunMenu(matchInfo)
-    else:
-        gunList[playerInput - 1].defaultGun = True
-        print(f"{gunList[playerInput].name} set to (f)ire by default")
-        return
 
 
 def nextMech(matchInfo):
