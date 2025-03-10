@@ -73,7 +73,7 @@ def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inp
         playerInput = input(inputQuery + '(eg. "xCoord,yCoord", or "x" to exit): ')
 
     if playerInput == "x": #exit
-        return
+        return "x"
 
     seperatorCount = 0
     acceptedChars = ["1","2","3","4","5","6","7","8","9","0",","]

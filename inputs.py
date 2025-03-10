@@ -44,11 +44,23 @@ def recieveInput(matchInfo):
         
         case "f" | "F":
             return fire(matchInfo)
+        
+        case "radar":
+            return radarToggle(matchInfo)
 
         case _:
             print("Input not recognized. Try again.")
             return
     
+
+def radarToggle(matchInfo):
+    mech = matchInfo.pov
+    if mech.radarOn == True:
+        mech.radarOn == False
+        print("Radar toggled off")
+    else:
+        mech.radarOn == True
+        print("Radar toggled on")
 
 def fire(matchInfo):
     mech = matchInfo.pov
@@ -69,6 +81,8 @@ def fire(matchInfo):
         return gunMenu(matchInfo)
     
     targetPos = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at") #TODO give option to cancel
+    if targetPos == "x":
+        return
     gun.shootAt(matchInfo, targetPos)
 
 def gunMenu(matchInfo): #TODO add ability to exit

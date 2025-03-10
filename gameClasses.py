@@ -20,10 +20,10 @@ class MatchInfo:
 
         self.blank = TerrainType("blank", " ", "black", size= 0, moveCostBySize = [], visualAbsorbtion = 9999, radarAbsorbtion = 9999, fireproof = True, passable = False)
         self.border = TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
-        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 3, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
+        self.desert = TerrainType("desert", "~", "yellow", size= 0, moveCostBySize = [1,2,3,2,1,1,1], visualAbsorbtion = 2, radarAbsorbtion = 1, radarSig = 9999, fireproof = True)
         self.plains = TerrainType("plains", "_", "light_green", size= 0, moveCostBySize = [1,1,1,1,1,1,1], visualAbsorbtion = 1, radarAbsorbtion = 1,radarSig = 9999)
-        self.forest = TerrainType("forest", "t", "green", size= 3, moveCostBySize = [1,1,3,3,2,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 100)
-        self.suburb = TerrainType("suburbs", "H", "light_grey", size= 3, moveCostBySize = [1,1,3,3,4,1,1], visualAbsorbtion = 20, radarAbsorbtion = 40, radarSig = 80)
+        self.forest = TerrainType("forest", "t", "green", size= 3, moveCostBySize = [1,1,2,4,3,1,1], visualAbsorbtion = 6, radarAbsorbtion = 15, radarSig = 100)
+        self.suburb = TerrainType("suburbs", "H", "light_grey", size= 3, moveCostBySize = [1,1,1,5,4,2,1], visualAbsorbtion = 20, radarAbsorbtion = 40, radarSig = 80)
         self.road = TerrainType("road", "=", "dark_grey", size= 0, moveCostBySize = [0,0,0,0,0,0,0], visualAbsorbtion = 1, radarAbsorbtion = 0, radarSig = 9999, requireFloat = False, fireproof = True)
 
     def spawnEntities(self):
@@ -470,12 +470,18 @@ class Cell:
     def roundRefresh(self): #TODO reset stats that refresh every round ex)radar and visual strength, radar sources then counting down cell effects
         pass
 
+#TODO add ejection mechanic and entity from sqaud, team, and entities list. but track pilot and mech condition for post-battle recovery
 class Entity: #a character on the map
     def __init__(self, mechClass, pilot):
         self.mechClass = copy.deepcopy(mechClass)
-        self.pilot = copy.deepcopy(pilot) #a unique name, seperate from the name of the mech in the stats dictionary. eventually should be an object that levels up and adds perks
+        self.mechClass.mech = self
+
+        self.pilot = copy.deepcopy(pilot)
         for limb in self.mechClass.limbList:
-            limb.mech = self    
+            limb.mech = self
+        #inserts pilot into mech's Helm
+        cockpit = Cockpit("Pilot", "multi ap", 3, ["0", ".75", "1"], self.pilot, False)
+        self.mechClass.helm.modsList.append(cockpit)
 
         self.name = self.pilot.name
         self.squad = ""
@@ -490,6 +496,7 @@ class Entity: #a character on the map
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
         self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
+        self.radarOn = True
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
@@ -627,7 +634,7 @@ class Entity: #a character on the map
             for tile in y:
                 tile.visPower = 0
 
-        startingCell.visPower = int(self.visPower + 2)
+        startingCell.visPower = int(self.visPower + startingCell.terrain.visAbsorb)
     
         calcList = [] #cells queued to be calced
         dontCalcList= [startingCell] #cells exempt from calcs
@@ -658,7 +665,7 @@ class Entity: #a character on the map
     def getRadar(self, matchInfo):
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
-        if self.radarPower <= 0: #checks if entity has radar.
+        if self.radarPower <= 0 or self.radarOn == False: #checks if entity has radar.
             return
 
         startingCell.radarPower = int(self.radarPower)
@@ -790,7 +797,7 @@ class Entity: #a character on the map
         return print(colored(self.mechClass.symbol,self.mechClass.color), end = " ")
 
 
-class Pilot:
+class Pilot: #TODO add pilot levels, skills, certs
     def __init__(self, name):
          self.name = name
 
@@ -802,6 +809,7 @@ class MechClass: #a constructed mech not a npc or player
         self.name = name
         self.symbol = symbol
         self.color = color
+        self.mech = ""
     
         #limb objects
         self.hull = copy.deepcopy(mechHull)
@@ -821,8 +829,6 @@ class MechClass: #a constructed mech not a npc or player
         if len(self.gunList) == 1:
             self.gunList[0].defaultGun = True
 
-        self.mech = ""
-
         #initialize limb passed stats
         self.size = 0
         self.limbsConditionList = []
@@ -839,8 +845,22 @@ class MechClass: #a constructed mech not a npc or player
         self.canFly = False
         self.initFlying = False
 
+        self.statUpdate()
+
+        self.condition = sum(self.limbsConditionList) / len(self.limbsConditionList) * 100
+        self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
+        self.sizeStr = self.sizeStrList[self.size]
+
+        self.desc = description
+
+    def displayStats(self): #basic stats display for bug fixing. TODO redo to look nicer and adding descriptions for gameplay
+        pass
+
+    def statUpdate(self):
+
         #retrieve limb passed stats
-        for limb in self.limbList:
+         for limb in self.limbList:
+            limb.updateModules()
             self.limbsConditionList.append(limb.limbCon)
             if limb.size > 0:
                 self.size = limb.size
@@ -868,21 +888,6 @@ class MechClass: #a constructed mech not a npc or player
                 self.canFly = limb.canFly
             if limb.initFly == True:
                 self.initFlying = limb.initFly
-
-        self.energy = int(self.energyMax)
-        self.condition = sum(self.limbsConditionList) / len(self.limbsConditionList) * 100
-        self.ap = int(self.apMax)
-        self.mp = int(self.mpMax)
-        self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
-        self.sizeStr = self.sizeStrList[self.size]
-
-        self.desc = description
-
-    def displayStats(self): #basic stats display for bug fixing. TODO redo to look nicer and adding descriptions for gameplay
-        pass
-
-    def statUpdate(self):
-        pass
 
     def statReset(self): #TODO resets mech's stats to default, including its limbs and modules
         pass
@@ -1070,6 +1075,7 @@ class MechPart: # super class to mech limbs
 
         self.mech.report(matchInfo, dmgdMod.name + " was damaged!", teamReport = False, critical = False)
         dmgdMod.damage()
+        self.mechClass.statUpdate()
             
 
 class Legs(MechPart): #subclass mechpart
@@ -1118,6 +1124,11 @@ class WeaponLimb(MechPart):
         self.armorDamage = armorDamage
         self.accuracyPenalty = 1
 
+    def emitSound(self, matchInfo):
+        for entity in matchInfo.entities:
+            if math.dist(matchInfo.pov.pos, entity.pos) <= self.soundReport and entity not in matchInfo.pov.squad.mechList:
+                entity.report(matchInfo, "I hear shots. Sounds like a " + self.name + "." , teamReport = False, critical = False)
+    
     def shootAt(self, matchInfo, pos):
 
         #check if enough resources
@@ -1134,6 +1145,9 @@ class WeaponLimb(MechPart):
         self.charges -= 1
         matchInfo.pov.ap -= self.apCost
         matchInfo.pov.energy -= self.energyCost
+        
+        #enemies will report noise
+        self.emitSound(matchInfo)
 
         #Calculates shot based on terrain between you and target, ignores the tile you're standing on and directly infront
         path = matchInfo.ListInterceptingSquares(matchInfo.pov.pos, pos)
@@ -1153,7 +1167,7 @@ class WeaponLimb(MechPart):
             i += 1
             shotDeviation = 1
             if matchInfo.pov.speed > 0:
-                shotDeviation = 1 + ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed ) / 100) #move speed inaccuracy penalty
+                shotDeviation = 1 - ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed ) / 100) #move speed inaccuracy penalty
             shotAccuracy = self.accuracy * shotDeviation
             shotAccuracy = self.accuracy * self.accuracyPenalty
             
@@ -1166,16 +1180,20 @@ class WeaponLimb(MechPart):
                         #TODO add system to target specific limbs or make add weight table of limb chance to be hit
                         random.choice(mech.mechClass.limbList).damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
+        matchInfo.advTurn = True
+
     def printShortDesc(self):
 
         return f"[{self.name} | Charges:({self.charges}/{self.maxCharges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
 
+
+#clean up module system and make it work (not updating)
 class Module: #supposed to be superclass but couldn't figure it out
     def __init__(self, name, statKey, bonusType, statChangeList, desc = ""): #[destroyed bonus, damaged bonus, good bonus]
         
         self.name = name
         self.statKey = statKey
-        #multi bonus = 1, flat bonus = 2, condition = 3
+        #multi bonus = 1, flat bonus = 2, condition = 3, no bonuses = 4
         self.modType = bonusType
         self.status = 2 #[destroyed, damaged, good]
         self.statList = statChangeList
@@ -1196,11 +1214,14 @@ class Module: #supposed to be superclass but couldn't figure it out
         else:
             pass
     
+class Cockpit(Module):
+    def __init__ (self, name, statKey, bonusType, statChangeList, pilot, crewServed, desc = ""):
+        super().__init__(name, statKey, bonusType, statChangeList, desc = "")
+        self.pilot = pilot
+        self.crewServed = crewServed
 
-
-
-
-        
+        #TODO add pilot skills and levels then make them apply
+        #TODO add ability for pilot to be injured and incapacitated
     
 class Squad:
     def __init__(self, squadName, squadList, squadRole, playerControlled = False):
@@ -1212,8 +1233,7 @@ class Squad:
         self.playerControlled = playerControlled
         self.macroObjective = ""
         self.microObjective = ""
-        self.oAmmo = 0
-        self.sAmmo = 0
+        self.Ammo = 0
         self.supplies = 0
         self.effectiveness = 100
         self.reportLog = []

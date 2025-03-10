@@ -9,13 +9,13 @@ import random as r
 game = True
 
 
-playermech= C.Entity(MO.test,P.testpilot)
+playermech= C.Entity(MO.lancer,P.testpilot)
 mech= C.Entity(MO.lancer,P.testpilot2)
 playerSquad = C.Squad("Player Squad",[playermech, mech],"Combat",playerControlled= True)
 playerTeam = C.Team("Player Team",[playerSquad])
 
 enemymech = C.Entity(MO.lancer,P.enemypilot)
-enemymech2 = C.Entity(MO.test,P.enemypilot2)
+enemymech2 = C.Entity(MO.lancer,P.enemypilot2)
 enemySquad = C.Squad("Enemy Squad",[enemymech,enemymech2],"Combat")
 enemies = C.Team("Enemy Team",[enemySquad])
 
@@ -32,8 +32,9 @@ while game is True:
                 matchInfo.playerSquad = squad
             for mech in squad.mechList:
                 matchInfo.entities.append(mech)
-            squad.spawnSquad(matchInfo.map,[r.randint(1,len(matchInfo.map)-1), r.randint(1,len(matchInfo.map)-1)])
-
+            #squad.spawnSquad(matchInfo.map,[r.randint(1,len(matchInfo.map)-1), r.randint(1,len(matchInfo.map)-1)]) #anywhere in map
+            #squad.spawnSquad(matchInfo.map,[r.randint(25,len(matchInfo.map)-25), r.randint(25,len(matchInfo.map)-25)]) #closer near center
+            squad.spawnSquad(matchInfo.map,[r.randint(40,len(matchInfo.map)-40), r.randint(40,len(matchInfo.map)-40)]) #brawl
     while match is True:
         round = True
         for team in  matchInfo.teamList:
