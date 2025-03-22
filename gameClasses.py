@@ -1225,8 +1225,8 @@ class Module: #supposed to be superclass but couldn't figure it out
             pass
     
 class Cockpit(Module):
-    def __init__ (self, name, statKey, bonusType, statChangeList, pilot, crewServed, desc = ""):
-        super().__init__(name, statKey, bonusType, statChangeList, desc = "")
+    def __init__ (self, name, attrNames, bonusType, statChangeList, pilot, crewServed, desc = ""):
+        super().__init__(name, attrNames, bonusType, statChangeList, desc = "")
         self.pilot = pilot
         self.crewServed = crewServed
 
