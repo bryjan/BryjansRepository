@@ -5,7 +5,7 @@ import copy
 
     #setModules
 radarDetector = C.Module("Lancer Radar Detector", ["passiveRadar"], 1, [[False, False, True]], desc="")
-chainGunAuto = C.Module("ChainGun Bolt", ["bonusProjectileCount"], 1, [[1, 2, 3]], desc="")
+chainGunAuto = C.Module("ChainGun Bolt", ["bonusProjectileCount"], 1, [[-1, 0, 2]], desc="")
 lightWeightFrame = C.Module("light Lancer Frame", ["bonusMP"], 1, [[-2 , -1, 2]], desc= "A lightweight frame to increase mobility, at the cost of structural integrity")
 exosuitLegMotor = C.Module("Exosuit Leg Motors", ["multiMP"], 1,  [[.5 , .8 , 1]], desc= "Motors that run the Exosuit's legs. Made resilient for the fact that mobility is essential for Lancers Class Mechs")
 chainGunHoloSight = C.Module("ChainGun Holosight", ["accuracyPenalty"], 1, [[.75, .9, 1]], desc="")

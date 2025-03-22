@@ -495,7 +495,7 @@ class Entity: #a character on the map
         self.mp = int(self.mechClass.mpMax)
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
-        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
+        self.radarPower = self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
         self.radarOn = True
 
         self.turnStartPos = list(self.pos)
@@ -665,6 +665,7 @@ class Entity: #a character on the map
     def getRadar(self, matchInfo):
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
+        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
         if self.radarPower <= 0 or self.radarOn == False: #checks if entity has radar.
             return
 
@@ -700,7 +701,7 @@ class Entity: #a character on the map
             if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
                 if obj.team != self.team:
                     obj.passiveRadarDetect(matchInfo, self)
-            if map[obj.pos[1]][obj.pos[0]].radarPower >= obj.radarSig:
+            if map[obj.pos[1]][obj.pos[0]].radarPower >= (obj.radarSig / (1 + (self.speed * .2 ))):
                 if obj.team != self.team:
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
 
@@ -716,6 +717,8 @@ class Entity: #a character on the map
             return
         if self.mechClass.passiveRadar == False:
             return
+        if self.entity.speed > 1:
+            return 
     
         strength = map[self.pos[1]][self.pos[0]].radarPower
 
@@ -859,7 +862,6 @@ class MechClass: #a constructed mech not a npc or player
         pass
 
     def statUpdate(self):
-
         #retrieve limb passed stats
          for limb in self.limbList:
             limb.updateModules()
@@ -910,12 +912,12 @@ class MechPart: # super class to mech limbs
                 i = 0
                 while i < len(m.statNames):
                     if getattr(self, m.statNames[i], "x") == "x":
-                        print(m.name + " is incompatable with " + self.name)
-                        print(self.name + " has no " + m.statNames[i])
+                        #print(m.name + " is incompatable with " + self.name)
+                        #print(self.name + " has no " + m.statNames[i])
                         return
                     else:
                         setattr(self, m.statNames[i], m.statsArray[i][m.status]) 
-                        print("updated " + m.name + " " + m.statNames[i] + " to " + str(m.statsArray[i][m.status]))
+                        #print("updated " + m.name + " " + m.statNames[i] + " to " + str(m.statsArray[i][m.status]))
                     i += 1
         self.updateStats()
 
