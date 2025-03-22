@@ -9,9 +9,11 @@ class MatchInfo:
         
         self.mapSize = mapSize
         self.windowSize = windowSize
-        self.teamList = teams
+        self.teamList = teams #team0 are nuetral entities
         self.playerSquad = ""
         self.entities = []
+        self.abandonedMechs = []
+        self.destroyedMechs = []
         self.matchRound = 0
         self.pov = ""
         self.mapParamsList = mapParams
@@ -43,8 +45,12 @@ class MatchInfo:
                 #TODO refresh round stats
                 nextTeamIndex = 0
             
-    
         self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
+
+        for mech in self.pov.squad.mechList:
+            if mech.cockpit.status == 0:
+                self.destoryedMechs.append(mech)
+                mech.squad.mechlist.remove(mech)
         self.pov.squad.roundRefresh(self)
         self.advTurn = True
 
