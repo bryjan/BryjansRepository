@@ -4,14 +4,14 @@ import copy
 #MechModules do not touch Init stats
 
     #setModules
-radarDetector = C.Module("Lancer Radar Detector", "passiveRadar", 3, [False, False, True], desc="")
-chainGunAuto = C.Module("ChainGun Bolt", "projectileCount", 3, [1, 2, 3], desc="")
-lightWeightFrame = C.Module("light Lancer Frame", "bonus mp", 3, [-2 , -1, 2], desc= "A lightweight frame to increase mobility, at the cost of structural integrity")
-exosuitLegMotor = C.Module("Exosuit Leg Motors", "multi mp", 3,  [.5 , .8 , 1], desc= "Motors that run the Exosuit's legs. Made resilient for the fact that mobility is essential for Lancers Class Mechs")
-chainGunHoloSight = C.Module("ChainGun Holosight", "accuracyPenalty", 3, [.75, .9, 1], desc="")
+radarDetector = C.Module("Lancer Radar Detector", ["passiveRadar"], 1, [[False, False, True]], desc="")
+chainGunAuto = C.Module("ChainGun Bolt", ["bonusProjectileCount"], 1, [[1, 2, 3]], desc="")
+lightWeightFrame = C.Module("light Lancer Frame", ["bonusMP"], 1, [[-2 , -1, 2]], desc= "A lightweight frame to increase mobility, at the cost of structural integrity")
+exosuitLegMotor = C.Module("Exosuit Leg Motors", ["multiMP"], 1,  [[.5 , .8 , 1]], desc= "Motors that run the Exosuit's legs. Made resilient for the fact that mobility is essential for Lancers Class Mechs")
+chainGunHoloSight = C.Module("ChainGun Holosight", ["accuracyPenalty"], 1, [[.75, .9, 1]], desc="")
 
     #nonModules-Modules
-critProtection = C.Module("Anti-spalling Foam", "Na", 4, ["Na", "Na", "Na"], desc="")
+critProtection = C.Module("Anti-spalling Foam", ["Na"], 0, [["Na", "Na", "Na"]], desc="")
 
     #MechLimbs
 greatHelm= C.Helm( "Great Helm", 5, 30, [critProtection], 6, 12, 0, desc = "A Lancer Power Armor Helm with a suite of sensor data displays inside")

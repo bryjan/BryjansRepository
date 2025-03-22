@@ -830,8 +830,8 @@ class MechClass: #a constructed mech not a npc or player
             self.gunList[0].defaultGun = True
 
         #initialize limb passed stats
-        self.size = 0
         self.limbsConditionList = []
+        self.size = 0
         self.radarSig = 0
         self.apMax = 0
         self.mpMax = 0
@@ -844,6 +844,8 @@ class MechClass: #a constructed mech not a npc or player
         self.canfloat = False
         self.canFly = False
         self.initFlying = False
+
+        self.passedStatsList = ["size","radarSig","apMax","mpMax","energyMax","energyGen","shareData","visPower","radarPower","passiveRadar","canFly","canFloat","initFlying"]
 
         self.statUpdate()
 
@@ -862,32 +864,10 @@ class MechClass: #a constructed mech not a npc or player
          for limb in self.limbList:
             limb.updateModules()
             self.limbsConditionList.append(limb.limbCon)
-            if limb.size > 0:
-                self.size = limb.size
-            if limb.baseRadarSig > 0:
-                self.radarSig = (limb.baseRadarSig * limb.multiRadarSig) + limb.bonusRadarSig
-            if limb.baseAP > 0:
-                self.apMax = (limb.baseAP * limb.multiAP) + limb.bonusAP
-            if limb.baseMP > 0:
-                self.mpMax = (limb.baseMP * limb.multiMP) + limb.bonusMP
-            if limb.baseEnergy > 0:
-                self.energyMax = (limb.baseEnergy * limb.multiEnergy) + limb.bonusEnergy
-            if limb.baseEnergyGen > 0:
-                self.energyGen = (limb.baseEnergyGen * limb.multiEnergyGen) + limb.bonusEnergyGen
-            if limb.baseVisPower > 0:
-                self.visPower = (limb.baseVisPower * limb.multiVisPower) + limb.bonusVisPower
-            if limb.baseRadarPower > 0:
-                self.radarPower = (limb.baseRadarPower * limb.multiRadarPower) + limb.bonusRadarPower
-            if limb.passiveRadar == True:
-                self.passiveRadar = limb.passiveRadar
-            if limb.shareData == True:
-                self.shareData = limb.shareData
-            if limb.canFloat == True:
-                self.canFloat = limb.canFloat
-            if limb.canFly == True:
-                self.canFly = limb.canFly
-            if limb.initFly == True:
-                self.initFlying = limb.initFly
+            for stat in self.passedStatsList:
+                if getattr(limb, stat, "No attribute of that Name") != "No attribute of that Name":
+                    setattr(self, stat, getattr(limb, stat))
+
 
     def statReset(self): #TODO resets mech's stats to default, including its limbs and modules
         pass
@@ -901,112 +881,62 @@ class MechPart: # super class to mech limbs
 
         self.desc = desc
         self.name = name
-        self.size = 0
-        self.mechClass = 0
+        self.mechClass = "" #will be assigned when attached to a mech
         self.isGun = False
-
-        self.moduleStatsDict = {
-    "bonus hp": 0,
-    "multi hp": 1,
-    "bonus armor": 0,
-    "multi armor": 1,
-    "bonus ap": 0,
-    "multi ap": 1,
-    "bonus mp": 0,
-    "multi mp": 1,
-    "bonus energy": 0, #Total stored power
-    "multi energy": 1,
-    "bonus energyGen": 0, #power returned every round
-    "multi energyGen": 1,
-
-    "shareData": False,
-    "bonus visPower": 0, #Higher means it can see further. common tiles absorb 2 visual strength per tile. so 20 visual power = ~10tile view
-    "multi visPower": 1,
-    "bonus radarPower": 0, #Higher means it can see/detect further. common tiles absorb 2 radar strength per tile. so 200 visual power = ~100tile view
-    "multi radarPower": 1,
-    "bonus radarSig" : 0, #Determines how high enemy radar needs to be to detect something is there
-    "multi radarSig" : 1,
-    "passiveRadar": False, #Mech will report incoming radar strength and directions
-    "canFloat": False,
-    "canFly": False,
-    "initFly": False,
-
-    "projectileCount": 0,
-    "accuracyPenalty": 0,
-    
-}
         
-        self.modsList = moduleList.copy()
-        self.updateModules()
+        self.modsList = copy.deepcopy(moduleList)
 
-        self.bonusArmor = self.moduleStatsDict["bonus armor"]
+        #limb stats
         self.baseArmor = armor
-        self.multiArmor = self.moduleStatsDict["multi armor"]
-        self.armor = armor
-        self.armorCon = (armor) / ((self.baseArmor * self.multiArmor) + self.bonusArmor)
-
-        self.bonusHP = self.moduleStatsDict["bonus hp"]
-        self.baseHP = hp
-        self.multiHP = self.moduleStatsDict["multi hp"]
-        self.hp = hp
-
-        self.baseAP = 0
-        self.bonusAP = self.moduleStatsDict["bonus ap"]
-        self.multiAP = self.moduleStatsDict["multi ap"]
-
-        self.baseMP = 0
-        self.bonusMP = self.moduleStatsDict["bonus mp"]
-        self.multiMP = self.moduleStatsDict["multi mp"]
-
-        self.baseEnergy = 0
-        self.bonusEnergy = self.moduleStatsDict["bonus energy"]
-        self.multiEnergy = self.moduleStatsDict["multi energy"]
-
-        self.baseEnergyGen = 0
-        self.bonusEnergyGen = self.moduleStatsDict["bonus energyGen"]
-        self.multiEnergyGen = self.moduleStatsDict["multi energyGen"]
-
-        self.baseVisPower = 0
-        self.bonusVisPower = self.moduleStatsDict["bonus visPower"]
-        self.multiVisPower = self.moduleStatsDict["multi visPower"]
-
-        self.baseRadarSig = 0
-        self.bonusRadarSig = self.moduleStatsDict["bonus radarSig"]
-        self.multiRadarSig = self.moduleStatsDict["multi radarSig"]
-
-        self.baseRadarPower = 0
-        self.bonusRadarPower = self.moduleStatsDict["bonus radarPower"]
-        self.multiRadarPower = self.moduleStatsDict["multi radarPower"]
-        
-        self.shareData = self.moduleStatsDict["shareData"]
-        self.passiveRadar = self.moduleStatsDict["passiveRadar"]
-        self.canFloat = self.moduleStatsDict["canFloat"]
-        self.canFly = self.moduleStatsDict["canFly"]
-        self.initFly = self.moduleStatsDict["initFly"]
-
-        #TODO find a better way to force every limb to have gun stats
-        self.projectileCount = self.moduleStatsDict["projectileCount"]
-        self.accuracyPenalty = self.moduleStatsDict["accuracyPenalty"]
-
-        self.hp = int((self.baseHP * self. multiHP) + self.bonusHP)
-        self.armor = int((self.baseArmor * self. multiArmor) + self.bonusArmor)
-
-        self.startingArmor = int((self.baseArmor * self.multiArmor) + self.bonusArmor)
+        self.bonusArmor = 0
+        self.multiArmor = 1
+        self.armor = (self.baseArmor * self.multiArmor) + self.bonusArmor
+        self.startingArmor = int(self.armor)
         self.armorCon = self.armor / self.startingArmor
-        self.startingHP = int((self.baseHP * self.multiHP) + self.bonusHP)
+       
+        self.baseHP = hp
+        self.bonusHP = 0
+        self.multiHP = 1
+        self.hp = (self.baseHP * self.multiHP) + self.bonusHP
+        self.startingHP = int(self.hp)
         self.hpCon = self.hp / self.startingHP
 
-        #TODO limbcondition not updating
         self.limbCon = round((self.armorCon * .25) + (self.hpCon * .75), 2)
+        self.updateModules()
 
     def updateModules(self):
         for m in self.modsList:
-            if m.modType == 1:
-                self.moduleStatsDict["multi " + m.statKey] = m.statList[m.status]
-            if m.modType == 2:
-                self.moduleStatsDict["bonus " + m.statKey] = m.statList[m.status]
-            if m.modType == 3:
-                self.moduleStatsDict[m.statKey] = m.statList[m.status]
+            if m.modType == 1: #skips modules that make no stat change
+                i = 0
+                while i < len(m.statNames):
+                    if getattr(self, m.statNames[i], "x") == "x":
+                        print(m.name + " is incompatable with " + self.name)
+                        print(self.name + " has no " + m.statNames[i])
+                        return
+                    else:
+                        setattr(self, m.statNames[i], m.statsArray[i][m.status]) 
+                        print("updated " + m.name + " " + m.statNames[i] + " to " + str(m.statsArray[i][m.status]))
+                    i += 1
+        self.updateStats()
+
+    def updateStats(self):
+
+        if getattr(self, "isGun", False) != False:
+            self.updateWeaponStats()
+        
+        if getattr(self, "isLauncher", False) != False:
+            self.updateLauncherStats()
+
+        if getattr(self, "size", False) != False:
+            self.updateHullStats()
+
+        if getattr(self, "apMax", False) != False:
+            self.updateHelmStats()
+
+        if getattr(self, "mpMax", False) != False:
+            self.updateLegStats()
+
+
 
     def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
 
@@ -1041,7 +971,12 @@ class MechPart: # super class to mech limbs
         if self.armor < 0:
             self.armor = 0
 
+        #determining if a module was damaged / crit
+        if random.randint(0, self.hp) + dmgAmount > self.hp + self.armor:
+            self.critical(matchInfo)
+
         #updating limb's condition
+        self.updateStats()
         self.armorCon = self.armor / self.startingArmor
         self.hpCon = self.hp / self.startingHP
         self.limbCon = round((self.armorCon * .25) + (self.hpCon * .75), 2)
@@ -1049,11 +984,6 @@ class MechPart: # super class to mech limbs
         for limb in self.mechClass.limbList:
             self.mechClass.limbsConditionList.append(limb.limbCon)
         self.mechClass.condition = round(sum(self.mechClass.limbsConditionList) / len(self.mechClass.limbList) * 100)
-
-
-        #determining if a module was damaged / crit
-        if random.randint(0, self.hp) + dmgAmount > self.hp + self.armor:
-            self.critical(matchInfo)
 
         #reporting damage
         self.mech.report(matchInfo, "I was hit by a " + dmgSource + "!", teamReport = False, critical = False)
@@ -1083,26 +1013,70 @@ class Legs(MechPart): #subclass mechpart
         super().__init__(name, armor, hp, moduleList, desc="")
         
         self.baseMP = speed
+        self.bonusMP = 0
+        self.multiMP = 1
+        self.mpMax = (self.baseMP * self.multiMP) + self.bonusMP
+
         self.canFloat = float
         self.canFly = fly
         self.initFly = fly
-        
+
+    def updateLegStats(self):
+        self.mpMax = int((self.baseMP * self.multiMP) + self.bonusMP)
 
 class Hull(MechPart):
     def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = ""):
         super().__init__(name, armor, hp, moduleList, desc = "")
         
         self.size = size
+        
         self.baseRadarSig = radarSig
+        self.bonusRadarSig = 0
+        self.multiRadarSig = 1
+        self.radarSig = (self.baseRadarSig * self.multiRadarSig) + self.bonusRadarSig
+
         self.baseEnergy = pwrCapacity
+        self.bonusEnergy = 0
+        self.multiEnergy = 1
+        self.energyMax = (self.baseRadarSig * self.multiEnergy) + self.bonusEnergy
+
         self.baseEnergyGen = pwrGen
+        self.bonusEnergyGen = 0
+        self.multiEnergyGen = 1
+        self.energyGen = (self.baseEnergyGen * self.multiEnergyGen) + self.bonusEnergyGen
+
+    def updateHullStats(self):
+        self.radarSig = int((self.baseRadarSig * self.multiRadarSig) + self.bonusRadarSig)
+        self.energyMax = int((self.baseRadarSig * self.multiEnergy) + self.bonusEnergy)
+        self.energyGen = int((self.baseEnergyGen * self.multiEnergyGen) + self.bonusEnergyGen)
+
 
 class Helm(MechPart):
     def __init__ (self, name, armor, hp, moduleList, ap, visualPower, radarPower, desc=""):
         super().__init__(name, armor, hp, moduleList, desc="")
         self.baseAP = ap
+        self.bonusAP = 0
+        self.multiAP = 1
+        self.apMax = (self.baseAP * self.multiAP) + self.bonusAP
+
         self.baseVisPower = visualPower
+        self.bonusVisPower = 0
+        self.multiVisPower = 1
+        self.visPower = (self.baseVisPower * self.multiVisPower) + self.bonusVisPower
+
         self.baseRadarPower = radarPower
+        self.bonusRadarPower = 0
+        self.multiRadarPower = 1
+        self.radarPower = (self.baseRadarPower * self.multiRadarPower) + self.bonusRadarPower
+
+        self.shareData = True
+        self.passiveRadar = False
+
+    def updateHelmStats(self):
+        self.apMax = int((self.baseAP * self.multiAP) + self.bonusAP)
+        self.visPower = int((self.baseVisPower * self.multiVisPower) + self.bonusVisPower)
+        self.visPower = int((self.baseVisPower * self.multiVisPower) + self.bonusVisPower)
+
 
 class WeaponLimb(MechPart):
     def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, desc = ""):
@@ -1111,18 +1085,46 @@ class WeaponLimb(MechPart):
         self.desc = desc
         self.isGun = True
         self.defaultGun = False
-        self.projectileCount = projectileCount
-        self.dmg = damage
-        self.accuracy = accuracy #affected by visAbsorb of tiles, higher means more accuracy
-        self.soundReport = soundRep #the distance the weapon can be heard from
+
+        self.baseProjectileCount = projectileCount
+        self.bonusProjectileCount = 0
+        self.multiProjectileCount = 1
+        self.projectileCount = (self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount
+
+        self.baseDmg = damage
+        self.bonusDmg = 0
+        self.multiDmg = 1
+        self.dmg = (self.baseDmg * self.multiDmg) + self.bonusDmg
+
+
+        self.baseAccuracy = accuracy #affected by visAbsorb of tiles, higher means more accuracy
+        self.bonusAccuracy = 0
+        self.multiAccuracy = 1
+        self.accuracy = (self.baseAccuracy * self.multiAccuracy) + self.bonusAccuracy
+
+        self.baseSoundReport = soundRep #the distance the weapon can be heard from
+        self.bonusSoundReport = 0
+        self.multiSoundReport = 1
+        self.soundReport = (self.baseSoundReport * self.multiSoundReport) + self.bonusSoundReport
+
         self.maxCharges = charges
         self.charges = charges #amount of ammo carried
+
         self.apCost = apCost
         self.energyCost = energyCost
+
         self.speedPenalty = speedPenalty
+
         self.piercing = armorPiercing
+
         self.armorDamage = armorDamage
+
         self.accuracyPenalty = 1
+
+    def updateWeaponStats(self):
+        self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
+        self.accuracy = int((self.baseAccuracy * self.multiAccuracy) + self.bonusAccuracy)
+        self.soundReport = int((self.baseSoundReport * self.multiSoundReport) + self.bonusSoundReport)
 
     def emitSound(self, matchInfo):
         for entity in matchInfo.entities:
@@ -1189,14 +1191,13 @@ class WeaponLimb(MechPart):
 
 #clean up module system and make it work (not updating)
 class Module: #supposed to be superclass but couldn't figure it out
-    def __init__(self, name, statKey, bonusType, statChangeList, desc = ""): #[destroyed bonus, damaged bonus, good bonus]
+    def __init__(self, name, attrNames, bonusType, statChangeList, desc = ""): #[destroyed bonus, damaged bonus, good bonus]
         
         self.name = name
-        self.statKey = statKey
-        #multi bonus = 1, flat bonus = 2, condition = 3, no bonuses = 4
-        self.modType = bonusType
+        self.statNames = attrNames
+        self.modType = bonusType #0 makes no stat changes
         self.status = 2 #[destroyed, damaged, good]
-        self.statList = statChangeList
+        self.statsArray = statChangeList
         self.desc = desc
 
     def restore(self):
