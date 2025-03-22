@@ -51,6 +51,7 @@ class MatchInfo:
             if mech.cockpit.status == 0:
                 self.destoryedMechs.append(mech)
                 mech.squad.mechlist.remove(mech)
+                self.entities.remove(mech)
         self.pov.squad.roundRefresh(self)
         self.advTurn = True
 
