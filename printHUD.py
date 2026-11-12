@@ -1,6 +1,7 @@
 import termcolor
 
 def displayHUD(matchInfo):
+    """Render the current mech's resources and movement state."""
     mech = matchInfo.pov
     condPercent= round(mech.mechClass.condition)
 
@@ -13,6 +14,7 @@ def displayHUD(matchInfo):
     print()
     
 def report(matchInfo, mech, message, teamReport = False, critical = False): #TODO add messages to a report log
+    """Format and store a report for a mech or its entire team."""
     matchRound = matchInfo.matchRound
     critMessage = ""
     if critical == True:
@@ -26,6 +28,7 @@ def report(matchInfo, mech, message, teamReport = False, critical = False): #TOD
         mech.squad.reportLog.insert(0,[report, critical, False])
 
 def criticalReports(matchstats):
+    """Print critical reports stored on the match state."""
     mech = matchstats.pov
     matchstats.advTurn = False
     pageSize = 40

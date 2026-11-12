@@ -40,6 +40,7 @@ def compass_bearing(pointA, pointB):
     return compass_bearing
 
 def neswDirection(pointA, pointB):
+    """Convert the bearing between two map positions into a compass label."""
     
     bearing = compass_bearing(tuple(pointA), tuple(pointB))
     direction = f""
@@ -64,6 +65,7 @@ def neswDirection(pointA, pointB):
     return direction
 
 def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inputQuery is a string of why they are entering coords
+    """Read and validate one in-bounds ``x,y`` position, or return ``"x"`` to cancel."""
     playerInput= ""
     coordinate = []
     xyMax = len(matchInfo.map) - 1

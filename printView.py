@@ -1,12 +1,11 @@
-import gameClasses as C
 import functions as f
 import termcolor
 import printHUD as ph
 
 def printPOV(matchInfo, povX, povY):
+    """Render a square tactical window centered on the supplied map position."""
+    from mechgame.terrain import Cell
 
-    blank = C.TerrainType("blank", " ", "black", size= 0, moveCostBySize = [], visualAbsorbtion = 9999, radarAbsorbtion = 9999, fireproof = True, passable = False)
-    border = C.TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
     #makes window
     mapWindow = []
 
@@ -22,7 +21,9 @@ def printPOV(matchInfo, povX, povY):
         x = povX - windowExtend
         while x <= povX + windowExtend:
             if y < 0 or y > matchInfo.mapSize - 1 or x < 0 or x > matchInfo.mapSize - 1:
-                xRow.append(C.Cell(blank,[x, y]))
+                # Reuse the match's terrain catalogue instead of constructing
+                # equivalent blank and border terrain objects for every frame.
+                xRow.append(Cell(matchInfo.blank,[x, y]))
             else:
                 xRow.append(matchInfo.map[y][x])
             x += 1
@@ -34,7 +35,7 @@ def printPOV(matchInfo, povX, povY):
     #print window
     for y in mapWindow:
         for cell in y:
-            if cell.terrain == border:
+            if cell.terrain == matchInfo.border:
                 cell.terrain.displayTerrain() #display borders
             elif cell.canSee == True:
                     cell.displayCell(matchInfo) #already anticipates entities on cell, will display entity if visible
@@ -46,6 +47,7 @@ def printPOV(matchInfo, povX, povY):
     return
     
 def lookAt(matchInfo): #TODO parse text to make input smoother
+    """Prompt for a coordinate and display the tactical view around it."""
     
     coord = f.getCoordinateInput(matchInfo, "View coordinates")
     ph.displayHUD(matchInfo)
