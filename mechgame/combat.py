@@ -5,6 +5,7 @@ are gradually split into focused systems. Map construction lives in
 ``mechgame.world``; focused modules re-export their public classes from here.
 """
 
+import heapq
 import math
 import functions as f
 import copy
@@ -596,61 +597,60 @@ class Entity: #a character on the map
         self.trackedEnemies = list(dict.fromkeys([*self.directlyVisibleEnemies, *radarContacts]))
 
     def getRadar(self, matchInfo):
-        """Project active radar strength through radar absorption."""
+        """Refresh shared active-radar coverage when a source state changed."""
+        matchInfo.refreshRadar()
+
+    def _projectRadar(self, matchInfo):
+        """Project one source through terrain using the strongest available path."""
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
-        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
-        if self.radarPower <= 0 or not self.radarOn:
+        sourcePower = int(self.mechClass.radarPower / (1 + (self.speed * .25)))
+        if sourcePower <= 0:
             return
 
-        startingCell.radarPower = int(self.radarPower)
-        self.radarIDlist.append(startingCell)
-        startingCell.radarReturn = True
+        # Radar below this strength cannot create a passive-radar warning or
+        # any current terrain/entity contact, so there is no reason to expand.
+        propagationCutoff = 25
+        bestPower = {tuple(startingCell.pos): sourcePower}
+        frontier = [(-sourcePower, 0, startingCell)]
+        sequence = 1
+        self.radarPower = sourcePower
+        self.radarIDlist = [startingCell]
 
-        calcList = [] #cells queued to be calced
-        dontCalcList = [startingCell] #cells exempt from calcs
-    
-        for n in startingCell.nList:
-            calcList.append(n)
-        
-        for cell in calcList:
-            if cell not in dontCalcList:
-                #print("calcd: " + str(cell.pos) + " | prevPower: " + str(cell.radarPower), end = " newPower:") #test
-                dontCalcList.append(cell)
-                closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
-                # Apply a fixed loss for each tile crossed.  Calculating loss
-                # from the source distance here made each successive step more
-                # expensive than the last, preventing meaningful long range.
-                radarLoss = radar_step_loss(closestNeighbor.terrain.radarAbsorb)
-                cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
-                #print(cell.radarPower)#test
+        while frontier:
+            negativePower, _, cell = heapq.heappop(frontier)
+            power = -negativePower
+            if power != bestPower.get(tuple(cell.pos)):
+                continue
 
-                if cell.radarPower < 0:
-                    cell.radarPower = 0
+            cell.radarPower = max(cell.radarPower, power)
+            cell.radarReturn = True
 
-                if cell.radarPower > 0:
-                    cell.radarReturn = True
-                    for n in cell.nList:
-                        if (n not in dontCalcList):
-                            calcList.append(n)
+            for neighbor in cell.nList:
+                nextPower = power - radar_step_loss(neighbor.terrain.radarAbsorb)
+                neighborPos = tuple(neighbor.pos)
+                if nextPower < propagationCutoff or nextPower <= bestPower.get(neighborPos, -1):
+                    continue
+                bestPower[neighborPos] = nextPower
+                heapq.heappush(frontier, (-nextPower, sequence, neighbor))
+                sequence += 1
 
         radarContacts = []
         for obj in matchInfo.entities: #passive radar and radar ID reports
-            if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
+            contactPower = bestPower.get(tuple(obj.pos), 0)
+            if obj.mechClass.passiveRadar == True and contactPower >= propagationCutoff:
                 if obj.team != self.team:
                     obj.passiveRadarDetect(matchInfo, self)
-            if map[obj.pos[1]][obj.pos[0]].radarPower >= entity_detection_threshold(obj.radarSig):
+            if contactPower >= entity_detection_threshold(obj.radarSig):
                 if obj.team != self.team:
                     radarContacts.append(obj)
-                    self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
+                    self.radarReport(matchInfo, contactPower, obj)
 
         # Radar contacts belong to the squad, not only the mech that emitted
         # the scan. Preserve contacts from other active friendly radars too.
         for contact in radarContacts:
             if contact not in self.squad.radarTrackedEnemies:
                 self.squad.radarTrackedEnemies.append(contact)
-        for mech in self.squad.mechList:
-            mech._refresh_tracked_enemies()
 
     def passiveRadarDetect(self, matchInfo, emittor):
         """Try to detect an emitting entity using this mech's passive radar."""
