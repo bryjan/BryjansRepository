@@ -1333,6 +1333,51 @@ class Squad:
         self.radarTrackedEnemies = []
         for entity in self.mechList:
             entity.roundRefresh(matchInfo)
+
+    def statusReport(self):
+        """Return a squad readiness summary for the player or future AI."""
+        if not self.mechList:
+            return f"{self.name}: no operational mechs remain."
+
+        averageIntegrity = sum(mech.mechClass.condition for mech in self.mechList) / len(self.mechList)
+        damagedModules = sum(
+            module.status < 2
+            for mech in self.mechList
+            for part in mech.mechClass.limbList
+            for module in part.modsList
+        )
+        totalModules = sum(
+            len(part.modsList)
+            for mech in self.mechList
+            for part in mech.mechClass.limbList
+        )
+        mostDamaged = min(self.mechList, key=lambda mech: mech.mechClass.condition)
+
+        ammoByWeapon = {}
+        for mech in self.mechList:
+            for weapon in mech.mechClass.gunList:
+                ammunition = ammoByWeapon.setdefault(
+                    weapon.name,
+                    {"current": 0, "maximum": 0, "unlimited": False},
+                )
+                if weapon.charges is None:
+                    ammunition["unlimited"] = True
+                    continue
+                ammunition["current"] += weapon.charges
+                ammunition["maximum"] += weapon.maxCharges
+
+        ammoSummary = []
+        for weaponName, ammo in ammoByWeapon.items():
+            amount = "unlimited" if ammo["unlimited"] else f"{ammo['current']}/{ammo['maximum']}"
+            ammoSummary.append(f"{weaponName} {amount}")
+        ammunition = ", ".join(ammoSummary) if ammoSummary else "none"
+
+        return "\n".join([
+            f"{self.name} squad status",
+            f"Average integrity: {round(averageIntegrity)}% | Damaged modules: {damagedModules}/{totalModules}",
+            f"Ammunition: {ammunition}",
+            f"Most damaged: {mostDamaged.pilot.name} — {mostDamaged.mechClass.name} ({round(mostDamaged.mechClass.condition)}%)",
+        ])
     
     def squadView(self, matchInfo):
         for entity in self.mechList:

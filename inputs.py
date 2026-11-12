@@ -31,6 +31,10 @@ def receive_input(matchInfo):
         case "st" | "status":
             print(matchInfo.pov.statusReport())
             return
+
+        case "sq" | "squad":
+            print(matchInfo.pov.squad.statusReport())
+            return
         
         case "next":
             return matchInfo.nextMechinTeam()
@@ -253,6 +257,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Type 'f' to target the nearest tracked enemy, then Enter or f to fire; other target options are available")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'st' for a full mech integrity, module, and ammunition report")
+    print ("Type 'sq' for squad integrity, module, ammunition, and damage summary")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
 
