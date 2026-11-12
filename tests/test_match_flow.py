@@ -16,3 +16,16 @@ class MatchFlowTests(unittest.TestCase):
         match.nextSquadTurn()
         self.assertIs(match.pov.team, player_team)
         self.assertEqual(match.matchRound, 1)
+
+    def test_actions_do_not_change_squads_without_an_end_request(self):
+        game = Game(map_size=20, window_size=9, rng=random.Random(0))
+        match = game.create_match()
+        active_mech = match.pov
+
+        match.advTurn = True
+        game.advance_turn_if_requested(match)
+        self.assertIs(match.pov, active_mech)
+
+        match.turnEnded = True
+        game.advance_turn_if_requested(match)
+        self.assertIsNot(match.pov, active_mech)
