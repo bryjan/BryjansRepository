@@ -1,10 +1,8 @@
-"""Temporary implementation home for interdependent combat domain objects.
+"""Combat domain objects shared by entities, mech parts, and teams.
 
 This module keeps the original combat model together while its responsibilities
 are gradually split into focused systems. Map construction lives in
-``mechgame.world``; public imports now go through focused modules. This file
-remains while the tightly coupled entity, mech, and team implementations are
-migrated without altering their game behavior.
+``mechgame.world``; focused modules re-export their public classes from here.
 """
 
 import math
