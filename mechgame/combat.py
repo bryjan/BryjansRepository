@@ -10,6 +10,7 @@ import functions as f
 import copy
 import random
 from termcolor import colored, cprint #print(colored(string, color as string),attrs=[bold,dark,underline,blink,reverse,concealed],end='')
+from .radar import entity_detection_threshold
 
 class MatchInfo:
     """Mutable state shared by one running match.
@@ -300,10 +301,11 @@ class Cell:
     def displayRadarReturn(self, matchInfo):
 
         for entity in matchInfo.entities:
-            if entity.pos == self.pos and self.radarPower >= (entity.radarSig * 2):
+            threshold = entity_detection_threshold(entity.radarSig)
+            if entity.pos == self.pos and self.radarPower >= (threshold * 2):
                 entity.displayObject()
                 return
-            if entity.pos == self.pos and self.radarPower >= entity.radarSig:
+            if entity.pos == self.pos and self.radarPower >= threshold:
                 print(colored("?", "white"), end=" ")
                 return
         
@@ -557,7 +559,7 @@ class Entity: #a character on the map
             if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
                 if obj.team != self.team:
                     obj.passiveRadarDetect(matchInfo, self)
-            if map[obj.pos[1]][obj.pos[0]].radarPower >= (obj.radarSig / (1 + (self.speed * .2 ))):
+            if map[obj.pos[1]][obj.pos[0]].radarPower >= entity_detection_threshold(obj.radarSig):
                 if obj.team != self.team:
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
 
@@ -579,10 +581,11 @@ class Entity: #a character on the map
     
         strength = map[self.pos[1]][self.pos[0]].radarPower
 
-        if strength >= self.radarSig * 2:
+        threshold = entity_detection_threshold(self.radarSig)
+        if strength >= threshold * 2:
             status = "identified"
             repCritical = True
-        elif strength >= self.radarSig:
+        elif strength >= threshold:
             status = "noticable"
             repCritical = True
         else:
@@ -593,7 +596,8 @@ class Entity: #a character on the map
     def radarReport(self, matchInfo, radarPower, target):
         """Record an imprecise radar contact for the target's squad."""
 
-        if radarPower < target.radarSig:
+        threshold = entity_detection_threshold(target.radarSig)
+        if radarPower < threshold:
             return
     
         targetName = f""
@@ -607,11 +611,11 @@ class Entity: #a character on the map
             moveDir = f.neswDirection(target.turnStartPos, target.pos)
             moveDirection = f", moving {moveDir}"
 
-        if radarPower >= target.radarSig * 2:
+        if radarPower >= threshold * 2:
             targetName = f" Identified as {target.mechClass.name},"
             speed = f" Moving at {target.speed} units a turn."
     
-        if radarPower >= target.radarSig * 1.5:
+        if radarPower >= threshold * 1.5:
             size = target.sizeStr.capitalize()
             if target.speed == 0:
                 moveDirection = f", not moving"
