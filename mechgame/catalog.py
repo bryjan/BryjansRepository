@@ -76,16 +76,33 @@ def _module_kestrel_reserve_capacitor():
     )
 
 
+def _module_efficient_combat_reactor():
+    """Give Bastion sustained output without relying on a huge reserve."""
+    return Module(
+        "Efficient Combat Reactor",
+        ["bonusEnergy", "bonusEnergyGen"],
+        1,
+        [[0, 3, 6], [0, 0, 1]],
+    )
+
+
+def _module_reinforced_leg_drives():
+    """Keep Bastion at full speed until its durable drives are destroyed."""
+    return Module("Reinforced Leg Drives", ["bonusMP"], 1, [[-1, 0, 0]])
+
+
 MODULE_FACTORIES = {
     "anti_spalling_foam": _module_anti_spalling_foam,
     "chaingun_bolt": _module_chaingun_bolt,
     "exosuit_leg_motors": _module_exosuit_leg_motors,
+    "efficient_combat_reactor": _module_efficient_combat_reactor,
     "holosight": _module_holosight,
     "kestrel_active_radar_array": _module_kestrel_active_radar_array,
     "kestrel_leg_actuators": _module_kestrel_leg_actuators,
     "kestrel_reserve_capacitor": _module_kestrel_reserve_capacitor,
     "lancer_light_frame": _module_lancer_light_frame,
     "passive_radar_detector": _module_passive_radar_detector,
+    "reinforced_leg_drives": _module_reinforced_leg_drives,
     "standard_active_radar_array": _module_standard_active_radar_array,
 }
 
@@ -194,6 +211,46 @@ def _kestrel_energy_beam():
     )
 
 
+def _bastion_helm():
+    return Helm(
+        "Bastion Helm", 11, 55,
+        [create_module("anti_spalling_foam"), create_module("anti_spalling_foam")],
+        ap=7, visualPower=15, radarPower=0, radarEnergyCost=0,
+    )
+
+
+def _bastion_hull():
+    return Hull(
+        "Bastion Hull", 12, 65,
+        [
+            create_module("anti_spalling_foam"),
+            create_module("anti_spalling_foam"),
+            create_module("efficient_combat_reactor"),
+        ],
+        pwrCapacity=26, pwrGen=5, radarSig=280, size=3,
+    )
+
+
+def _bastion_legs():
+    return Legs("Bastion Legs", 9, 55, [create_module("reinforced_leg_drives")], speed=4)
+
+
+def _heavy_melting_beam():
+    return WeaponLimb(
+        "Heavy Melting Beam", 10, 45, [], damage=20, accuracy=32,
+        soundRep=20, charges=None, apCost=2, energyCost=2,
+        armorDamage=2, maxRange=28,
+    )
+
+
+def _sustained_chaingun():
+    return WeaponLimb(
+        "Sustained ChainGun", 8, 30,
+        [create_module("chaingun_bolt"), create_module("holosight")],
+        damage=9, accuracy=20, soundRep=20, charges=120, projectileCount=3,
+    )
+
+
 PART_FACTORIES = {
     2: {
         "lancer.standard_helm": _standard_lancer_helm,
@@ -206,10 +263,15 @@ PART_FACTORIES = {
         "scout_rifle": _scout_rifle,
     },
     3: {
+        "bastion.helm": _bastion_helm,
+        "bastion.hull": _bastion_hull,
+        "bastion.legs": _bastion_legs,
+        "heavy_melting_beam": _heavy_melting_beam,
         "kestrel.sensor_helm": _kestrel_sensor_helm,
         "kestrel.hull": _kestrel_hull,
         "kestrel.legs": _kestrel_legs,
         "kestrel_energy_beam": _kestrel_energy_beam,
+        "sustained_chaingun": _sustained_chaingun,
     },
 }
 
@@ -252,9 +314,19 @@ def _kestrel():
     )
 
 
+def _bastion():
+    return MechClass(
+        "Bastion", "B", "green",
+        create_part(3, "bastion.hull"),
+        create_part(3, "bastion.helm"),
+        create_part(3, "bastion.legs"),
+        [create_part(3, "heavy_melting_beam"), create_part(3, "sustained_chaingun")],
+    )
+
+
 MECH_FACTORIES = {
     2: {"lancer.type_a": _lancer_type_a, "lancer.pathfinder": _lancer_pathfinder},
-    3: {"kestrel": _kestrel},
+    3: {"bastion": _bastion, "kestrel": _kestrel},
 }
 
 

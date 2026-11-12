@@ -1167,7 +1167,7 @@ class WeaponLimb(MechPart):
             if math.dist(matchInfo.pov.pos, entity.pos) <= self.soundReport and entity not in matchInfo.pov.squad.mechList:
                 entity.report(matchInfo, "I hear shots. Sounds like a " + self.name + "." , teamReport = False, critical = False)
     
-    def shootAt(self, matchInfo, pos):
+    def shootAt(self, matchInfo, pos, aimedLimb=None):
         """Spend resources and resolve every projectile fired at a map position."""
 
         #check if enough resources
@@ -1177,7 +1177,8 @@ class WeaponLimb(MechPart):
         if self.maxRange is not None and math.dist(matchInfo.pov.pos, pos) > self.maxRange:
             print(f"Target is beyond this weapon's {self.maxRange}-tile range.")
             return
-        if matchInfo.pov.ap - self.apCost < 0:
+        aimApCost = 1 if aimedLimb is not None else 0
+        if matchInfo.pov.ap - (self.apCost + aimApCost) < 0:
             print("Out of action points!")
             return
         if matchInfo.pov.energy - self.energyCost < 0:
@@ -1186,7 +1187,7 @@ class WeaponLimb(MechPart):
 
         if self.charges is not None:
             self.charges -= 1
-        matchInfo.pov.ap -= self.apCost
+        matchInfo.pov.ap -= self.apCost + aimApCost
         matchInfo.pov.energy -= self.energyCost
         # Store the attempted location even on a miss so a follow-up shot can
         # be ordered without re-entering coordinates.
@@ -1224,8 +1225,8 @@ class WeaponLimb(MechPart):
             else:
                 print("Shot hit!")
                 if target is not None:
-                    #TODO add system to target specific limbs or make add weight table of limb chance to be hit
-                    random.choice(target.mechClass.limbList).damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
+                    targetLimb = aimedLimb if aimedLimb in target.mechClass.limbList else random.choice(target.mechClass.limbList)
+                    targetLimb.damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
         matchInfo.advTurn = True
 

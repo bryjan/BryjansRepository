@@ -96,10 +96,11 @@ def fire(matchInfo):
         print(f"Default target: {defaultTarget.pilot.name} — {defaultTarget.mechClass.name} at {defaultTarget.pos}")
         pv.printPOV(matchInfo, *defaultTarget.pos)
 
-    targetPos = chooseFireTarget(matchInfo, defaultTarget)
-    if targetPos is None:
+    targetChoice = chooseFireTarget(matchInfo, defaultTarget)
+    if targetChoice is None:
         return
-    gun.shootAt(matchInfo, targetPos)
+    targetPos, aimedLimb = targetChoice
+    gun.shootAt(matchInfo, targetPos, aimedLimb)
 
 
 def nearestTrackedEnemy(mech):
@@ -163,10 +164,13 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
-        print("Press Enter or f to fire. [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
+        print("Press Enter or f to fire. [a]im limb (+1 AP)  [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
-            return list(defaultTarget.pos)
+            return list(defaultTarget.pos), None
+        if choice == "a":
+            aimedLimb = chooseAimedLimb(defaultTarget)
+            return None if aimedLimb is None else (list(defaultTarget.pos), aimedLimb)
     else:
         print("Fire target: [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
         choice = _read_nonempty("Target: ").lower()
@@ -175,12 +179,13 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         return None
     if choice == "c":
         target = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at")
-        return None if target == "x" else target
+        return None if target == "x" else (target, None)
     if choice == "l":
         if mech.lastFiredAt is None:
             print("No previous firing location.")
             return None
-        return list(mech.lastFiredAt)
+        target = next((enemy for enemy in mech.trackedEnemies if enemy.pos == mech.lastFiredAt), None)
+        return chooseTargetAction(target) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
         print("Choose t, l, c, or x.")
         return None
@@ -188,7 +193,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         print("No enemy mechs are currently tracked.")
         return None
     if len(mech.trackedEnemies) == 1:
-        return list(mech.trackedEnemies[0].pos)
+        return chooseTargetAction(mech.trackedEnemies[0])
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         print(f"{index}. {enemy.pilot.name} — {enemy.mechClass.name} at {enemy.pos}")
@@ -196,7 +201,36 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return list(mech.trackedEnemies[int(selection) - 1].pos)
+    return chooseTargetAction(mech.trackedEnemies[int(selection) - 1])
+
+
+def chooseTargetAction(target):
+    """Confirm a tracked target and optionally select a specific mech part."""
+    print(f"Target: {target.pilot.name} — {target.mechClass.name} at {target.pos}")
+    choice = input("Press Enter or f to fire, or a to aim at a limb (+1 AP): ").strip().lower()
+    if choice in ("", "f"):
+        return list(target.pos), None
+    if choice != "a":
+        print("Choose Enter, f, or a.")
+        return None
+
+    aimedLimb = chooseAimedLimb(target)
+    if aimedLimb is None:
+        return None
+    return list(target.pos), aimedLimb
+
+
+def chooseAimedLimb(target):
+    """Let the player select a live target part for the one-AP aiming cost."""
+    for index, limb in enumerate(target.mechClass.limbList, start=1):
+        print(f"{index}. {limb.name} — armor {limb.armor}/{limb.startingArmor}, HP {limb.hp}/{limb.startingHP}")
+    selection = _read_nonempty("Aim at limb (x to cancel): ").lower()
+    if selection == "x":
+        return None
+    if not selection.isdigit() or not 1 <= int(selection) <= len(target.mechClass.limbList):
+        print("Choose a listed limb number.")
+        return None
+    return target.mechClass.limbList[int(selection) - 1]
 
 def gunMenu(matchInfo): #TODO add ability to exit
     """Display weapons and make one available as the default firing choice."""
@@ -305,7 +339,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
     print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
-    print ("Type 'f' to target the nearest tracked enemy, then Enter or f to fire; other target options are available")
+    print ("Type 'f' to target the nearest tracked enemy; press a to aim at a limb for +1 AP")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'st' for a full mech integrity, module, and ammunition report")
     print ("Type 'sq' for squad status and mech or controllable-squad switching")
