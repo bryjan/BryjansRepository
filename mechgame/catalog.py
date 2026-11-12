@@ -227,7 +227,7 @@ def _bastion_hull():
             create_module("anti_spalling_foam"),
             create_module("efficient_combat_reactor"),
         ],
-        pwrCapacity=26, pwrGen=5, radarSig=280, size=3,
+        pwrCapacity=26, pwrGen=5, radarSig=320, size=3,
     )
 
 
@@ -237,7 +237,7 @@ def _bastion_legs():
 
 def _heavy_melting_beam():
     return WeaponLimb(
-        "Heavy Melting Beam", 10, 45, [], damage=20, accuracy=32,
+        "Heavy Melting Beam", 10, 45, [], damage=20, accuracy=30,
         soundRep=20, charges=None, apCost=2, energyCost=2,
         armorDamage=2, maxRange=28,
     )
