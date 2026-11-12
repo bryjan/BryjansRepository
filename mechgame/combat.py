@@ -721,12 +721,13 @@ class MechClass: #a constructed mech not a npc or player
         self.shareData = False
         self.visPower = 0
         self.radarPower = 0
+        self.radarEnergyCost = 0
         self.passiveRadar = False
         self.canfloat = False
         self.canFly = False
         self.initFlying = False
 
-        self.passedStatsList = ["size","radarSig","apMax","mpMax","energyMax","energyGen","shareData","visPower","radarPower","passiveRadar","canFly","canFloat","initFlying"]
+        self.passedStatsList = ["size","radarSig","apMax","mpMax","energyMax","energyGen","shareData","visPower","radarPower","radarEnergyCost","passiveRadar","canFly","canFloat","initFlying"]
 
         self.statUpdate()
 
@@ -940,7 +941,7 @@ class Hull(MechPart):
 
 class Helm(MechPart):
     """Mech part that supplies action points and sensor power."""
-    def __init__ (self, name, armor, hp, moduleList, ap, visualPower, radarPower, desc=""):
+    def __init__ (self, name, armor, hp, moduleList, ap, visualPower, radarPower, radarEnergyCost=0, desc=""):
         super().__init__(name, armor, hp, moduleList, desc="")
         self.baseAP = ap
         self.bonusAP = 0
@@ -956,6 +957,10 @@ class Helm(MechPart):
         self.bonusRadarPower = 0
         self.multiRadarPower = 1
         self.radarPower = (self.baseRadarPower * self.multiRadarPower) + self.bonusRadarPower
+
+        # Sensor modules can set this alongside radarPower. It is inherited by
+        # MechClass now so an active-scan action can spend it later.
+        self.radarEnergyCost = radarEnergyCost
 
         self.shareData = True
         self.passiveRadar = False
