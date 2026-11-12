@@ -4,6 +4,7 @@ import termcolor
 import printHUD as ph
 
 def printPOV(matchInfo, povX, povY):
+    """Render a square tactical window centered on the supplied map position."""
 
     blank = C.TerrainType("blank", " ", "black", size= 0, moveCostBySize = [], visualAbsorbtion = 9999, radarAbsorbtion = 9999, fireproof = True, passable = False)
     border = C.TerrainType("border", "X", "white", size= 0, moveCostBySize = [9999,9999,9999,9999,9999,9999,9999], visualAbsorbtion = 1, radarAbsorbtion =1, radarSig = 1, fireproof = True, passable = False)
@@ -46,6 +47,7 @@ def printPOV(matchInfo, povX, povY):
     return
     
 def lookAt(matchInfo): #TODO parse text to make input smoother
+    """Prompt for a coordinate and display the tactical view around it."""
     
     coord = f.getCoordinateInput(matchInfo, "View coordinates")
     ph.displayHUD(matchInfo)

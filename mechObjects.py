@@ -1,3 +1,9 @@
+"""Legacy sample mech definitions.
+
+New scenarios should use factories in ``mechgame.content`` so every match gets
+its own mutable parts and modules.
+"""
+
 import gameClasses as C
 import copy
 

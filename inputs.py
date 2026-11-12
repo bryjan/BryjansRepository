@@ -2,6 +2,7 @@ import printView as pv
 import functions as f
 
 def recieveInput(matchInfo):
+    """Read one player command and dispatch it to the relevant game action."""
 
     playerInput = ""
     while len(playerInput) == 0:
@@ -54,6 +55,7 @@ def recieveInput(matchInfo):
     
 
 def radarToggle(matchInfo):
+    """Switch the current mech's active radar state."""
     mech = matchInfo.pov
     if mech.radarOn == True:
         mech.radarOn == False
@@ -63,6 +65,7 @@ def radarToggle(matchInfo):
         print("Radar toggled on")
 
 def fire(matchInfo):
+    """Fire the selected default weapon, prompting when none is selected."""
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
 
@@ -86,6 +89,7 @@ def fire(matchInfo):
     gun.shootAt(matchInfo, targetPos)
 
 def gunMenu(matchInfo): #TODO add ability to exit
+    """Display weapons and make one available as the default firing choice."""
 
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
@@ -150,6 +154,7 @@ def nextMech(matchInfo):
     matchInfo.nextMechinTeam()
 
 def printReportLogPrompt(matchInfo):
+    """Ask for a report-log page before rendering it."""
     inpPage = input("Page number: ")
     if inpPage.isdigit():
         inpPage = int(inpPage)
@@ -158,6 +163,7 @@ def printReportLogPrompt(matchInfo):
     printReportLog(matchInfo, page=int(inpPage))
 
 def printReportLog(matchInfo,page=1):
+    """Print one fixed-size page of the current squad's reports."""
     mech = matchInfo.pov
     matchInfo.advTurn = False
     pageTotal = len(mech.squad.reportLog)
@@ -178,6 +184,7 @@ def printReportLog(matchInfo,page=1):
     print()
 
 def printUnreads(matchInfo):
+    """Print unread squad reports and mark each displayed entry as read."""
     mech = matchInfo.pov
     matchInfo.advTurn = False
     pageSize = 100
@@ -192,6 +199,7 @@ def printUnreads(matchInfo):
     print()
 
 def helpCommand(matchInfo): #TODO update with all commands
+    """Show the currently supported command shortcuts."""
     print ("Here are the list of commands available to you:")
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to see your team's unread reports, 'rep' will prompt you for page number for full the report log")

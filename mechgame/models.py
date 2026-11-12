@@ -1,3 +1,11 @@
+"""Domain objects used by the tactical simulation.
+
+This module keeps the original combat model together while its responsibilities
+are gradually split into focused systems. Map construction now lives in
+``mechgame.world``; the remaining map helpers are retained for compatibility
+with older callers.
+"""
+
 import math
 import functions as f
 import copy
@@ -5,6 +13,11 @@ import random
 from termcolor import colored, cprint #print(colored(string, color as string),attrs=[bold,dark,underline,blink,reverse,concealed],end='')
 
 class MatchInfo:
+    """Mutable state shared by one running match.
+
+    It owns the teams, map, turn cursor, and collections of active and removed
+    entities. Systems receive this object when they need match-wide context.
+    """
     def __init__(self, mapSize, windowSize, teams, mapParams):
         
         self.mapSize = mapSize
@@ -30,6 +43,7 @@ class MatchInfo:
         pass #TODO
 
     def nextSquadTurn(self):
+        """Advance the point of view to the first mech in the next squad."""
         teamIndex = self.teamList.index(self.pov.team)
         squadIndex = self.pov.team.squadsList.index(self.pov.squad)
     
@@ -54,6 +68,7 @@ class MatchInfo:
         self.advTurn = True
 
     def nextMechinTeam(self):
+        """Cycle the point of view through the current squad without ending its turn."""
         nextMechIndex = self.pov.squad.mechList.index(self.pov) + 1
     
         if nextMechIndex > len(self.pov.squad.mechList)-1:
@@ -63,6 +78,7 @@ class MatchInfo:
         self.advTurn = False
 
     def clearVisuals(self):
+        """Clear per-turn visibility and radar data from every map cell."""
         for y in self.map:
             for x in y:
                 x.canSee = False
@@ -73,6 +89,7 @@ class MatchInfo:
     
     
     def explosion(self, location, radius, size, damage): #spawns explosions. for rockets/artillery
+        """Apply area damage to entities within ``radius`` of a map position."""
         
         pos = location #[x , y]
         radius = radius #radius of explosion
@@ -101,6 +118,7 @@ class MatchInfo:
         #TODO chance to start fire
 
     def calcLine(self, point1, point2):
+        """Return the slope and intercept for a line between two grid positions."""
 
         x1, y1 = point1
         x2, y2 = point2
@@ -111,6 +129,7 @@ class MatchInfo:
         return [slope, yIntercept]
 
     def ListInterceptingSquares(self, point1, point2):
+        """Return approximate cells crossed by a line of sight or projectile path."""
 
         interceptingCells = []
         
@@ -150,6 +169,7 @@ class MatchInfo:
         self.map = MapGenerator(self.mapSize).build(self)
 
     def mapinitPop(self): #populates map with a tile to start
+        # Legacy generator entry point. New matches use MapGenerator via mapInit.
         mapArray = []
         xRow = []
         y = 0
@@ -268,6 +288,7 @@ class MatchInfo:
 
 #key descriptions in dictionary
 class TerrainType:
+    """Immutable-style description of how a terrain category behaves and renders."""
     def __init__(self, name, symbol, color,size= 0, moveCostBySize=[], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 0, requireFloat = False, fireproof = False, passable = True, symbolHighlight = "", symbolAttribute = []):
         self.name = name
         self.symbol = symbol
@@ -362,6 +383,7 @@ class TerrainType:
 
 
 class Cell:
+    """One map location, including its terrain, neighbors, and transient sensor data."""
     def __init__ (self, terrainType, xyPosition):
         self.terrain = terrainType
         self.pos = xyPosition
@@ -379,6 +401,7 @@ class Cell:
         self.radarReturn = False
         
     def refNeighbors(self,map): #gets a list of neighbor cells to refernce for calculations
+        """Populate adjacent-cell references once the full map grid exists."""
         self.nList=[]
 
         if (self.pos[1] + 1 <= len(map)-1) and (self.pos[0] - 1 >= 0):
@@ -447,6 +470,7 @@ class Cell:
         
 
     def displayCell(self, matchInfo): #TODO what will the cell print on map. smoke and fire affects will be displayed through here too
+        """Render the visible entity at this cell, or fall back to terrain."""
         
         for entity in matchInfo.entities:
             if entity.pos == self.pos:
@@ -478,6 +502,7 @@ class Cell:
 
 #TODO add ejection mechanic and entity from sqaud, team, and entities list. but track pilot and mech condition for post-battle recovery
 class Entity: #a character on the map
+    """A pilot-controlled instance of a mech class placed in a match."""
     def __init__(self, mechClass, pilot):
         self.mechClass = copy.deepcopy(mechClass)
         self.mechClass.mech = self
@@ -521,6 +546,7 @@ class Entity: #a character on the map
         return self.pilot.name
     
     def roundRefresh(self, matchInfo):
+        """Restore per-round state and refresh the mech's derived statistics."""
 
         #basic stats
         self.turnStartPos = list(self.pos)
@@ -543,6 +569,7 @@ class Entity: #a character on the map
 
     
     def moveMech(self, matchInfo, input):
+        """Attempt one keyboard-directed move and charge the required movement points."""
         map = matchInfo.map
         targetCell = matchInfo.map[self.pos[0]][self.pos[1]] #just to initialize to avoid error
 
@@ -633,6 +660,7 @@ class Entity: #a character on the map
         matchInfo.advTurn = True
     
     def getVis(self, matchInfo):
+        """Project this entity's visual range through terrain absorption."""
         startingCell = matchInfo.map[self.pos[1]][self.pos[0]]
         startingCell.canSee = True
 
@@ -669,6 +697,7 @@ class Entity: #a character on the map
                         dontCalcList.append(n)
 
     def getRadar(self, matchInfo):
+        """Project active radar strength through radar absorption."""
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
         self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
@@ -712,6 +741,7 @@ class Entity: #a character on the map
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
 
     def passiveRadarDetect(self, matchInfo, emittor):
+        """Try to detect an emitting entity using this mech's passive radar."""
         map = matchInfo.map
         repCritical = False
         emittorCell = map[emittor.pos[1]][emittor.pos[0]]
@@ -740,6 +770,7 @@ class Entity: #a character on the map
         return self.report(matchInfo,"Getting pinged from the " + direction + ". At " + str(strength) + " strength, I'm " + status + ".", critical = repCritical)
     
     def radarReport(self, matchInfo, radarPower, target):
+        """Record an imprecise radar contact for the target's squad."""
 
         if radarPower < target.radarSig:
             return
@@ -769,6 +800,7 @@ class Entity: #a character on the map
         self.report(matchInfo, message, critical = True)
     
     def getVisuals(self, matchInfo):
+        """Update both visual and radar information for the current entity."""
         self.getVis(matchInfo)
         self.getRadar(matchInfo)
 
@@ -807,11 +839,13 @@ class Entity: #a character on the map
 
 
 class Pilot: #TODO add pilot levels, skills, certs
+    """Named crew member assigned to an entity."""
     def __init__(self, name):
          self.name = name
 
 
 class MechClass: #a constructed mech not a npc or player
+    """Reusable mech blueprint composed from hull, helm, legs, and weapon limbs."""
     def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist = [], description = ""):
 
         #basic details
@@ -868,8 +902,9 @@ class MechClass: #a constructed mech not a npc or player
         pass
 
     def statUpdate(self):
+        """Recalculate derived mech statistics after a part or module changes."""
         #retrieve limb passed stats
-         for limb in self.limbList:
+        for limb in self.limbList:
             limb.updateModules()
             self.limbsConditionList.append(limb.limbCon)
             for stat in self.passedStatsList:
@@ -881,10 +916,12 @@ class MechClass: #a constructed mech not a npc or player
         pass
 
     def roundRefresh(self): #TODO refreshes round based stats(AP,MP,moved)and adds round based resources ex.power from powerGen
+        """Restore action and movement resources for a new round."""
         pass
 
         
 class MechPart: # super class to mech limbs
+    """Base component with armor, hit points, modules, and derived modifiers."""
     def __init__ (self, name, armor, hp, moduleList, desc = ""):
 
         self.desc = desc
@@ -913,6 +950,7 @@ class MechPart: # super class to mech limbs
         self.updateModules()
 
     def updateModules(self):
+        """Apply this part's active module modifiers to its target attributes."""
         for m in self.modsList:
             if m.modType == 1: #skips modules that make no stat change
                 i = 0
@@ -947,6 +985,7 @@ class MechPart: # super class to mech limbs
 
 
     def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
+        """Resolve damage against armor and hit points, then check critical effects."""
 
         #no negative damage values
         dmg = dmgAmount
@@ -1017,6 +1056,7 @@ class MechPart: # super class to mech limbs
             
 
 class Legs(MechPart): #subclass mechpart
+    """Mech part that contributes mobility and optional floating or flight."""
     def __init__ (self, name, armor, hp, moduleList, speed, float = False, fly = False, desc = ""): #this will initi the superclass the same sats
         super().__init__(name, armor, hp, moduleList, desc="")
         
@@ -1033,6 +1073,7 @@ class Legs(MechPart): #subclass mechpart
         self.mpMax = int((self.baseMP * self.multiMP) + self.bonusMP)
 
 class Hull(MechPart):
+    """Mech part that supplies power, signature, and chassis size."""
     def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = ""):
         super().__init__(name, armor, hp, moduleList, desc = "")
         
@@ -1060,6 +1101,7 @@ class Hull(MechPart):
 
 
 class Helm(MechPart):
+    """Mech part that supplies action points and sensor power."""
     def __init__ (self, name, armor, hp, moduleList, ap, visualPower, radarPower, desc=""):
         super().__init__(name, armor, hp, moduleList, desc="")
         self.baseAP = ap
@@ -1087,6 +1129,7 @@ class Helm(MechPart):
 
 
 class WeaponLimb(MechPart):
+    """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats."""
     def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, desc = ""):
         super().__init__(name, armor, hp, moduleList, desc = "")
         
@@ -1135,11 +1178,13 @@ class WeaponLimb(MechPart):
         self.soundReport = int((self.baseSoundReport * self.multiSoundReport) + self.bonusSoundReport)
 
     def emitSound(self, matchInfo):
+        """Send a sound report to enemy entities within audible range."""
         for entity in matchInfo.entities:
             if math.dist(matchInfo.pov.pos, entity.pos) <= self.soundReport and entity not in matchInfo.pov.squad.mechList:
                 entity.report(matchInfo, "I hear shots. Sounds like a " + self.name + "." , teamReport = False, critical = False)
     
     def shootAt(self, matchInfo, pos):
+        """Spend resources and resolve every projectile fired at a map position."""
 
         #check if enough resources
         if self.charges - 1 < 0:
@@ -1199,6 +1244,7 @@ class WeaponLimb(MechPart):
 
 #clean up module system and make it work (not updating)
 class Module: #supposed to be superclass but couldn't figure it out
+    """Damageable modifier attached to a mech part."""
     def __init__(self, name, attrNames, bonusType, statChangeList, desc = ""): #[destroyed bonus, damaged bonus, good bonus]
         
         self.name = name
@@ -1224,6 +1270,7 @@ class Module: #supposed to be superclass but couldn't figure it out
             pass
     
 class Cockpit(Module):
+    """Module that records the pilot and crew required to operate a mech."""
     def __init__ (self, name, attrNames, bonusType, statChangeList, pilot, crewServed, desc = ""):
         super().__init__(name, attrNames, bonusType, statChangeList, desc = "")
         self.pilot = pilot
@@ -1233,6 +1280,7 @@ class Cockpit(Module):
         #TODO add ability for pilot to be injured and incapacitated
     
 class Squad:
+    """Ordered group of mechs that acts together and shares intelligence."""
     def __init__(self, squadName, squadList, squadRole, playerControlled = False):
         self.name = squadName 
         self.mechList = squadList #in order of command
@@ -1251,6 +1299,7 @@ class Squad:
             mech.squad = self
 
     def roundRefresh(self, matchInfo):
+        """Refresh every squad member at the beginning of its round."""
         matchInfo.clearVisuals()
         for entity in self.mechList:
             entity.roundRefresh(matchInfo)
@@ -1268,6 +1317,7 @@ class Squad:
         self.effectiveness = (status/len(self.mechList))*100
 
     def spawnSquad(self, map, spawnPosition):
+        """Place squad members on nearby passable, non-floating terrain cells."""
 
         mechs = self.mechList
         
@@ -1311,6 +1361,7 @@ class Squad:
 
 
 class Team:
+    """Collection of squads with a shared name, resources, and report log."""
     def __init__(self, teamName, squadsList, playerControlled = False):
         self.name = teamName
         self.squadsList = squadsList
