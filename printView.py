@@ -1,6 +1,22 @@
 import functions as f
 import termcolor
 import printHUD as ph
+import textwrap
+
+
+def _print_panel_text(text, width):
+    """Print wrapped panel text without exceeding the tactical-map width."""
+    for line in textwrap.wrap(text, width=width) or [""]:
+        print(f"|{line:<{width}}|")
+
+
+def _print_tactical_footer(width):
+    """Show the most useful options and log commands below the map frame."""
+    divider = "+" + ("-" * width) + "+"
+    print(divider)
+    _print_panel_text("Options: f fire | fire change weapon | st status | sq squad | ? help | end turn", width)
+    _print_panel_text("Logs: rep1 unread reports | rep report pages", width)
+    print(divider)
 
 def printPOV(matchInfo, povX, povY):
     """Render a square tactical window centered on the supplied map position."""
@@ -34,8 +50,13 @@ def printPOV(matchInfo, povX, povY):
         xRow = []
 
     
-    #print window
+    # Each map cell renders as a symbol plus one trailing space, so the frame
+    # width scales with the configured tactical window rather than map size.
+    panelWidth = matchInfo.windowSize * 2
+    divider = "+" + ("-" * panelWidth) + "+"
+    print(divider)
     for y in mapWindow:
+        print("|", end="")
         for cell in y:
             if cell.terrain == matchInfo.border:
                 cell.terrain.displayTerrain() #display borders
@@ -45,7 +66,8 @@ def printPOV(matchInfo, povX, povY):
                     cell.displayRadarReturn(matchInfo)
             else:
                  print(" ", end = " ")
-        print()
+        print("|")
+    _print_tactical_footer(panelWidth)
     return
     
 def lookAt(matchInfo): #TODO parse text to make input smoother
