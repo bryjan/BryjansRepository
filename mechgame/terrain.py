@@ -54,21 +54,23 @@ class Cell:
     def refNeighbors(self,map): #gets a list of neighbor cells to refernce for calculations
         """Populate adjacent-cell references once the full map grid exists."""
         self.nList=[]
-        if (self.pos[1] + 1 <= len(map)-1) and (self.pos[0] - 1 >= 0):
+        mapHeight = len(map)
+        mapWidth = len(map[0])
+        if (self.pos[1] + 1 < mapHeight) and (self.pos[0] - 1 >= 0):
             self.nList.append(map[self.pos[1] + 1][self.pos[0] - 1])  # north west
-        if self.pos[1] + 1 <= len(map)-1:   
+        if self.pos[1] + 1 < mapHeight:
             self.nList.append(map[self.pos[1] + 1][self.pos[0]])  # north
-        if (self.pos[1] + 1 <= len(map)-1) and (self.pos[0] + 1 <= len(map)-1):
+        if (self.pos[1] + 1 < mapHeight) and (self.pos[0] + 1 < mapWidth):
             self.nList.append(map[self.pos[1] + 1][self.pos[0] + 1])  # north east
         if self.pos[0] - 1 >= 0:
             self.nList.append(map[self.pos[1]][self.pos[0] - 1])  # west
-        if self.pos[0] + 1 <= len(map)-1:
+        if self.pos[0] + 1 < mapWidth:
             self.nList.append(map[self.pos[1]][self.pos[0] + 1])  # east
         if (self.pos[1] - 1 >= 0)  and (self.pos[0] - 1 >= 0):
             self.nList.append(map[self.pos[1] - 1][self.pos[0] - 1])  # south west
         if self.pos[1] - 1 >= 0:
             self.nList.append(map[self.pos[1] - 1][self.pos[0]])  # south
-        if (self.pos[1] - 1 >= 0) and (self.pos[0] + 1 <= len(map)-1):
+        if (self.pos[1] - 1 >= 0) and (self.pos[0] + 1 < mapWidth):
             self.nList.append(map[self.pos[1] - 1][self.pos[0] + 1])  # south east
 
     def refClosestNeighborTo(self,targetPos): #returns neighbor cell's position closest to target

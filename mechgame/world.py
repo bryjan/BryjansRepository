@@ -15,8 +15,13 @@ class MapGenerator:
 
     DENSITY_MULTIPLIERS = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}
 
-    def __init__(self, size: int, rng: random.Random | None = None):
-        self.size = size
+    def __init__(self, width: int, height: int | random.Random | None = None, rng: random.Random | None = None):
+        # Preserve ``MapGenerator(size, rng)`` while also allowing rectangles.
+        if isinstance(height, random.Random):
+            rng = height
+            height = None
+        self.width = width
+        self.height = width if height is None else height
         self.rng = rng or random.Random()
 
     def build(self, match):
@@ -48,10 +53,10 @@ class MapGenerator:
             setattr(match, name, value)
 
         grid = []
-        for y in range(self.size):
+        for y in range(self.height):
             row = []
-            for x in range(self.size):
-                tile = terrain["border"] if x in (0, self.size - 1) or y in (0, self.size - 1) else terrain["plains"]
+            for x in range(self.width):
+                tile = terrain["border"] if x in (0, self.width - 1) or y in (0, self.height - 1) else terrain["plains"]
                 row.append(Cell(tile, [x, y]))
             grid.append(row)
         for row in grid:
@@ -110,9 +115,9 @@ class MapGenerator:
 
     def _distant_cells(self, grid):
         while True:
-            start = [self.rng.randrange(2, self.size - 2), self.rng.randrange(2, self.size - 2)]
-            end = [self.rng.randrange(2, self.size - 2), self.rng.randrange(2, self.size - 2)]
-            if math.dist(start, end) >= self.size / 2:
+            start = [self.rng.randrange(2, self.width - 2), self.rng.randrange(2, self.height - 2)]
+            end = [self.rng.randrange(2, self.width - 2), self.rng.randrange(2, self.height - 2)]
+            if math.dist(start, end) >= min(self.width, self.height) / 2:
                 return start, end
 
     def _draw_road(self, grid, start, end, terrain):

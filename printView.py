@@ -36,7 +36,7 @@ def printPOV(matchInfo, povX, povY):
     while y <= povY + windowExtend:
         x = povX - windowExtend
         while x <= povX + windowExtend:
-            if y < 0 or y > matchInfo.mapSize - 1 or x < 0 or x > matchInfo.mapSize - 1:
+            if y < 0 or y >= matchInfo.mapHeight or x < 0 or x >= matchInfo.mapWidth:
                 # Reuse the match's terrain catalogue instead of constructing
                 # equivalent blank and border terrain objects for every frame.
                 xRow.append(Cell(matchInfo.blank,[x, y]))

@@ -13,15 +13,17 @@ from .content import create_demo_teams
 class Game:
     """Owns match creation and the interactive loop."""
 
-    def __init__(self, map_size=100, window_size=19, rng=None):
-        self.map_size = map_size
+    def __init__(self, map_size=100, window_size=19, rng=None, map_width=None, map_height=None):
+        self.map_width = map_size if map_width is None else map_width
+        self.map_height = map_size if map_height is None else map_height
         self.window_size = window_size
         self.rng = rng or random.Random()
 
     def create_match(self):
-        match = MatchInfo(self.map_size, self.window_size, create_demo_teams(), "")
+        match = MatchInfo(self.map_width, self.window_size, create_demo_teams(), "", self.map_height)
         match.mapInit()
-        spawn_margin = min(40, max(2, self.map_size // 4))
+        xMargin = min(40, max(2, self.map_width // 4))
+        yMargin = min(40, max(2, self.map_height // 4))
         for team in match.teamList:
             for squad in team.squadsList:
                 if squad.playerControlled:
@@ -30,14 +32,15 @@ class Game:
                 squad.spawnSquad(
                     match.map,
                     [
-                        self.rng.randint(spawn_margin, self.map_size - spawn_margin - 1),
-                        self.rng.randint(spawn_margin, self.map_size - spawn_margin - 1),
+                        self.rng.randint(xMargin, self.map_width - xMargin - 1),
+                        self.rng.randint(yMargin, self.map_height - yMargin - 1),
                     ],
                 )
         match.pov = match.playerSquad.mechList[0]
         return match
 
     def run(self):
+        self.prompt_map_dimensions()
         match = self.create_match()
         match.pov.squad.roundRefresh(match)
         while True:
@@ -46,6 +49,22 @@ class Game:
             printView.printPOV(match, *match.pov.pos)
             inputs.receive_input(match)
             self.advance_turn_if_requested(match)
+
+    def prompt_map_dimensions(self):
+        """Ask for demo-map height and width while keeping safe defaults."""
+        print("Demo map setup — press 'Enter' to keep the shown defaults.")
+        self.map_height = self._read_map_dimension("Map height", self.map_height)
+        self.map_width = self._read_map_dimension("Map width", self.map_width)
+
+    @staticmethod
+    def _read_map_dimension(label, default):
+        while True:
+            value = input(f"{label} [{default}]: ").strip()
+            if not value:
+                return default
+            if value.isdigit() and int(value) >= 10:
+                return int(value)
+            print("Enter a whole number of at least 10, or press 'Enter' for the default.")
 
     @staticmethod
     def advance_turn_if_requested(match):

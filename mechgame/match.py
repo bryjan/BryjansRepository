@@ -6,8 +6,12 @@ import math
 class MatchInfo:
     """Mutable state shared by one running match."""
 
-    def __init__(self, mapSize, windowSize, teams, mapParams):
+    def __init__(self, mapSize, windowSize, teams, mapParams, mapHeight=None):
+        # ``mapSize`` remains the width for compatibility with older callers.
+        # Height defaults to width so existing square-map games still work.
         self.mapSize = mapSize
+        self.mapWidth = mapSize
+        self.mapHeight = mapSize if mapHeight is None else mapHeight
         self.windowSize = windowSize
         self.teamList = teams #team0 are nuetral entities
         self.playerSquad = ""
@@ -187,4 +191,4 @@ class MatchInfo:
     def mapInit(self):
         """Build the world through the dedicated map-generation module."""
         from mechgame.world import MapGenerator
-        self.map = MapGenerator(self.mapSize).build(self)
+        self.map = MapGenerator(self.mapWidth, self.mapHeight).build(self)

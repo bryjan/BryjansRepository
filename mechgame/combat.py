@@ -1397,19 +1397,21 @@ class Squad:
         """Place squad members on nearby passable, non-floating terrain cells."""
 
         mechs = self.mechList
+        mapHeight = len(map)
+        mapWidth = len(map[0])
         
         xMinPos = int(spawnPosition[0]-2) #creating a starting range of 5x5 that a mech could spawn
         while  xMinPos < 1:
             xMinPos +=1
         xMaxPos = int(spawnPosition[0]+2)
-        while  xMaxPos > len(map)-2:
+        while  xMaxPos > mapWidth-2:
             xMaxPos -=1
             
         yMinPos = int(spawnPosition[1]-2)
         while  yMinPos < 1:
             yMinPos +=1
         yMaxPos = int(spawnPosition[1]+2)
-        while  yMaxPos > len(map)-2:
+        while  yMaxPos > mapHeight-2:
             yMaxPos -=1
 
         validSpawnLocations = [] #adds valid spawn points in that range
@@ -1421,11 +1423,11 @@ class Squad:
         while len(validSpawnLocations) <= len(mechs): #expand spawn area if not enough valid cells
             if xMinPos > 2:
                     xMinPos -= 1
-            if xMaxPos < len(map)-3:
+            if xMaxPos < mapWidth-3:
                     xMaxPos += 1
             if yMinPos > 2:
                     yMinPos -= 1
-            if yMaxPos < len(map)-3:
+            if yMaxPos < mapHeight-3:
                     yMaxPos += 1
 
         for mech in mechs:
