@@ -365,7 +365,8 @@ class Entity: #a character on the map
         self.needrest = False
         # Tactical memory is useful to both AI and the player fire menu.
         self.lastFiredAt = None
-        self.visibleEnemies = []
+        self.directlyVisibleEnemies = []
+        self.trackedEnemies = []
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
@@ -550,7 +551,6 @@ class Entity: #a character on the map
         # retain squad vision for rendering, but fire choices need this mech's
         # own currently visible enemies.
         self.visibleCells = [startingCell]
-        self.visibleEnemies = []
 
         for y in matchInfo.map:
             for tile in y:
@@ -582,12 +582,18 @@ class Entity: #a character on the map
                         calcList.append(n)
                         dontCalcList.append(n)
 
-        self.visibleEnemies = [
+        self.directlyVisibleEnemies = [
             entity
             for entity in matchInfo.entities
             if entity.team != self.team
             and matchInfo.map[entity.pos[1]][entity.pos[0]] in self.visibleCells
         ]
+        self._refresh_tracked_enemies()
+
+    def _refresh_tracked_enemies(self):
+        """Combine this mech's own vision with contacts shared by its squad."""
+        radarContacts = getattr(self.squad, "radarTrackedEnemies", [])
+        self.trackedEnemies = list(dict.fromkeys([*self.directlyVisibleEnemies, *radarContacts]))
 
     def getRadar(self, matchInfo):
         """Project active radar strength through radar absorption."""
@@ -628,13 +634,23 @@ class Entity: #a character on the map
                         if (n not in dontCalcList):
                             calcList.append(n)
 
+        radarContacts = []
         for obj in matchInfo.entities: #passive radar and radar ID reports
             if obj.mechClass.passiveRadar == True and map[obj.pos[1]][obj.pos[0]].radarPower >= 25:
                 if obj.team != self.team:
                     obj.passiveRadarDetect(matchInfo, self)
             if map[obj.pos[1]][obj.pos[0]].radarPower >= entity_detection_threshold(obj.radarSig):
                 if obj.team != self.team:
+                    radarContacts.append(obj)
                     self.radarReport(matchInfo,map[obj.pos[1]][obj.pos[0]].radarPower, obj)
+
+        # Radar contacts belong to the squad, not only the mech that emitted
+        # the scan. Preserve contacts from other active friendly radars too.
+        for contact in radarContacts:
+            if contact not in self.squad.radarTrackedEnemies:
+                self.squad.radarTrackedEnemies.append(contact)
+        for mech in self.squad.mechList:
+            mech._refresh_tracked_enemies()
 
     def passiveRadarDetect(self, matchInfo, emittor):
         """Try to detect an emitting entity using this mech's passive radar."""
@@ -1272,6 +1288,8 @@ class Squad:
         self.supplies = 0
         self.effectiveness = 100
         self.reportLog = []
+        # Active-radar contacts are shared by every mech in this squad.
+        self.radarTrackedEnemies = []
 
         for mech in self.mechList:
             mech.squad = self
@@ -1279,6 +1297,7 @@ class Squad:
     def roundRefresh(self, matchInfo):
         """Refresh every squad member at the beginning of its round."""
         matchInfo.clearVisuals()
+        self.radarTrackedEnemies = []
         for entity in self.mechList:
             entity.roundRefresh(matchInfo)
     

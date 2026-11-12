@@ -89,7 +89,7 @@ def fire(matchInfo):
 def chooseFireTarget(matchInfo):
     """Offer visible, remembered, and manual targeting without defaulting to text coordinates."""
     mech = matchInfo.pov
-    print("Fire target: [v]isible enemy  [l]ast fired location  [c]oordinates  [x] cancel")
+    print("Fire target: [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
     choice = _read_nonempty("Target: ").lower()
 
     if choice == "x":
@@ -102,22 +102,22 @@ def chooseFireTarget(matchInfo):
             print("No previous firing location.")
             return None
         return list(mech.lastFiredAt)
-    if choice != "v":
-        print("Choose v, l, c, or x.")
+    if choice not in ("t", "v"):
+        print("Choose t, l, c, or x.")
         return None
-    if not mech.visibleEnemies:
-        print("No enemy mechs are currently visible.")
+    if not mech.trackedEnemies:
+        print("No enemy mechs are currently tracked.")
         return None
-    if len(mech.visibleEnemies) == 1:
-        return list(mech.visibleEnemies[0].pos)
+    if len(mech.trackedEnemies) == 1:
+        return list(mech.trackedEnemies[0].pos)
 
-    for index, enemy in enumerate(mech.visibleEnemies, start=1):
+    for index, enemy in enumerate(mech.trackedEnemies, start=1):
         print(f"{index}. {enemy.pilot.name} — {enemy.mechClass.name} at {enemy.pos}")
-    selection = _read_nonempty("Visible target: ")
-    if not selection.isdigit() or not 1 <= int(selection) <= len(mech.visibleEnemies):
+    selection = _read_nonempty("Tracked target: ")
+    if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return list(mech.visibleEnemies[int(selection) - 1].pos)
+    return list(mech.trackedEnemies[int(selection) - 1].pos)
 
 def gunMenu(matchInfo): #TODO add ability to exit
     """Display weapons and make one available as the default firing choice."""
@@ -226,7 +226,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
     print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
-    print ("Type 'f' to fire: choose a visible enemy, your last firing location, or coordinates")
+    print ("Type 'f' to fire: choose a tracked enemy, your last firing location, or coordinates")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
