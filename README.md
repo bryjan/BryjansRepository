@@ -12,6 +12,10 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+For a quick manual test, type `end` twice after the map appears. The first
+command moves the active turn to the opposing squad; the second begins a new
+round and returns it to the player squad.
+
 ## Project map
 
 - `main.py` starts the application.
@@ -34,5 +38,5 @@ python -m unittest discover -s tests
 ```
 
 Current playable features include map generation, spawning, movement, visual
-range, radar reports, and weapon selection. Combat, AI, campaign flow, saves,
-and a full test suite are still in development.
+range, radar reports, weapon selection, and a two-team turn cycle. Combat, AI,
+campaign flow, saves, and a full test suite are still in development.

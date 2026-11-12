@@ -33,26 +33,23 @@ class MatchInfo:
         """Advance the point of view to the first mech in the next squad."""
         teamIndex = self.teamList.index(self.pov.team)
         squadIndex = self.pov.team.squadsList.index(self.pov.squad)
-    
-        if squadIndex + 1 > len(self.pov.team.squadsList) - 1:
-            self.clearVisuals()
+
+        nextTeamIndex = teamIndex
+        nextSquadIndex = squadIndex + 1
+        if nextSquadIndex >= len(self.pov.team.squadsList):
             nextSquadIndex = 0
-            nextTeamIndex = teamIndex + 1
+            nextTeamIndex += 1
 
-            if teamIndex + 1 > len(self.teamList) - 1: #start of new round
-                self.matchRound += 1
-                #TODO refresh round stats
-                nextTeamIndex = 0
-            
+        if nextTeamIndex >= len(self.teamList): #start of new round
+            self.matchRound += 1
+            #TODO refresh round stats
+            nextTeamIndex = 0
+
+        # Sensor information is rebuilt for the squad that is about to act.
+        self.clearVisuals()
         self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
-
-        for mech in self.pov.squad.mechList:
-            if mech.cockpit.status == 0:
-                self.destoryedMechs.append(mech)
-                mech.squad.mechlist.remove(mech)
-                self.entities.remove(mech)
         self.pov.squad.roundRefresh(self)
-        self.advTurn = True
+        self.advTurn = False
 
     def nextMechinTeam(self):
         """Cycle the point of view through the current squad without ending its turn."""

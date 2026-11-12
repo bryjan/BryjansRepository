@@ -39,14 +39,15 @@ class Game:
 
     def run(self):
         match = self.create_match()
+        match.pov.squad.roundRefresh(match)
         while True:
-            for team in match.teamList:
-                for squad in team.squadsList:
-                    if not squad.playerControlled:
-                        squad.roundRefresh(match)
-            match.pov.squad.roundRefresh(match)
+            # A movement, shot, or explicit end command sets advTurn. The
+            # runner owns the transition, so every ending action follows the
+            # same turn sequence.
+            match.advTurn = False
             while not match.advTurn:
                 match.pov.getVisuals(match)
                 printHUD.displayHUD(match)
                 printView.printPOV(match, *match.pov.pos)
                 inputs.receive_input(match)
+            match.nextSquadTurn()

@@ -36,7 +36,9 @@ def receive_input(matchInfo):
             return printUnreads(matchInfo)
         
         case "end":
-            return matchInfo.nextSquadTurn()
+            # The runner advances the active squad after every ending action.
+            matchInfo.advTurn = True
+            return
             
         case "look" | "l":
             return pv.lookAt(matchInfo)

@@ -1189,6 +1189,7 @@ class Team:
         self.playerControlled = playerControlled
 
         for squads in self.squadsList:
-            squads.team = self.name
+            # Keep the object reference: turn sequencing needs its squad list.
+            squads.team = self
             for mech in squads.mechList:
                 mech.team = self
