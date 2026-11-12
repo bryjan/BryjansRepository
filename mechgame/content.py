@@ -1,6 +1,8 @@
 """Reusable mech and pilot definitions plus example scenarios."""
 
-from .models import Entity, Helm, Hull, Legs, MechClass, Module, Pilot, Squad, Team, WeaponLimb
+from .entities import Entity, Pilot
+from .mechs import Helm, Hull, Legs, MechClass, Module, WeaponLimb
+from .teams import Squad, Team
 
 
 def create_lancer_class():

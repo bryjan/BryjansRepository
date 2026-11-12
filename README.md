@@ -18,8 +18,13 @@ python main.py
 - `mechgame/runner.py` owns match setup and the command-line loop.
 - `mechgame/content.py` creates reusable mech definitions and the demo scenario.
 - `mechgame/world.py` defines terrain and generates maps.
-- `mechgame/models.py` contains the combat and entity domain model.
-- `gameClasses.py` keeps the original import path working for existing add-ons.
+- `mechgame/match.py` owns match-wide state and turn calculations.
+- `mechgame/terrain.py` defines terrain and map cells.
+- `mechgame/entities.py`, `mechgame/mechs.py`, and `mechgame/teams.py` are the
+  focused import points for units, parts, and group coordination.
+- `mechgame/models.py` and `gameClasses.py` preserve the original import paths.
+- `mechgame/legacy_models.py` temporarily holds the tightly coupled combat
+  implementation while those focused modules are migrated one behavior at a time.
 - `tests/` contains automated checks for the world-generation boundary.
 
 ## Test

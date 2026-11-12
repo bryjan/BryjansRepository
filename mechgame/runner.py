@@ -5,7 +5,7 @@ import random
 import inputs
 import printHUD
 import printView
-from .models import MatchInfo
+from .match import MatchInfo
 
 from .content import create_demo_teams
 

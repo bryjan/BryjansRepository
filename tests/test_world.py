@@ -1,7 +1,7 @@
 import random
 import unittest
 
-from mechgame.models import MatchInfo
+from mechgame.match import MatchInfo
 from mechgame.runner import Game
 from mechgame.world import MapGenerator
 

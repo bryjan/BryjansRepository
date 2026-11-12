@@ -4,7 +4,7 @@ import printHUD as ph
 
 def printPOV(matchInfo, povX, povY):
     """Render a square tactical window centered on the supplied map position."""
-    from mechgame.models import Cell
+    from mechgame.terrain import Cell
 
     #makes window
     mapWindow = []

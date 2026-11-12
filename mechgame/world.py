@@ -22,7 +22,7 @@ class MapGenerator:
     def build(self, match):
         # Delayed import avoids a cycle while the legacy domain module is being
         # transitioned into smaller modules.
-        from .models import Cell, TerrainType
+        from .terrain import Cell, TerrainType
 
         terrain = {
             "blank": TerrainType("blank", " ", "black", visualAbsorbtion=9999,
