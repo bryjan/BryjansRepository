@@ -27,9 +27,9 @@ def printPOV(matchInfo, povX, povY):
             else:
                 xRow.append(matchInfo.map[y][x])
             x += 1
-        # Map rows use the usual screen convention: smaller Y values appear
-        # higher on screen, and larger Y values appear lower.
-        mapWindow.append(xRow)
+        # Tactical coordinates use a Cartesian convention: larger Y values are
+        # farther north and therefore appear higher on the displayed map.
+        mapWindow.insert(0, xRow)
         y += 1
         xRow = []
 

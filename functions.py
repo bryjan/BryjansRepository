@@ -42,12 +42,12 @@ def compass_bearing(pointA, pointB):
 def neswDirection(pointA, pointB):
     """Convert one screen-grid position to another into a compass label.
 
-    Map Y increases downward, matching array rows and the tactical display.
+    Map Y increases northward, matching the tactical display's coordinate axis.
     """
     dx = pointB[0] - pointA[0]
     dy = pointB[1] - pointA[1]
     horizontal = "East" if dx > 0 else "West" if dx < 0 else ""
-    vertical = "South" if dy > 0 else "North" if dy < 0 else ""
+    vertical = "North" if dy > 0 else "South" if dy < 0 else ""
     return f"{vertical} {horizontal}".strip() or "Stationary"
 
 def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inputQuery is a string of why they are entering coords
