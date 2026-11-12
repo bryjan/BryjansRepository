@@ -636,7 +636,9 @@ class Entity: #a character on the map
             return
         if self.mechClass.passiveRadar == False:
             return
-        if self.entity.speed > 1:
+        # ``self`` is the detecting mech.  Referring to ``self.entity`` here
+        # crashed as soon as active radar reached a passive detector.
+        if self.speed > 1:
             return 
     
         strength = map[self.pos[1]][self.pos[0]].radarPower
