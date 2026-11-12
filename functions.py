@@ -56,9 +56,9 @@ def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inp
     coordinate = []
     xyMax = len(matchInfo.map) - 1
 
-    playerInput = input(inputQuery + '(eg. "xCoord,yCoord", or "x" to exit): ')
+    playerInput = input(inputQuery + " (for example 'x,y', or 'x' to exit): ")
     while len(playerInput) == 0:
-        playerInput = input(inputQuery + '(eg. "xCoord,yCoord", or "x" to exit): ')
+        playerInput = input(inputQuery + " (for example 'x,y', or 'x' to exit): ")
 
     if playerInput == "x": #exit
         return "x"

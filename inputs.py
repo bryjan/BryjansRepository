@@ -116,7 +116,7 @@ def squadMenu(matchInfo):
     """Show squad readiness, then offer player-facing squad controls."""
     squad = matchInfo.pov.squad
     print(squad.statusReport())
-    print("Squad options: [m]ech  [s]witch controllable squad  [x] exit")
+    print("Squad options: 'm' switch mech | 's' switch controllable squad | 'x' exit")
     choice = input("Squad: ").strip().lower()
 
     if choice in ("", "x"):
@@ -125,7 +125,7 @@ def squadMenu(matchInfo):
         return selectSquadMech(matchInfo, squad)
     if choice == "s":
         return selectControllableSquad(matchInfo)
-    print("Choose m, s, or x.")
+    print("Choose 'm', 's', or 'x'.")
 
 
 def selectSquadMech(matchInfo, squad):
@@ -166,7 +166,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
-        print("Press Enter or f to fire. [a]im limb (+1 AP)  [w]eapon  [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
+        print("Press 'Enter' or 'f' to fire. 'a' aim limb (+1 AP) | 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel")
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
             return list(defaultTarget.pos), None
@@ -174,7 +174,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
             aimedLimb = chooseAimedLimb(defaultTarget)
             return None if aimedLimb is None else (list(defaultTarget.pos), aimedLimb)
     else:
-        print("Fire target: [w]eapon  [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
+        print("Fire target: 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel")
         choice = _read_nonempty("Target: ").lower()
 
     if choice == "x":
@@ -191,7 +191,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         target = next((enemy for enemy in mech.trackedEnemies if enemy.pos == mech.lastFiredAt), None)
         return chooseTargetAction(target) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
-        print("Choose t, l, c, or x.")
+        print("Choose 't', 'l', 'c', or 'x'.")
         return None
     if not mech.trackedEnemies:
         print("No enemy mechs are currently tracked.")
@@ -211,11 +211,11 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
 def chooseTargetAction(target):
     """Confirm a tracked target and optionally select a specific mech part."""
     print(f"Target: {target.pilot.name} — {target.mechClass.name} at {target.pos}")
-    choice = input("Press Enter or f to fire, or a to aim at a limb (+1 AP): ").strip().lower()
+    choice = input("Press 'Enter' or 'f' to fire, or 'a' to aim at a limb (+1 AP): ").strip().lower()
     if choice in ("", "f"):
         return list(target.pos), None
     if choice != "a":
-        print("Choose Enter, f, or a.")
+        print("Choose 'Enter', 'f', or 'a'.")
         return None
 
     aimedLimb = chooseAimedLimb(target)
@@ -228,7 +228,7 @@ def chooseAimedLimb(target):
     """Let the player select a live target part for the one-AP aiming cost."""
     for index, limb in enumerate(target.mechClass.limbList, start=1):
         print(f"{index}. {limb.name} — armor {limb.armor}/{limb.startingArmor}, HP {limb.hp}/{limb.startingHP}")
-    selection = _read_nonempty("Aim at limb (x to cancel): ").lower()
+    selection = _read_nonempty("Aim at limb ('x' to cancel): ").lower()
     if selection == "x":
         return None
     if not selection.isdigit() or not 1 <= int(selection) <= len(target.mechClass.limbList):
@@ -245,7 +245,7 @@ def gunMenu(matchInfo): #TODO add ability to exit
     if len(gunList) == 1:
         gunList[0].defaultGun = True
         print(gunList[0].printShortDesc())
-        print("You only have one weapon availble to (f)ire. It is set to your default weapon.")
+        print("You only have one weapon. It is set as the default for 'f'.")
         return
     elif len(gunList) == 0:
         print("You have no weapons.")
@@ -265,15 +265,15 @@ def gunMenu(matchInfo): #TODO add ability to exit
         i+=1
         menuDivider = f"{menuDivider}-" 
 
-    print("Select a weapon to (f)ire by default.")
+    print("Select the default weapon used by 'f'.")
     for limb in gunList:
         print(menuDivider)
-        print(f"{limb.printShortDesc()} | {gunList.index(limb) + 1}")
+        print(f"'{gunList.index(limb) + 1}' {limb.printShortDesc()}")
     print(menuDivider)
 
     #get default gun choice from menu
     #TODO add ability to pull a weapon's long description
-    playerInput = _read_nonempty("Choose default gun: ")
+    playerInput = _read_nonempty("Choose weapon number: ")
 
     try:
         playerInput = int(playerInput)
@@ -282,7 +282,7 @@ def gunMenu(matchInfo): #TODO add ability to exit
             gunMenu(matchInfo)
         else:
             gunList[playerInput - 1].defaultGun = True
-            print(f"{gunList[playerInput - 1].name} set to (f)ire by default")
+            print(f"{gunList[playerInput - 1].name} is now the default for 'f'.")
             return
     except ValueError:
         print("Please enter an integer.")
@@ -340,13 +340,13 @@ def printUnreads(matchInfo):
 def helpCommand(matchInfo): #TODO update with all commands
     """Show the currently supported command shortcuts."""
     print ("Here are the list of commands available to you:")
-    print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
-    print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
-    print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
-    print ("Type 'f' to target the nearest tracked enemy; press a to aim or w to switch weapons")
-    print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
-    print ("Type 'st' for a full mech integrity, module, and ammunition report")
-    print ("Type 'sq' for squad status and mech or controllable-squad switching")
-    print ("Type 'next' to switch to the next mech in you squad")
+    print ("Move with 'w', 'a', 's', 'd' and diagonals 'q', 'e', 'z', 'c'.")
+    print ("'r' toggles continuous radar; it costs energy to start and each turn it stays on.")
+    print ("'p' sends a one-turn radar pulse; it costs energy once and shuts off at turn end.")
+    print ("'f' targets the nearest tracked enemy; use 'a' to aim or 'w' to switch weapons.")
+    print ("'rep1' shows unread reports; 'rep' opens the full report log.")
+    print ("'st' shows mech integrity, modules, and ammunition.")
+    print ("'sq' opens squad status and switching options.")
+    print ("'next' switches to the next mech in your squad; 'end' ends the squad turn.")
     matchInfo.advTurn = False
 
