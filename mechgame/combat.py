@@ -328,8 +328,9 @@ class Entity: #a character on the map
         for limb in self.mechClass.limbList:
             limb.mech = self
         #inserts pilot into mech's Helm
-        cockpit = Cockpit("Pilot", "multi ap", 3, ["0", ".75", "1"], self.pilot, False)
-        self.mechClass.helm.modsList.append(cockpit)
+        self.cockpit = Cockpit("Pilot", "multi ap", 3, ["0", ".75", "1"], self.pilot, False)
+        self.cockpit.mech = self
+        self.mechClass.helm.modsList.append(self.cockpit)
 
         self.name = self.pilot.name
         self.squad = ""
@@ -357,6 +358,9 @@ class Entity: #a character on the map
         #ai flags
         self.travelSpeed = max(self.mechClass.apMax, self.mechClass.mpMax)
         self.needrest = False
+
+        # A destroyed cockpit takes the whole mech out of the current match.
+        self.destroyed = False
   
 
     def __repr__(self):
@@ -654,6 +658,23 @@ class Entity: #a character on the map
         
         return print(colored(self.mechClass.symbol,self.mechClass.color), end = " ")
 
+    def destroy(self, matchInfo):
+        """Remove this mech from active play and record its destruction once."""
+        if self.destroyed:
+            return
+
+        self.destroyed = True
+        if self in matchInfo.entities:
+            matchInfo.entities.remove(self)
+        if self.squad and self in self.squad.mechList:
+            self.squad.mechList.remove(self)
+        if self not in matchInfo.destroyedMechs:
+            matchInfo.destroyedMechs.append(self)
+
+        # A destroyed active mech cannot continue taking actions this turn.
+        if matchInfo.pov is self:
+            matchInfo.turnEnded = True
+
 
 class Pilot: #TODO add pilot levels, skills, certs
     """Named crew member assigned to an entity."""
@@ -868,7 +889,7 @@ class MechPart: # super class to mech limbs
             dmgdMod = random.choice(self.modsList)
 
         self.mech.report(matchInfo, dmgdMod.name + " was damaged!", teamReport = False, critical = False)
-        dmgdMod.damage()
+        dmgdMod.damage(matchInfo)
         self.mechClass.statUpdate()
             
 
@@ -904,7 +925,7 @@ class Hull(MechPart):
         self.baseEnergy = pwrCapacity
         self.bonusEnergy = 0
         self.multiEnergy = 1
-        self.energyMax = (self.baseRadarSig * self.multiEnergy) + self.bonusEnergy
+        self.energyMax = (self.baseEnergy * self.multiEnergy) + self.bonusEnergy
 
         self.baseEnergyGen = pwrGen
         self.bonusEnergyGen = 0
@@ -913,7 +934,7 @@ class Hull(MechPart):
 
     def updateHullStats(self):
         self.radarSig = int((self.baseRadarSig * self.multiRadarSig) + self.bonusRadarSig)
-        self.energyMax = int((self.baseRadarSig * self.multiEnergy) + self.bonusEnergy)
+        self.energyMax = int((self.baseEnergy * self.multiEnergy) + self.bonusEnergy)
         self.energyGen = int((self.baseEnergyGen * self.multiEnergyGen) + self.bonusEnergyGen)
 
 
@@ -1074,7 +1095,7 @@ class Module: #supposed to be superclass but couldn't figure it out
     def restore(self):
         self.status = 2
     
-    def damage(self):
+    def damage(self, matchInfo=None):
         if self.status > 0:
             self.status -= 1
         else:
@@ -1092,9 +1113,31 @@ class Cockpit(Module):
         super().__init__(name, attrNames, bonusType, statChangeList, desc = "")
         self.pilot = pilot
         self.crewServed = crewServed
+        self.mech = None
 
         #TODO add pilot skills and levels then make them apply
-        #TODO add ability for pilot to be injured and incapacitated
+
+    def damage(self, matchInfo=None):
+        """Warn on pilot injury and destroy the mech when the cockpit fails."""
+        previous_status = self.status
+        super().damage(matchInfo)
+
+        if matchInfo is None or self.mech is None or previous_status == self.status:
+            return
+
+        if self.status == 1:
+            self.mech.report(
+                matchInfo,
+                "Cockpit hit! Pilot injured; cockpit integrity is failing.",
+                critical=True,
+            )
+        elif self.status == 0:
+            self.mech.report(
+                matchInfo,
+                "Cockpit destroyed! Mech is no longer operational.",
+                critical=True,
+            )
+            self.mech.destroy(matchInfo)
     
 class Squad:
     """Ordered group of mechs that acts together and shares intelligence."""
