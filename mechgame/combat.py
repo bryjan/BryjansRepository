@@ -390,6 +390,12 @@ class Entity: #a character on the map
         if self.energy > self.mechClass.energyMax:
             self.energy = int(self.mechClass.energyMax)
 
+        # Sustained radar pays its scan cost every turn after its activation.
+        # It shuts down rather than allowing the energy reserve to go negative.
+        if self.radarOn and not self._spend_radar_energy():
+            self.radarOn = False
+            self.report(matchInfo, "Radar shut down: insufficient energy.")
+
         #get visuals
         self.getVisuals(matchInfo)
 
@@ -490,6 +496,14 @@ class Entity: #a character on the map
         self.speed += 1
         matchInfo.advTurn = True
 
+    def _spend_radar_energy(self):
+        """Spend the configured radar scan cost when the reserve can cover it."""
+        cost = self.mechClass.radarEnergyCost
+        if self.energy < cost:
+            return False
+        self.energy -= cost
+        return True
+
     def toggleRadar(self, matchInfo):
         """Enable or disable continuous active radar for the current mech."""
         if self.radarOn:
@@ -500,6 +514,9 @@ class Entity: #a character on the map
 
         if self.mechClass.radarPower <= 0:
             print("This mech has no active radar.")
+            return
+        if not self._spend_radar_energy():
+            print("Not enough energy to activate continuous radar.")
             return
 
         self.radarOn = True
@@ -513,6 +530,9 @@ class Entity: #a character on the map
             return
         if self.radarOn:
             print("Continuous radar is already active.")
+            return
+        if not self._spend_radar_energy():
+            print("Not enough energy for a radar pulse.")
             return
 
         self.radarOn = True

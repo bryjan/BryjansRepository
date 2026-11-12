@@ -190,7 +190,8 @@ def helpCommand(matchInfo): #TODO update with all commands
     """Show the currently supported command shortcuts."""
     print ("Here are the list of commands available to you:")
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
-    print ("Type 'r' to toggle continuous radar, or 'p' for a one-turn radar pulse")
+    print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
+    print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False

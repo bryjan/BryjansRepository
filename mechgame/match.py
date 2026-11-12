@@ -34,10 +34,13 @@ class MatchInfo:
 
     def nextSquadTurn(self):
         """Advance the point of view to the first mech in the next squad."""
-        # A pulse is active only for the turn in which its pilot ordered it.
-        if self.pov.radarPulseActive:
-            self.pov.radarOn = False
-            self.pov.radarPulseActive = False
+        # A pulse is active only for the squad turn in which it was ordered.
+        # Clear every squad member so changing the point of view cannot let a
+        # previous pilot's pulse survive into the next squad turn.
+        for mech in self.pov.squad.mechList:
+            if mech.radarPulseActive:
+                mech.radarOn = False
+                mech.radarPulseActive = False
 
         teamIndex = self.teamList.index(self.pov.team)
         squadIndex = self.pov.team.squadsList.index(self.pov.squad)
