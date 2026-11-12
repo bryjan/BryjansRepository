@@ -97,6 +97,8 @@ def fire(matchInfo):
         pv.printPOV(matchInfo, *defaultTarget.pos)
 
     targetChoice = chooseFireTarget(matchInfo, defaultTarget)
+    if targetChoice == "weapon":
+        return gunMenu(matchInfo)
     if targetChoice is None:
         return
     targetPos, aimedLimb = targetChoice
@@ -164,7 +166,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
-        print("Press Enter or f to fire. [a]im limb (+1 AP)  [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
+        print("Press Enter or f to fire. [a]im limb (+1 AP)  [w]eapon  [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
             return list(defaultTarget.pos), None
@@ -172,11 +174,13 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
             aimedLimb = chooseAimedLimb(defaultTarget)
             return None if aimedLimb is None else (list(defaultTarget.pos), aimedLimb)
     else:
-        print("Fire target: [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
+        print("Fire target: [w]eapon  [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
         choice = _read_nonempty("Target: ").lower()
 
     if choice == "x":
         return None
+    if choice == "w":
+        return "weapon"
     if choice == "c":
         target = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at")
         return None if target == "x" else (target, None)
@@ -339,7 +343,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
     print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
-    print ("Type 'f' to target the nearest tracked enemy; press a to aim at a limb for +1 AP")
+    print ("Type 'f' to target the nearest tracked enemy; press a to aim or w to switch weapons")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'st' for a full mech integrity, module, and ammunition report")
     print ("Type 'sq' for squad status and mech or controllable-squad switching")
