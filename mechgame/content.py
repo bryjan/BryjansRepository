@@ -19,10 +19,15 @@ def create_lancer_class():
     return MechClass("Lancer Type.A", "p", "dark_grey", hull, helm, legs, [gun])
 
 
+def _create_demo_mechs(*pilot_names):
+    """Create independent Lancers for the named pilots in a demo squad."""
+    return [Entity(create_lancer_class(), Pilot(name)) for name in pilot_names]
+
+
 def create_demo_teams():
     """Create the small playable scenario previously embedded in main.py."""
-    player_mechs = [Entity(create_lancer_class(), Pilot("Kiki")), Entity(create_lancer_class(), Pilot("Bryan"))]
-    enemy_mechs = [Entity(create_lancer_class(), Pilot("Wraith")), Entity(create_lancer_class(), Pilot("Ghost"))]
+    player_mechs = _create_demo_mechs("Kiki", "Bryan")
+    enemy_mechs = _create_demo_mechs("Wraith", "Ghost")
     player = Team("Player Team", [Squad("Player Squad", player_mechs, "Combat", playerControlled=True)])
     enemies = Team("Enemy Team", [Squad("Enemy Squad", enemy_mechs, "Combat")])
     return [enemies, player]

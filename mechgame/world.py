@@ -13,6 +13,8 @@ class MapGenerator:
     independent from match flow and combat rules.
     """
 
+    DENSITY_MULTIPLIERS = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}
+
     def __init__(self, size: int, rng: random.Random | None = None):
         self.size = size
         self.rng = rng or random.Random()
@@ -63,7 +65,7 @@ class MapGenerator:
         return grid
 
     def _scatter(self, grid, terrain, density):
-        multiplier = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}[density]
+        multiplier = self._density_multiplier(density)
         if not multiplier:
             return
         for row in grid[1:-1]:
@@ -81,7 +83,7 @@ class MapGenerator:
                 cell.terrain = terrain
 
     def _associate(self, grid, terrain, associated, density):
-        multiplier = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}[density]
+        multiplier = self._density_multiplier(density)
         for _ in range(multiplier):
             changes = []
             for row in grid[2:-2]:
@@ -93,10 +95,18 @@ class MapGenerator:
                 cell.terrain = terrain
 
     def _roads(self, grid, terrain, density):
-        multiplier = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}[density]
+        multiplier = self._density_multiplier(density)
         for _ in range(multiplier):
             start, end = self._distant_cells(grid)
             self._draw_road(grid, start, end, terrain)
+
+    def _density_multiplier(self, density):
+        """Translate a readable map-density setting into a generation count."""
+        try:
+            return self.DENSITY_MULTIPLIERS[density]
+        except KeyError as error:
+            valid = ", ".join(self.DENSITY_MULTIPLIERS)
+            raise ValueError(f"Unknown density {density!r}; choose one of: {valid}.") from error
 
     def _distant_cells(self, grid):
         while True:

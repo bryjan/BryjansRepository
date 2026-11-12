@@ -49,4 +49,4 @@ class Game:
                 match.pov.getVisuals(match)
                 printHUD.displayHUD(match)
                 printView.printPOV(match, *match.pov.pos)
-                inputs.recieveInput(match)
+                inputs.receive_input(match)

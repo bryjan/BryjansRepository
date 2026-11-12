@@ -1,9 +1,9 @@
 """Domain objects used by the tactical simulation.
 
 This module keeps the original combat model together while its responsibilities
-are gradually split into focused systems. Map construction now lives in
-``mechgame.world``; the remaining map helpers are retained for compatibility
-with older callers.
+are gradually split into focused systems. Map construction lives in
+``mechgame.world``; this module keeps only terrain and cell data used by the
+simulation and renderer.
 """
 
 import math
@@ -168,124 +168,6 @@ class MatchInfo:
 
         self.map = MapGenerator(self.mapSize).build(self)
 
-    def mapinitPop(self): #populates map with a tile to start
-        # Legacy generator entry point. New matches use MapGenerator via mapInit.
-        mapArray = []
-        xRow = []
-        y = 0
-        while y <= self.mapSize-1:
-            x = 0
-            while x <= self.mapSize-1:
-                if x == 0 or y == 0 or x == self.mapSize-1 or y == self.mapSize-1 :
-                    xRow.append(Cell(self.border,[x,y])) #makes the cells at the edge border tiles
-                else:
-                    xRow.append(Cell(self.plains,[x,y]))
-                x+=1
-            mapArray.append(xRow)
-            y+=1
-            xRow=[]
-        self.map = mapArray
-
-        for y in self.map: #adds a reference to neighbors for every cell
-            for cell in y:
-                cell.refNeighbors(self.map)
-
-    def basicTileInit(self):
-        self.forest.basicTileGen(self.map,"Normal")
-        self.desert.basicTileGen(self.map,"Light")
-        self.randomRoadGen(self.map,"Normal")
-        self.suburb.associationTileGen(self.map, "Normal", [self.road, self.suburb])
-
-    def redefineBorders(self):
-        for y in self.map:
-            for x in y:
-                if x == 0 or y == 0 or x == self.mapSize-1 or y == self.mapSize-1 :
-                    x.terrain = self.border
-
-    def createRoad(self, map, target1Pos, target2Pos): #makes a road between two points, with slight deviations
-
-        activeCell = map[target1Pos[1]][target1Pos[0]]
-        targetCell = map[target2Pos[1]][target2Pos[0]]
-        targetCell.terrain = self.road
-        activeCell.terrain = self.road
-
-        while activeCell.pos != targetCell.pos and activeCell.pos[0] > 2 and activeCell.pos[0] < len(map)-2 and activeCell.pos[1] > 2 and activeCell.pos[1] < len(map)-2:
-            activeCell.terrain = self.road
-            activeCell = activeCell.refClosestNeighborTo(targetCell.pos)
-
-        if math.dist(activeCell.pos,targetCell.pos) < 2:
-            activeCell.terrain = self.road
-            activeCell = targetCell
-            return
-
-        if random.randint(1,9) == 1: #Randomly deviate by one tile
-            activeCell = random.choice(activeCell.refPerpendicularNeigbors(targetCell.pos))
-
-    def createStraightRoad(self, map, target1Pos, target2Pos): #makes a road between two points, with slight deviations
-        
-        roadList = self.ListInterceptingSquares(target1Pos, target2Pos)
-
-        for cell in roadList:
-            cell.terrain = self.road
-        return
-        
-    def createHighway(self, map, target1Pos, target2Pos, AdjTarget1Pos = [], AdjTarget2Pos = []):
-        
-        target1Cell = map[target1Pos[1]][target1Pos[0]]
-        target2Cell = map[target2Pos[1]][target2Pos[0]]
-
-        if AdjTarget1Pos == [] and AdjTarget2Pos == []:
-            nextStartPos = random.choice(target1Cell.refPerpendicularNeigbors(target2Pos)).pos #picking a perpendicular neighbor to make parallel road
-            nextEndPos = target2Cell.nList[target1Cell.nList.index(map[nextStartPos[1]][nextStartPos[0]])].pos #matching neighbor
-        else:
-            nextStartPos = AdjTarget1Pos
-            nextEndPos = AdjTarget2Pos
-
-        self.createStraightRoad(map,target1Pos,target2Pos)
-        self.createStraightRoad(map,nextStartPos,nextEndPos)
-
-    def randomRoadGen(self, map, density): #["None","Light","Normal","Thick"]
-        
-        densityList=["None","Light","Normal","Thick"]
-        if density not in densityList:
-            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
-            return
-        else:
-            densityMult= densityList.index(density)
-            seedingChance = densityMult #roads per 20 tile radius or n in 4000
-            totalTiles = len(map)*len(map)
-            roadsPerSeed = round(totalTiles/4000,0) #~3 for a 100x100 map
-            expectedRoads = roadsPerSeed * seedingChance
-            roads=0
-
-            #constuct Highways = densityMult
-            highways=0
-            while highways < densityMult:
-                highways+=1
-                roads+=1
-            
-                startcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-                endcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-
-                while math.dist(startcell.pos,endcell.pos) < len(map): #making sure the Highway is actually long
-                    startcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-                    endcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-            
-                self.createHighway(map, startcell.pos, endcell.pos)
-
-            while roads < expectedRoads:
-                roads+=1
-                startcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-                endcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-
-                while math.dist(startcell.pos,endcell.pos) < len(map): #making sure the road is actually long
-                    startcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-                    endcell = map[random.randint(2,len(map)-2)][random.randint(2,len(map)-2)]
-                
-                self.createRoad(map, startcell.pos, endcell.pos)
-
-
-
 #key descriptions in dictionary
 class TerrainType:
     """Immutable-style description of how a terrain category behaves and renders."""
@@ -304,70 +186,6 @@ class TerrainType:
         self.symbolHighlight = symbolHighlight
         self.passable = passable
 
-    def basicTileGen(self, map, density): #["None","Light","Normal","Thick"]
-        densityList = ["None","Light","Normal","Thick"]
-        if density not in densityList:
-            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal',and 'Thick'")
-            return
-        else:
-            densityMult = densityList.index(density)
-            seedingChance = 3 #out of 1000
-            neighborConversionChance = 25 #out of 100
-            for y in map[1 : len(map) - 1]:
-                for cell in y[1:len(y)-1]: #to avoid flipping border tiles
-                    if (random.randint(1, 1000) <= seedingChance * densityMult):
-                        cell.terrain = self
-            
-            genLoops = densityMult
-
-            i = 0
-            while i < genLoops:
-                i+=1
-                changeQueue=[] #using a neighbors terrain to determine if you flip will cause a slant if you make changes during the loop
-                for y in map[2:len(map)-2]:
-                    for cell in y[2:len(y)-2]:
-                        flipRoll = False
-                        numTerrain = 0
-                        for n in cell.nList:
-                            if n.terrain == self:
-                                flipRoll = True
-                                numTerrain += 1
-                        if flipRoll is True:
-                            if (random.randint(1 , 100) + numTerrain < neighborConversionChance):
-                                changeQueue.append(cell)
-                        for cell in changeQueue:
-                            cell.terrain = self
-                changeQueue=[]
-
-    def associationTileGen(self, map, density, associatedTerrainList): # Places a terrain tile next to an associated tile
-        densityList = ["None","Light","Normal","Thick"]
-        if density not in densityList:
-            print(str(density) + "is not a valid density setting. Please use 'None','Light','Normal', and 'Thick'")
-            return
-        else:
-            densityMult = densityList.index(density)
-            neighborConversionChance = 5 #out of 100
-            genLoops = densityMult
-
-            i = 0
-            while i < genLoops:
-                i+=1
-                changeQueue=[] #using a neighbors terrain to determine if you flip will cause a slant if you make changes during the loop
-                for y in map[2:len(map)-2]:
-                    for cell in y[2:len(y)-2]:
-                        flipRoll = False
-                        numTerrain = 0
-                        for n in cell.nList:
-                            if n.terrain in associatedTerrainList:
-                                flipRoll = True
-                                numTerrain += 1 # more neighbors of associated type = greater chance of flipping. makes tighter groups
-                        if flipRoll is True and cell.terrain not in associatedTerrainList:
-                            if (random.randint(1 , 100) + numTerrain < neighborConversionChance):
-                                changeQueue.append(cell)
-                        for cell in changeQueue:
-                            cell.terrain = self
-                changeQueue=[]
-          
     def displayTerrain(self):
         if self.symbolAttribute != [] and self.symbolHighlight != "":
             return cprint(self.symbol,self.color,self.symbolHighlight,attrs=[self.symbolAttribute], end = " ")

@@ -1,18 +1,19 @@
 import printView as pv
 import functions as f
 
-def recieveInput(matchInfo):
-    """Read one player command and dispatch it to the relevant game action."""
 
-    playerInput = ""
-    while len(playerInput) == 0:
-        playerInput = input("Input: ")
+def _read_nonempty(prompt):
+    """Read a trimmed command or menu value, rejecting blank input."""
+    while True:
+        value = input(prompt).strip()
+        if value:
+            return value
         print()
 
-    if playerInput[0] == " ": #cleans up input from accidental spaces
-        playerInput.pop(0)
-    if playerInput[:-0] == " ":
-        playerInput.pop(len(playerInput)-1)
+
+def receive_input(matchInfo):
+    """Read one player command and dispatch it to the relevant game action."""
+    playerInput = _read_nonempty("Input: ").lower()
 
     match playerInput:
     
@@ -25,7 +26,7 @@ def recieveInput(matchInfo):
         case "rep1":
             return printReportLog(matchInfo)
         
-        case "next" | "Next" | "NEXT":
+        case "next":
             return matchInfo.nextMechinTeam()
         
         case "q" | "w" | "e" | "a" | "s" | "d" | "z" | "c":
@@ -34,13 +35,13 @@ def recieveInput(matchInfo):
         case "r":
             return printUnreads(matchInfo)
         
-        case "end" | "End":
+        case "end":
             return matchInfo.nextSquadTurn()
             
         case "look" | "l":
             return pv.lookAt(matchInfo)
         
-        case "fire" | "Fire":
+        case "fire":
             return gunMenu(matchInfo)
         
         case "f" | "F":
@@ -54,15 +55,15 @@ def recieveInput(matchInfo):
             return
     
 
+def recieveInput(matchInfo):
+    """Compatibility wrapper for the original misspelled command function."""
+    return receive_input(matchInfo)
+
 def radarToggle(matchInfo):
     """Switch the current mech's active radar state."""
     mech = matchInfo.pov
-    if mech.radarOn == True:
-        mech.radarOn == False
-        print("Radar toggled off")
-    else:
-        mech.radarOn == True
-        print("Radar toggled on")
+    mech.radarOn = not mech.radarOn
+    print("Radar toggled on" if mech.radarOn else "Radar toggled off")
 
 def fire(matchInfo):
     """Fire the selected default weapon, prompting when none is selected."""
@@ -125,27 +126,18 @@ def gunMenu(matchInfo): #TODO add ability to exit
 
     #get default gun choice from menu
     #TODO add ability to pull a weapon's long description
-    playerInput = ""
-    playerInput = input("Choose default gun: ")
-    while len(playerInput) == 0:
-        playerInput = input("Choose default gun: ")
-        print()
-
-    if playerInput[0] == " ": #cleans up input from accidental spaces
-        playerInput.pop(0)
-    if playerInput[:-0] == " ":
-        playerInput.pop(len(playerInput)-1)
+    playerInput = _read_nonempty("Choose default gun: ")
 
     try:
         playerInput = int(playerInput)
-        if playerInput < 0 or playerInput > len(gunList) + 1:
+        if not 1 <= playerInput <= len(gunList):
             print("Please enter an integer listed in the menu.")
             gunMenu(matchInfo)
         else:
             gunList[playerInput - 1].defaultGun = True
             print(f"{gunList[playerInput - 1].name} set to (f)ire by default")
             return
-    except:
+    except ValueError:
         print("Please enter an integer.")
         gunMenu(matchInfo)
 
