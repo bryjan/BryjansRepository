@@ -293,7 +293,7 @@ class Cell:
         
         for entity in matchInfo.entities:
             if entity.pos == self.pos:
-                entity.displayObject()
+                entity.displayObject(active=entity is matchInfo.pov)
                 return
         else:
             self.terrain.displayTerrain()
@@ -304,7 +304,7 @@ class Cell:
         for entity in matchInfo.entities:
             threshold = entity_detection_threshold(entity.radarSig)
             if entity.pos == self.pos and self.radarPower >= (threshold * 2):
-                entity.displayObject()
+                entity.displayObject(active=entity is matchInfo.pov)
                 return
             if entity.pos == self.pos and self.radarPower >= threshold:
                 print(colored("?", "white"), end=" ")
@@ -782,9 +782,10 @@ class Entity: #a character on the map
                 return
         print()
 
-    def displayObject(self):
-        
-        return print(colored(self.mechClass.symbol,self.mechClass.color), end = " ")
+    def displayObject(self, active=False):
+        """Render a mech symbol, emphasizing the currently controlled mech."""
+        attributes = ["bold", "reverse", "blink"] if active else []
+        return print(colored(self.mechClass.symbol, self.mechClass.color, attrs=attributes), end=" ")
 
     def destroy(self, matchInfo):
         """Remove this mech from active play and record its destruction once."""

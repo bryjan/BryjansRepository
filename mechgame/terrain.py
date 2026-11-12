@@ -114,7 +114,7 @@ class Cell:
         """Render the visible entity at this cell, or fall back to terrain."""
         for entity in matchInfo.entities:
             if entity.pos == self.pos:
-                entity.displayObject()
+                entity.displayObject(active=entity is matchInfo.pov)
                 return
         else:
             self.terrain.displayTerrain()
@@ -124,7 +124,7 @@ class Cell:
         for entity in matchInfo.entities:
             threshold = entity_detection_threshold(entity.radarSig)
             if entity.pos == self.pos and self.radarPower >= (threshold * 2):
-                entity.displayObject()
+                entity.displayObject(active=entity is matchInfo.pov)
                 return
             if entity.pos == self.pos and self.radarPower >= threshold:
                 print(colored("?", "white"), end=" ")
