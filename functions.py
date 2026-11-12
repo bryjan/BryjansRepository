@@ -40,29 +40,15 @@ def compass_bearing(pointA, pointB):
     return compass_bearing
 
 def neswDirection(pointA, pointB):
-    """Convert the bearing between two map positions into a compass label."""
-    
-    bearing = compass_bearing(tuple(pointA), tuple(pointB))
-    direction = f""
+    """Convert one screen-grid position to another into a compass label.
 
-    if bearing >= 337.5 or bearing < 22.5:
-        direction = f"North"
-    elif bearing < 67.5:
-        direction = f"North East"
-    elif bearing < 112.5:
-        direction = f"East"
-    elif bearing < 157.5:
-        direction = f"South East"
-    elif bearing < 202.5:
-        direction = f"South"
-    elif bearing < 247.5:
-        direction = f"South West"
-    elif bearing < 292.5:
-        direction = f"West"
-    elif bearing < 337.5:
-        direction = f"North West"
-
-    return direction
+    Map Y increases downward, matching array rows and the tactical display.
+    """
+    dx = pointB[0] - pointA[0]
+    dy = pointB[1] - pointA[1]
+    horizontal = "East" if dx > 0 else "West" if dx < 0 else ""
+    vertical = "South" if dy > 0 else "North" if dy < 0 else ""
+    return f"{vertical} {horizontal}".strip() or "Stationary"
 
 def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inputQuery is a string of why they are entering coords
     """Read and validate one in-bounds ``x,y`` position, or return ``"x"`` to cancel."""

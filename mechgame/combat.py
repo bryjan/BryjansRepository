@@ -418,17 +418,17 @@ class Entity: #a character on the map
         match input:
 
             case "q":
-                targetPos = [self.pos[0]-1, self.pos[1]+1]
+                targetPos = [self.pos[0]-1, self.pos[1]-1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 
             case "w":
-                targetPos = [self.pos[0], self.pos[1]+1]
+                targetPos = [self.pos[0], self.pos[1]-1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 
             case "e":
-                targetPos = [self.pos[0]+1, self.pos[1]+1]
+                targetPos = [self.pos[0]+1, self.pos[1]-1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 
@@ -438,7 +438,7 @@ class Entity: #a character on the map
                 moveCost = targetCell.terrain.moveCost[self.size]
 
             case "s":
-                targetPos = [self.pos[0], self.pos[1]-1]
+                targetPos = [self.pos[0], self.pos[1]+1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 
@@ -448,12 +448,12 @@ class Entity: #a character on the map
                 moveCost = targetCell.terrain.moveCost[self.size]
 
             case "z":
-                targetPos = [self.pos[0] - 1, self.pos[1]-1]
+                targetPos = [self.pos[0] - 1, self.pos[1]+1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 
             case "c":
-                targetPos = [self.pos[0] + 1, self.pos[1]-1]
+                targetPos = [self.pos[0] + 1, self.pos[1]+1]
                 targetCell = map[targetPos[1]][targetPos[0]]
                 moveCost = targetCell.terrain.moveCost[self.size]
 

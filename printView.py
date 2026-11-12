@@ -27,7 +27,9 @@ def printPOV(matchInfo, povX, povY):
             else:
                 xRow.append(matchInfo.map[y][x])
             x += 1
-        mapWindow.insert(0, xRow)
+        # Map rows use the usual screen convention: smaller Y values appear
+        # higher on screen, and larger Y values appear lower.
+        mapWindow.append(xRow)
         y += 1
         xRow = []
 
