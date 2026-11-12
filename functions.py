@@ -54,8 +54,6 @@ def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inp
     """Read and validate one in-bounds ``x,y`` position, or return ``"x"`` to cancel."""
     playerInput= ""
     coordinate = []
-    xyMax = len(matchInfo.map) - 1
-
     playerInput = input(inputQuery + " (for example 'x,y', or 'x' to exit): ")
     while len(playerInput) == 0:
         playerInput = input(inputQuery + " (for example 'x,y', or 'x' to exit): ")
@@ -96,10 +94,14 @@ def getCoordinateInput(matchInfo, inputQuery): #asks player for coordinates, inp
         return getCoordinateInput(matchInfo, inputQuery)
 
 
-    for axis in coordinate:
-        if axis > xyMax or axis < 0:
-            print(str(coordinate) + " is not in the map.")
-            return getCoordinateInput(matchInfo, inputQuery)
+    x, y = coordinate
+    if not (0 <= x < matchInfo.mapWidth and 0 <= y < matchInfo.mapHeight):
+        print(
+            f"{coordinate} is not in the map. "
+            f"Use X from 0 to {matchInfo.mapWidth - 1} and "
+            f"Y from 0 to {matchInfo.mapHeight - 1}."
+        )
+        return getCoordinateInput(matchInfo, inputQuery)
 
     return coordinate
 

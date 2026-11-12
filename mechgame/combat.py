@@ -446,7 +446,6 @@ class Entity: #a character on the map
     def moveMech(self, matchInfo, input):
         """Attempt one keyboard-directed move and charge the required movement points."""
         map = matchInfo.map
-        targetCell = matchInfo.map[self.pos[0]][self.pos[1]] #just to initialize to avoid error
 
         if self.ap == 0 or self.mp == 0 or self.energy == 0:
             print("You don't have the ability to move anymore this turn.")
@@ -457,47 +456,42 @@ class Entity: #a character on the map
 
             case "q":
                 targetPos = [self.pos[0]-1, self.pos[1]+1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "w":
                 targetPos = [self.pos[0], self.pos[1]+1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "e":
                 targetPos = [self.pos[0]+1, self.pos[1]+1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "a":
                 targetPos = [self.pos[0]-1, self.pos[1]]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "s":
                 targetPos = [self.pos[0], self.pos[1]-1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "d":
                 targetPos = [self.pos[0] + 1, self.pos[1]]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "z":
                 targetPos = [self.pos[0] - 1, self.pos[1]-1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case "c":
                 targetPos = [self.pos[0] + 1, self.pos[1]-1]
-                targetCell = map[targetPos[1]][targetPos[0]]
-                moveCost = targetCell.terrain.moveCost[self.size]
 
             case _:
                 print("Not a valid movement input.")
                 return
+
+        targetX, targetY = targetPos
+        if not (0 <= targetX < matchInfo.mapWidth and 0 <= targetY < matchInfo.mapHeight):
+            print("That move would leave the map.")
+            return
+
+        # Rows are indexed by Y, then columns by X. Keeping this lookup in one
+        # place prevents valid X positions on rectangular maps from being read
+        # as row numbers.
+        targetCell = map[targetY][targetX]
+        moveCost = targetCell.terrain.moveCost[self.size]
 
         #checks for viability
         if moveCost > self.energy:
@@ -596,7 +590,10 @@ class Entity: #a character on the map
         dontCalcList= [startingCell] #cells exempt from calcs
         for n in startingCell.nList:
             dontCalcList.append(n)
-            if n.pos[0] > 0 and n.pos[0] < len(matchInfo.map) and n.pos[1] > 0 and n.pos[1] < len(matchInfo.map):
+            if (
+                0 < n.pos[0] < matchInfo.mapWidth
+                and 0 < n.pos[1] < matchInfo.mapHeight
+            ):
                 calcList.append(n)
         
         for cell in calcList:

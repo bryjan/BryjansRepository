@@ -180,12 +180,12 @@ class MatchInfo:
         if abs(slope) <= 1:
             for i in range(min(point1[0], point2[0]), max(point1[0], point2[0]) + 1):
                 y = round((slope * i) + intercept)
-                interceptingCells.append(self.map[i][y])
+                interceptingCells.append(self.map[y][i])
             return interceptingCells
 
         for i in range(min(point1[1], point2[1]), max(point1[1], point2[1]) + 1):
             x = round((i - intercept) / slope)
-            interceptingCells.append(self.map[x][i])
+            interceptingCells.append(self.map[i][x])
         return interceptingCells
 
     def mapInit(self):
