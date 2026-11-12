@@ -29,6 +29,8 @@ round and returns it to the player squad.
 - `mechgame/combat.py` contains the shared combat implementation behind the
   focused entity, mech, and team modules.
 - `gameClasses.py` preserves the original top-level import path.
+- [`docs/size-classes.md`](docs/size-classes.md) is the balance reference for
+  designing mech classes and their expected values.
 - `tests/` contains automated checks for the world-generation boundary.
 
 ## Test
