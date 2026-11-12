@@ -26,9 +26,9 @@ round and returns it to the player squad.
 - `mechgame/terrain.py` defines terrain and map cells.
 - `mechgame/entities.py`, `mechgame/mechs.py`, and `mechgame/teams.py` are the
   focused import points for units, parts, and group coordination.
-- `mechgame/models.py` and `gameClasses.py` preserve the original import paths.
-- `mechgame/legacy_models.py` temporarily holds the tightly coupled combat
-  implementation while those focused modules are migrated one behavior at a time.
+- `mechgame/combat.py` contains the shared combat implementation behind the
+  focused entity, mech, and team modules.
+- `gameClasses.py` preserves the original top-level import path.
 - `tests/` contains automated checks for the world-generation boundary.
 
 ## Test

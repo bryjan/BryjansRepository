@@ -19,6 +19,9 @@ class MatchInfo:
         self.mapParamsList = mapParams
         self.map = []
         self.advTurn = False #did POV take a turn ending action (ap costing). reading reports dont advance the turn, moving would, ect.
+        # advTurn records an action; turnEnded is reserved for the player's
+        # explicit request to hand control to the next squad.
+        self.turnEnded = False
 
         # Terrain definitions and map construction live in mechgame.world.
         # These attributes are populated by mapInit for compatibility with the
@@ -50,6 +53,7 @@ class MatchInfo:
         self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
         self.pov.squad.roundRefresh(self)
         self.advTurn = False
+        self.turnEnded = False
 
     def nextMechinTeam(self):
         """Cycle the point of view through the current squad without ending its turn."""

@@ -1,9 +1,5 @@
-"""Mech instances and their pilots.
+"""Mech instances and their pilots."""
 
-The implementations remain in ``legacy_models`` during the staged extraction;
-new callers should import from this focused module.
-"""
-
-from .legacy_models import Entity, Pilot
+from .combat import Entity, Pilot
 
 __all__ = ["Entity", "Pilot"]

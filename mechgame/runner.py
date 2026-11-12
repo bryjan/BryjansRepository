@@ -41,13 +41,18 @@ class Game:
         match = self.create_match()
         match.pov.squad.roundRefresh(match)
         while True:
-            # A movement, shot, or explicit end command sets advTurn. The
-            # runner owns the transition, so every ending action follows the
-            # same turn sequence.
-            match.advTurn = False
-            while not match.advTurn:
-                match.pov.getVisuals(match)
-                printHUD.displayHUD(match)
-                printView.printPOV(match, *match.pov.pos)
-                inputs.receive_input(match)
+            match.pov.getVisuals(match)
+            printHUD.displayHUD(match)
+            printView.printPOV(match, *match.pov.pos)
+            inputs.receive_input(match)
+            self.advance_turn_if_requested(match)
+
+    @staticmethod
+    def advance_turn_if_requested(match):
+        """Advance only after an explicit ``end`` command.
+
+        Movement and firing may set ``advTurn`` for their own rules, but they
+        do not transfer control away from the active mech.
+        """
+        if match.turnEnded:
             match.nextSquadTurn()
