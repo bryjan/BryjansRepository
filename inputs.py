@@ -1,5 +1,7 @@
 import math
 
+import math
+
 import printView as pv
 import functions as f
 
@@ -33,8 +35,7 @@ def receive_input(matchInfo):
             return
 
         case "sq" | "squad":
-            print(matchInfo.pov.squad.statusReport())
-            return
+            return squadMenu(matchInfo)
         
         case "next":
             return matchInfo.nextMechinTeam()
@@ -106,6 +107,56 @@ def nearestTrackedEnemy(mech):
     if not mech.trackedEnemies:
         return None
     return min(mech.trackedEnemies, key=lambda enemy: math.dist(mech.pos, enemy.pos))
+
+
+def squadMenu(matchInfo):
+    """Show squad readiness, then offer player-facing squad controls."""
+    squad = matchInfo.pov.squad
+    print(squad.statusReport())
+    print("Squad options: [m]ech  [s]witch controllable squad  [x] exit")
+    choice = input("Squad: ").strip().lower()
+
+    if choice in ("", "x"):
+        return
+    if choice == "m":
+        return selectSquadMech(matchInfo, squad)
+    if choice == "s":
+        return selectControllableSquad(matchInfo)
+    print("Choose m, s, or x.")
+
+
+def selectSquadMech(matchInfo, squad):
+    """Switch the point of view to a mech in the current squad."""
+    for index, mech in enumerate(squad.mechList, start=1):
+        print(f"{index}. {mech.pilot.name} — {mech.mechClass.name} ({round(mech.mechClass.condition)}%)")
+    selection = _read_nonempty("Mech: ")
+    if not selection.isdigit() or not 1 <= int(selection) <= len(squad.mechList):
+        print("Choose a listed mech number.")
+        return
+    matchInfo.pov = squad.mechList[int(selection) - 1]
+    matchInfo.advTurn = False
+
+
+def selectControllableSquad(matchInfo):
+    """Switch to a non-empty squad explicitly marked as player controlled."""
+    squads = [
+        squad
+        for team in matchInfo.teamList
+        for squad in team.squadsList
+        if squad.playerControlled and squad.mechList
+    ]
+    if not squads:
+        print("No controllable squads are available.")
+        return
+    for index, squad in enumerate(squads, start=1):
+        print(f"{index}. {squad.name} — {len(squad.mechList)} mechs")
+    selection = _read_nonempty("Squad: ")
+    if not selection.isdigit() or not 1 <= int(selection) <= len(squads):
+        print("Choose a listed squad number.")
+        return
+    matchInfo.pov = squads[int(selection) - 1].mechList[0]
+    matchInfo.playerSquad = matchInfo.pov.squad
+    matchInfo.advTurn = False
 
 
 def chooseFireTarget(matchInfo, defaultTarget=None):
@@ -257,7 +308,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Type 'f' to target the nearest tracked enemy, then Enter or f to fire; other target options are available")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'st' for a full mech integrity, module, and ammunition report")
-    print ("Type 'sq' for squad integrity, module, ammunition, and damage summary")
+    print ("Type 'sq' for squad status and mech or controllable-squad switching")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
 
