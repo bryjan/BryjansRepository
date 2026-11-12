@@ -27,6 +27,10 @@ def receive_input(matchInfo):
         
         case "rep1":
             return printReportLog(matchInfo)
+
+        case "st" | "status":
+            print(matchInfo.pov.statusReport())
+            return
         
         case "next":
             return matchInfo.nextMechinTeam()
@@ -248,6 +252,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
     print ("Type 'f' to target the nearest tracked enemy, then Enter or f to fire; other target options are available")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
+    print ("Type 'st' for a full mech integrity, module, and ammunition report")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
 
