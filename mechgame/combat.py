@@ -363,6 +363,9 @@ class Entity: #a character on the map
         #ai flags
         self.travelSpeed = max(self.mechClass.apMax, self.mechClass.mpMax)
         self.needrest = False
+        # Tactical memory is useful to both AI and the player fire menu.
+        self.lastFiredAt = None
+        self.visibleEnemies = []
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
@@ -543,6 +546,11 @@ class Entity: #a character on the map
         """Project this entity's visual range through terrain absorption."""
         startingCell = matchInfo.map[self.pos[1]][self.pos[0]]
         startingCell.canSee = True
+        # Rebuild personal line-of-sight data each refresh. Map cells also
+        # retain squad vision for rendering, but fire choices need this mech's
+        # own currently visible enemies.
+        self.visibleCells = [startingCell]
+        self.visibleEnemies = []
 
         for y in matchInfo.map:
             for tile in y:
@@ -552,9 +560,6 @@ class Entity: #a character on the map
     
         calcList = [] #cells queued to be calced
         dontCalcList= [startingCell] #cells exempt from calcs
-        if startingCell not in self.visibleCells:
-            self.visibleCells.append(startingCell)
-    
         for n in startingCell.nList:
             dontCalcList.append(n)
             if n.pos[0] > 0 and n.pos[0] < len(matchInfo.map) and n.pos[1] > 0 and n.pos[1] < len(matchInfo.map):
@@ -571,10 +576,18 @@ class Entity: #a character on the map
 
             if cell.visPower > 0:
                 cell.canSee = True
+                self.visibleCells.append(cell)
                 for n in cell.nList:
                     if (n not in dontCalcList):
                         calcList.append(n)
                         dontCalcList.append(n)
+
+        self.visibleEnemies = [
+            entity
+            for entity in matchInfo.entities
+            if entity.team != self.team
+            and matchInfo.map[entity.pos[1]][entity.pos[0]] in self.visibleCells
+        ]
 
     def getRadar(self, matchInfo):
         """Project active radar strength through radar absorption."""
@@ -1126,6 +1139,9 @@ class WeaponLimb(MechPart):
             self.charges -= 1
         matchInfo.pov.ap -= self.apCost
         matchInfo.pov.energy -= self.energyCost
+        # Store the attempted location even on a miss so a follow-up shot can
+        # be ordered without re-entering coordinates.
+        matchInfo.pov.lastFiredAt = list(pos)
         
         #enemies will report noise
         self.emitSound(matchInfo)
