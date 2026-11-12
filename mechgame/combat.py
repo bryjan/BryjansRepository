@@ -10,7 +10,7 @@ import functions as f
 import copy
 import random
 from termcolor import colored, cprint #print(colored(string, color as string),attrs=[bold,dark,underline,blink,reverse,concealed],end='')
-from .radar import entity_detection_threshold
+from .radar import entity_detection_threshold, radar_step_loss
 
 class MatchInfo:
     """Mutable state shared by one running match.
@@ -542,7 +542,10 @@ class Entity: #a character on the map
                 #print("calcd: " + str(cell.pos) + " | prevPower: " + str(cell.radarPower), end = " newPower:") #test
                 dontCalcList.append(cell)
                 closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
-                radarLoss = int(closestNeighbor.terrain.radarAbsorb) + round(math.dist(startingCell.pos, cell.pos))
+                # Apply a fixed loss for each tile crossed.  Calculating loss
+                # from the source distance here made each successive step more
+                # expensive than the last, preventing meaningful long range.
+                radarLoss = radar_step_loss(closestNeighbor.terrain.radarAbsorb)
                 cell.radarPower = int(closestNeighbor.radarPower) - radarLoss
                 #print(cell.radarPower)#test
 

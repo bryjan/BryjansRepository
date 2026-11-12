@@ -15,7 +15,8 @@ def create_lancer_class():
     crit_protection = Module(name="Anti-spalling Foam", attrNames=["Na"], bonusType=0, statChangeList=[["Na", "Na", "Na"]])
 
     helm = Helm(name="Great Helm", armor=5, hp=30, moduleList=[crit_protection], ap=6, visualPower=12, radarPower=0, radarEnergyCost=0)
-    hull = Hull(name="Lancer Power Armor", armor=5, hp=25, moduleList=[], pwrCapacity=20, pwrGen=1, radarSig=250, size=2)
+    # Lancers are slightly harder than a typical size-2 unit to find.
+    hull = Hull(name="Lancer Power Armor", armor=5, hp=25, moduleList=[], pwrCapacity=20, pwrGen=1, radarSig=100, size=2)
     legs = Legs(name="Lancer Power Armor Legs", armor=5, hp=25, moduleList=[leg_motor, light_frame], speed=4)
     gun = WeaponLimb(name="ChainGun", armor=8, hp=30, moduleList=[chain_gun_auto, holo_sight], damage=8, accuracy=20, soundRep=20, charges=60, projectileCount=3)
     return MechClass(name="Lancer Type.A", symbol="p", color="dark_grey", mechHull=hull, mechHelm=helm, mechLeg=legs, limblist=[gun])

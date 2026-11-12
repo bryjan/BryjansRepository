@@ -1,8 +1,12 @@
 """Shared radar-detection rules for mech targets."""
 
-# Existing hull signatures cluster around 250. Keeping the scale while using a
-# fixed baseline makes a larger signature easier, rather than harder, to find.
-RADAR_DETECTION_BASE = 300
+# A fixed baseline makes a larger signature easier, rather than harder, to
+# find.  The larger scale leaves room for low-observable units to matter.
+RADAR_DETECTION_BASE = 400
+
+# Radar travels one map cell at a time.  Open ground has an absorption of one,
+# so its total loss is two power per tile: one for distance and one for terrain.
+RADAR_DISTANCE_LOSS = 1
 
 
 def entity_detection_threshold(radar_signature):
@@ -12,3 +16,8 @@ def entity_detection_threshold(radar_signature):
     required for detection. Terrain keeps its separate radar-return values.
     """
     return max(1, RADAR_DETECTION_BASE - radar_signature)
+
+
+def radar_step_loss(terrain_absorption):
+    """Return the power lost while radar crosses one terrain cell."""
+    return RADAR_DISTANCE_LOSS + int(terrain_absorption)
