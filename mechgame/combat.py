@@ -855,7 +855,11 @@ class MechPart: # super class to mech limbs
         self.updateModules()
 
     def updateModules(self):
-        """Apply this part's active module modifiers to its target attributes."""
+        """Apply this part's active module modifiers to its target attributes.
+
+        Module stat arrays are indexed by module condition: destroyed (0),
+        damaged (1), then intact (2).
+        """
         for m in self.modsList:
             if m.modType == 1: #skips modules that make no stat change
                 i = 0
@@ -958,6 +962,10 @@ class MechPart: # super class to mech limbs
         self.mech.report(matchInfo, dmgdMod.name + " was damaged!", teamReport = False, critical = False)
         dmgdMod.damage(matchInfo)
         self.mechClass.statUpdate()
+        # Damaged modules can lower live resource limits immediately. Clamp the
+        # current values so a mech cannot keep capacity or movement it lost.
+        self.mech.energy = min(self.mech.energy, self.mechClass.energyMax)
+        self.mech.mp = min(self.mech.mp, self.mechClass.mpMax)
             
 
 class Legs(MechPart): #subclass mechpart

@@ -12,6 +12,8 @@ SIZE_CLASS_NAMES = {
     5: "huge", 6: "titanic",
 }
 
+# Module stat arrays always use this order: destroyed, damaged, intact.
+# Keeping that convention beside the factories makes balance values readable.
 
 def _module_passive_radar_detector():
     return Module("Passive Radar Detector", ["passiveRadar"], 1, [[False, False, True]])
@@ -55,12 +57,33 @@ def _module_kestrel_active_radar_array():
     )
 
 
+def _module_kestrel_leg_actuators():
+    """Make leg damage Kestrel's primary mobility weakness.
+
+    Intact actuators preserve the Kestrel's 5 MP. Damage reduces it to 4 MP,
+    while a destroyed actuator pack leaves only 2 MP for emergency movement.
+    """
+    return Module("Kestrel Leg Actuators", ["bonusMP"], 1, [[-3, -1, 0]])
+
+
+def _module_kestrel_reserve_capacitor():
+    """Supply the Kestrel's burst reserve and its final fourth energy regen."""
+    return Module(
+        "Kestrel Reserve Capacitor",
+        ["bonusEnergy", "bonusEnergyGen"],
+        1,
+        [[0, 5, 10], [0, 0, 1]],
+    )
+
+
 MODULE_FACTORIES = {
     "anti_spalling_foam": _module_anti_spalling_foam,
     "chaingun_bolt": _module_chaingun_bolt,
     "exosuit_leg_motors": _module_exosuit_leg_motors,
     "holosight": _module_holosight,
     "kestrel_active_radar_array": _module_kestrel_active_radar_array,
+    "kestrel_leg_actuators": _module_kestrel_leg_actuators,
+    "kestrel_reserve_capacitor": _module_kestrel_reserve_capacitor,
     "lancer_light_frame": _module_lancer_light_frame,
     "passive_radar_detector": _module_passive_radar_detector,
     "standard_active_radar_array": _module_standard_active_radar_array,
@@ -144,11 +167,24 @@ def _kestrel_sensor_helm():
 
 
 def _kestrel_hull():
-    return Hull("Kestrel Hull", 10, 50, [], pwrCapacity=50, pwrGen=4, radarSig=250, size=3)
+    # The capacitor brings this 40/3 chassis to its intended 50 reserve and
+    # 4 regeneration. Losing it removes that performance advantage.
+    return Hull(
+        "Kestrel Hull", 10, 50,
+        [
+            create_module("anti_spalling_foam"),
+            create_module("kestrel_reserve_capacitor"),
+        ],
+        pwrCapacity=40, pwrGen=3, radarSig=250, size=3,
+    )
 
 
 def _kestrel_legs():
-    return Legs("Kestrel Legs", 7, 40, [], speed=5)
+    return Legs(
+        "Kestrel Legs", 7, 40,
+        [create_module("kestrel_leg_actuators")],
+        speed=5,
+    )
 
 
 def _kestrel_energy_beam():
