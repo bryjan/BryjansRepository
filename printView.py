@@ -25,10 +25,13 @@ def printPOV(matchInfo, povX, povY):
     #makes window
     mapWindow = []
 
-    # ensure window is odd.
-    if matchInfo.windowSize % 2 == 0:
-        matchInfo.windowSize += 1
-    windowExtend = matchInfo.windowSize - 1
+    # A small map should not look empty simply because the normal tactical
+    # window is larger than one of its dimensions. Keep the displayed window
+    # odd so the active coordinate remains centered.
+    windowSize = min(matchInfo.windowSize, matchInfo.mapWidth, matchInfo.mapHeight)
+    if windowSize % 2 == 0:
+        windowSize -= 1
+    windowExtend = windowSize - 1
     windowExtend = int(windowExtend / 2) #half the window size extended from the center will make up the window
 
     xRow = []
@@ -37,9 +40,9 @@ def printPOV(matchInfo, povX, povY):
         x = povX - windowExtend
         while x <= povX + windowExtend:
             if y < 0 or y >= matchInfo.mapHeight or x < 0 or x >= matchInfo.mapWidth:
-                # Reuse the match's terrain catalogue instead of constructing
-                # equivalent blank and border terrain objects for every frame.
-                xRow.append(Cell(matchInfo.blank,[x, y]))
+                # Mark space beyond the generated world as a border rather
+                # than blank terrain, making map limits immediately obvious.
+                xRow.append(Cell(matchInfo.border,[x, y]))
             else:
                 xRow.append(matchInfo.map[y][x])
             x += 1
@@ -52,7 +55,7 @@ def printPOV(matchInfo, povX, povY):
     
     # Each map cell renders as a symbol plus one trailing space, so the frame
     # width scales with the configured tactical window rather than map size.
-    panelWidth = matchInfo.windowSize * 2
+    panelWidth = windowSize * 2
     divider = "+" + ("-" * panelWidth) + "+"
     print(divider)
     for y in mapWindow:
