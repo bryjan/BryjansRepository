@@ -36,6 +36,9 @@ def receive_input(matchInfo):
 
         case "sq" | "squad":
             return squadMenu(matchInfo)
+
+        case "o" | "options":
+            return optionsMenu(matchInfo)
         
         case "next":
             return matchInfo.nextMechinTeam()
@@ -126,6 +129,27 @@ def squadMenu(matchInfo):
     if choice == "s":
         return selectControllableSquad(matchInfo)
     print("Choose 'm', 's', or 'x'.")
+
+
+def optionsMenu(matchInfo):
+    """Offer display preferences that do not alter match state."""
+    print(f"Options: 'w' tactical window size (currently {matchInfo.windowSize}) | 'x' exit")
+    choice = input("Options: ").strip().lower()
+    if choice in ("", "x"):
+        return
+    if choice != "w":
+        print("Choose 'w' or 'x'.")
+        return
+
+    while True:
+        size = input("Tactical window size (odd whole number, at least 5; 'x' to cancel): ").strip().lower()
+        if size == "x":
+            return
+        if size.isdigit() and int(size) >= 5 and int(size) % 2 == 1:
+            matchInfo.windowSize = int(size)
+            print(f"Tactical window size set to {matchInfo.windowSize}.")
+            return
+        print("Enter an odd whole number of at least 5, or 'x' to cancel.")
 
 
 def selectSquadMech(matchInfo, squad):
@@ -347,6 +371,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("'rep1' shows unread reports; 'rep' opens the full report log.")
     print ("'st' shows mech integrity, modules, and ammunition.")
     print ("'sq' opens squad status and switching options.")
+    print ("'o' opens display options, including tactical window size.")
     print ("'next' switches to the next mech in your squad; 'end' ends the squad turn.")
     matchInfo.advTurn = False
 

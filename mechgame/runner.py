@@ -40,7 +40,6 @@ class Game:
         return match
 
     def run(self):
-        self.prompt_map_dimensions()
         match = self.create_match()
         match.pov.squad.roundRefresh(match)
         while True:
@@ -49,22 +48,6 @@ class Game:
             printView.printPOV(match, *match.pov.pos)
             inputs.receive_input(match)
             self.advance_turn_if_requested(match)
-
-    def prompt_map_dimensions(self):
-        """Ask for demo-map height and width while keeping safe defaults."""
-        print("Demo map setup — press 'Enter' to keep the shown defaults.")
-        self.map_height = self._read_map_dimension("Map height", self.map_height)
-        self.map_width = self._read_map_dimension("Map width", self.map_width)
-
-    @staticmethod
-    def _read_map_dimension(label, default):
-        while True:
-            value = input(f"{label} [{default}]: ").strip()
-            if not value:
-                return default
-            if value.isdigit() and int(value) >= 10:
-                return int(value)
-            print("Enter a whole number of at least 10, or press 'Enter' for the default.")
 
     @staticmethod
     def advance_turn_if_requested(match):

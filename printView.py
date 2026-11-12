@@ -14,8 +14,7 @@ def _print_tactical_footer(width):
     """Show the most useful options and log commands below the map frame."""
     divider = "+" + ("-" * width) + "+"
     print(divider)
-    _print_panel_text("Options: 'f' fire | 'fire' change weapon | 'st' status | 'sq' squad | '?' help | 'end' turn", width)
-    _print_panel_text("Logs: 'rep1' unread reports | 'rep' report pages", width)
+    _print_panel_text("Options: 'f' fire | 'st' status | 'sq' squad | 'o' options | '?' help | 'end' turn", width)
     print(divider)
 
 def printPOV(matchInfo, povX, povY):
