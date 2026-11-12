@@ -1394,46 +1394,32 @@ class Squad:
         self.effectiveness = (status/len(self.mechList))*100
 
     def spawnSquad(self, map, spawnPosition):
-        """Place squad members on nearby passable, non-floating terrain cells."""
-
-        mechs = self.mechList
+        """Place every squad member on a unique, in-bounds passable cell."""
         mapHeight = len(map)
         mapWidth = len(map[0])
-        
-        xMinPos = int(spawnPosition[0]-2) #creating a starting range of 5x5 that a mech could spawn
-        while  xMinPos < 1:
-            xMinPos +=1
-        xMaxPos = int(spawnPosition[0]+2)
-        while  xMaxPos > mapWidth-2:
-            xMaxPos -=1
-            
-        yMinPos = int(spawnPosition[1]-2)
-        while  yMinPos < 1:
-            yMinPos +=1
-        yMaxPos = int(spawnPosition[1]+2)
-        while  yMaxPos > mapHeight-2:
-            yMaxPos -=1
+        radius = 2
 
-        validSpawnLocations = [] #adds valid spawn points in that range
-        for rows in map[yMinPos:yMaxPos]:
-            for cell in rows[xMinPos:xMaxPos]:
-                if cell.terrain.passable == True and cell.terrain.requireFloat == False:
-                    validSpawnLocations.append(list(cell.pos))
-            
-        while len(validSpawnLocations) <= len(mechs): #expand spawn area if not enough valid cells
-            if xMinPos > 2:
-                    xMinPos -= 1
-            if xMaxPos < mapWidth-3:
-                    xMaxPos += 1
-            if yMinPos > 2:
-                    yMinPos -= 1
-            if yMaxPos < mapHeight-3:
-                    yMaxPos += 1
+        while True:
+            xMin = max(1, spawnPosition[0] - radius)
+            xMax = min(mapWidth - 2, spawnPosition[0] + radius)
+            yMin = max(1, spawnPosition[1] - radius)
+            yMax = min(mapHeight - 2, spawnPosition[1] + radius)
+            validSpawnLocations = [
+                list(cell.pos)
+                for row in map[yMin:yMax + 1]
+                for cell in row[xMin:xMax + 1]
+                if cell.terrain.passable and not cell.terrain.requireFloat
+            ]
+            if len(validSpawnLocations) >= len(self.mechList):
+                break
+            if xMin == 1 and xMax == mapWidth - 2 and yMin == 1 and yMax == mapHeight - 2:
+                raise ValueError("Map has insufficient passable cells to spawn this squad.")
+            radius += 1
 
-        for mech in mechs:
-            spawnPosition = random.choice(validSpawnLocations)
-            mech.pos = random.choice(validSpawnLocations)
-            validSpawnLocations.remove(spawnPosition)
+        for mech in self.mechList:
+            position = random.choice(validSpawnLocations)
+            mech.pos = position
+            validSpawnLocations.remove(position)
                 
 
 
