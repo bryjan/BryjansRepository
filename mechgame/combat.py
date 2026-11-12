@@ -1022,9 +1022,10 @@ class Helm(MechPart):
         self.multiRadarPower = 1
         self.radarPower = (self.baseRadarPower * self.multiRadarPower) + self.bonusRadarPower
 
-        # Sensor modules can set this alongside radarPower. It is inherited by
-        # MechClass now so an active-scan action can spend it later.
-        self.radarEnergyCost = radarEnergyCost
+        self.baseRadarEnergyCost = radarEnergyCost
+        self.bonusRadarEnergyCost = 0
+        self.multiRadarEnergyCost = 1
+        self.radarEnergyCost = (self.baseRadarEnergyCost * self.multiRadarEnergyCost) + self.bonusRadarEnergyCost
 
         self.shareData = True
         self.passiveRadar = False
@@ -1032,7 +1033,8 @@ class Helm(MechPart):
     def updateHelmStats(self):
         self.apMax = int((self.baseAP * self.multiAP) + self.bonusAP)
         self.visPower = int((self.baseVisPower * self.multiVisPower) + self.bonusVisPower)
-        self.visPower = int((self.baseVisPower * self.multiVisPower) + self.bonusVisPower)
+        self.radarPower = int((self.baseRadarPower * self.multiRadarPower) + self.bonusRadarPower)
+        self.radarEnergyCost = int((self.baseRadarEnergyCost * self.multiRadarEnergyCost) + self.bonusRadarEnergyCost)
 
 
 class WeaponLimb(MechPart):
