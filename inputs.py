@@ -1,3 +1,5 @@
+import math
+
 import printView as pv
 import functions as f
 
@@ -62,7 +64,7 @@ def recieveInput(matchInfo):
     return receive_input(matchInfo)
 
 def fire(matchInfo):
-    """Fire the selected default weapon at a tactical-menu target."""
+    """Fire the selected weapon, defaulting to the nearest tracked enemy."""
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
 
@@ -80,17 +82,35 @@ def fire(matchInfo):
         print("Select a default weapon.")
         return gunMenu(matchInfo)
     
-    targetPos = chooseFireTarget(matchInfo)
+    defaultTarget = nearestTrackedEnemy(mech)
+    if defaultTarget is not None:
+        print(f"Default target: {defaultTarget.pilot.name} — {defaultTarget.mechClass.name} at {defaultTarget.pos}")
+        pv.printPOV(matchInfo, *defaultTarget.pos)
+
+    targetPos = chooseFireTarget(matchInfo, defaultTarget)
     if targetPos is None:
         return
     gun.shootAt(matchInfo, targetPos)
 
 
-def chooseFireTarget(matchInfo):
-    """Offer visible, remembered, and manual targeting without defaulting to text coordinates."""
+def nearestTrackedEnemy(mech):
+    """Return the closest tracked enemy, or ``None`` when no contact exists."""
+    if not mech.trackedEnemies:
+        return None
+    return min(mech.trackedEnemies, key=lambda enemy: math.dist(mech.pos, enemy.pos))
+
+
+def chooseFireTarget(matchInfo, defaultTarget=None):
+    """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
-    print("Fire target: [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
-    choice = _read_nonempty("Target: ").lower()
+    if defaultTarget is not None:
+        print("Press Enter or f to fire. [t]racked enemy  [l]ast location  [c]oordinates  [x] cancel")
+        choice = input("Target: ").strip().lower()
+        if choice in ("", "f"):
+            return list(defaultTarget.pos)
+    else:
+        print("Fire target: [t]racked enemy  [l]ast fired location  [c]oordinates  [x] cancel")
+        choice = _read_nonempty("Target: ").lower()
 
     if choice == "x":
         return None
@@ -226,7 +246,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
     print ("Type 'r' to toggle continuous radar; it costs energy to start and each turn it stays on")
     print ("Type 'p' for a one-turn radar pulse; it costs energy once and shuts off at turn end")
-    print ("Type 'f' to fire: choose a tracked enemy, your last firing location, or coordinates")
+    print ("Type 'f' to target the nearest tracked enemy, then Enter or f to fire; other target options are available")
     print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
