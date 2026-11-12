@@ -58,4 +58,4 @@ holosight = create_module("holosight")
 
 `list_catalog()` lists entries grouped under class sizes from flat through
 titanic. The current test match includes Kiki's Pathfinder and Bryan's standard
-Lancer against two standard enemy Lancers.
+Lancer against the Kestrel and a standard enemy Lancer.

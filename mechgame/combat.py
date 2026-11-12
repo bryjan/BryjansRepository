@@ -1041,7 +1041,7 @@ class Helm(MechPart):
 
 class WeaponLimb(MechPart):
     """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats."""
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, desc = ""):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = ""):
         super().__init__(name, armor, hp, moduleList, desc = "")
         
         self.desc = desc
@@ -1081,7 +1081,10 @@ class WeaponLimb(MechPart):
 
         self.armorDamage = armorDamage
 
-        self.accuracyPenalty = 1
+        # Any accuracy-affecting module may change this multiplier. The
+        # Holosight is only one example of such a module.
+        self.accuracyMultiplier = 1
+        self.maxRange = maxRange
 
     def updateWeaponStats(self):
         self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
@@ -1098,8 +1101,11 @@ class WeaponLimb(MechPart):
         """Spend resources and resolve every projectile fired at a map position."""
 
         #check if enough resources
-        if self.charges - 1 < 0:
+        if self.charges is not None and self.charges - 1 < 0:
             print("Out of ammo!")
+            return
+        if self.maxRange is not None and math.dist(matchInfo.pov.pos, pos) > self.maxRange:
+            print(f"Target is beyond this weapon's {self.maxRange}-tile range.")
             return
         if matchInfo.pov.ap - self.apCost < 0:
             print("Out of action points!")
@@ -1108,7 +1114,8 @@ class WeaponLimb(MechPart):
             print("Not enough energy to fire!")
             return
 
-        self.charges -= 1
+        if self.charges is not None:
+            self.charges -= 1
         matchInfo.pov.ap -= self.apCost
         matchInfo.pov.energy -= self.energyCost
         
@@ -1117,8 +1124,8 @@ class WeaponLimb(MechPart):
 
         #Calculates shot based on terrain between you and target, ignores the tile you're standing on and directly infront
         path = matchInfo.ListInterceptingSquares(matchInfo.pov.pos, pos)
-        removeList = matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]].nList
-        removeList.append(matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]])
+        startingCell = matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]]
+        removeList = [*startingCell.nList, startingCell]
 
         for cell in removeList:
             if cell in path:
@@ -1128,29 +1135,43 @@ class WeaponLimb(MechPart):
         for n in path:
             accuracyRequired += n.terrain.visAbsorb
 
+        target = next((entity for entity in matchInfo.entities if entity.pos == pos), None)
+
         i = 1
         while i <= self.projectileCount:
             i += 1
-            shotDeviation = 1
+            movementMultiplier = 1
             if matchInfo.pov.speed > 0:
-                shotDeviation = 1 - ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed ) / 100) #move speed inaccuracy penalty
-            shotAccuracy = self.accuracy * shotDeviation
-            shotAccuracy = self.accuracy * self.accuracyPenalty
-            
-            if shotAccuracy < accuracyRequired:
+                movementMultiplier = 1 - ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed) / 100)
+            effectiveAccuracy = self.accuracy * self.accuracyMultiplier * movementMultiplier
+            hitChance = self._hit_chance(matchInfo.pov, target, effectiveAccuracy, accuracyRequired)
+
+            if random.randint(1, 100) > hitChance:
                 print("Shot missed!")
             else:
                 print("Shot hit!")
-                for mech in matchInfo.entities:
-                    if mech.pos == pos:
-                        #TODO add system to target specific limbs or make add weight table of limb chance to be hit
-                        random.choice(mech.mechClass.limbList).damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
+                if target is not None:
+                    #TODO add system to target specific limbs or make add weight table of limb chance to be hit
+                    random.choice(target.mechClass.limbList).damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
         matchInfo.advTurn = True
 
+    def _hit_chance(self, shooter, target, effectiveAccuracy, accuracyRequired):
+        """Return the per-projectile hit chance after terrain and size effects."""
+        if effectiveAccuracy < accuracyRequired:
+            return 0
+
+        # Meeting the terrain requirement creates the first 10% chance. Every
+        # further point adds 5%, then target size modifies the final result.
+        baseChance = 10 + ((effectiveAccuracy - accuracyRequired) * 5)
+        targetSize = target.size if target is not None else shooter.size
+        sizeMultiplier = 1.2 ** (targetSize - shooter.size)
+        return min(99, max(10, round(baseChance * sizeMultiplier)))
+
     def printShortDesc(self):
 
-        return f"[{self.name} | Charges:({self.charges}/{self.maxCharges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
+        charges = "Unlimited" if self.charges is None else f"{self.charges}/{self.maxCharges}"
+        return f"[{self.name} | Charges:({charges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
 
 
 #clean up module system and make it work (not updating)

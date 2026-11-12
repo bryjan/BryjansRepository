@@ -15,6 +15,11 @@ def create_sensor_lancer_class():
     return create_mech("lancer.pathfinder")
 
 
+def create_kestrel_class():
+    """Compatibility alias for the Kestrel catalog entry."""
+    return create_mech("kestrel")
+
+
 def create_demo_teams():
     """Create a playable sensor-Lancer test match."""
     player_mechs = [
@@ -22,7 +27,7 @@ def create_demo_teams():
         Entity(create_mech("lancer.type_a"), Pilot("Bryan")),
     ]
     enemy_mechs = [
-        Entity(create_mech("lancer.type_a"), Pilot("Wraith")),
+        Entity(create_mech("kestrel"), Pilot("Wraith")),
         Entity(create_mech("lancer.type_a"), Pilot("Ghost")),
     ]
     player = Team("Player Team", [Squad("Player Squad", player_mechs, "Combat", playerControlled=True)])

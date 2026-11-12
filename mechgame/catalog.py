@@ -26,7 +26,7 @@ def _module_exosuit_leg_motors():
 
 
 def _module_holosight():
-    return Module("Holosight", ["accuracyPenalty"], 1, [[.75, 1, 1.2]])
+    return Module("Holosight", ["accuracyMultiplier"], 1, [[.75, 1, 1.2]])
 
 
 def _module_anti_spalling_foam():
@@ -46,11 +46,21 @@ def _module_standard_active_radar_array():
     )
 
 
+def _module_kestrel_active_radar_array():
+    return Module(
+        "Kestrel Active Radar Array",
+        ["bonusRadarPower", "bonusRadarEnergyCost"],
+        1,
+        [[0, 175, 250], [0, 2, 2]],
+    )
+
+
 MODULE_FACTORIES = {
     "anti_spalling_foam": _module_anti_spalling_foam,
     "chaingun_bolt": _module_chaingun_bolt,
     "exosuit_leg_motors": _module_exosuit_leg_motors,
     "holosight": _module_holosight,
+    "kestrel_active_radar_array": _module_kestrel_active_radar_array,
     "lancer_light_frame": _module_lancer_light_frame,
     "passive_radar_detector": _module_passive_radar_detector,
     "standard_active_radar_array": _module_standard_active_radar_array,
@@ -121,6 +131,33 @@ def _scout_rifle():
     return WeaponLimb("Scout Rifle", 6, 24, [create_module("holosight")], damage=10, accuracy=30, soundRep=20, charges=60)
 
 
+def _kestrel_sensor_helm():
+    return Helm(
+        "Kestrel Sensor Helm", 9, 45,
+        [
+            create_module("anti_spalling_foam"),
+            create_module("passive_radar_detector"),
+            create_module("kestrel_active_radar_array"),
+        ],
+        ap=8, visualPower=16, radarPower=0, radarEnergyCost=0,
+    )
+
+
+def _kestrel_hull():
+    return Hull("Kestrel Hull", 10, 50, [], pwrCapacity=50, pwrGen=4, radarSig=250, size=3)
+
+
+def _kestrel_legs():
+    return Legs("Kestrel Legs", 7, 40, [], speed=5)
+
+
+def _kestrel_energy_beam():
+    return WeaponLimb(
+        "Kestrel Energy Beam", 8, 30, [], damage=12, accuracy=34,
+        soundRep=20, charges=None, apCost=2, energyCost=4, maxRange=32,
+    )
+
+
 PART_FACTORIES = {
     2: {
         "lancer.standard_helm": _standard_lancer_helm,
@@ -131,6 +168,12 @@ PART_FACTORIES = {
         "pathfinder.legs": _pathfinder_lancer_legs,
         "chaingun": _chaingun,
         "scout_rifle": _scout_rifle,
+    },
+    3: {
+        "kestrel.sensor_helm": _kestrel_sensor_helm,
+        "kestrel.hull": _kestrel_hull,
+        "kestrel.legs": _kestrel_legs,
+        "kestrel_energy_beam": _kestrel_energy_beam,
     },
 }
 
@@ -163,8 +206,19 @@ def _lancer_pathfinder():
     )
 
 
+def _kestrel():
+    return MechClass(
+        "Kestrel", "K", "light_blue",
+        create_part(3, "kestrel.hull"),
+        create_part(3, "kestrel.sensor_helm"),
+        create_part(3, "kestrel.legs"),
+        [create_part(3, "kestrel_energy_beam")],
+    )
+
+
 MECH_FACTORIES = {
     2: {"lancer.type_a": _lancer_type_a, "lancer.pathfinder": _lancer_pathfinder},
+    3: {"kestrel": _kestrel},
 }
 
 
@@ -184,7 +238,7 @@ def list_catalog(size=None):
             "name": class_name,
             "mechs": tuple(MECH_FACTORIES.get(class_size, {})),
             "parts": tuple(PART_FACTORIES.get(class_size, {})),
-            "modules": tuple(MODULE_FACTORIES) if class_size == 2 else (),
+            "modules": tuple(MODULE_FACTORIES) if class_size in PART_FACTORIES else (),
         }
         for class_size, class_name in sizes.items()
     }
