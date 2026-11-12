@@ -3,6 +3,7 @@
 import math
 
 from termcolor import colored, cprint
+from .radar import entity_detection_threshold
 
 
 #key descriptions in dictionary
@@ -121,10 +122,11 @@ class Cell:
 
     def displayRadarReturn(self, matchInfo):
         for entity in matchInfo.entities:
-            if entity.pos == self.pos and self.radarPower >= (entity.radarSig * 2):
+            threshold = entity_detection_threshold(entity.radarSig)
+            if entity.pos == self.pos and self.radarPower >= (threshold * 2):
                 entity.displayObject()
                 return
-            if entity.pos == self.pos and self.radarPower >= entity.radarSig:
+            if entity.pos == self.pos and self.radarPower >= threshold:
                 print(colored("?", "white"), end=" ")
                 return
         if self.radarReturn == True and self.radarPower >= self.terrain.radarSig:
