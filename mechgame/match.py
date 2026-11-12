@@ -71,6 +71,12 @@ class MatchInfo:
             for x in y:
                 x.canSee = False
                 x.visPower = 0
+        self.clearRadar()
+
+    def clearRadar(self):
+        """Clear radar returns without disturbing ordinary line of sight."""
+        for y in self.map:
+            for x in y:
                 x.radarReturn = False
                 x.radarPower = 0
 

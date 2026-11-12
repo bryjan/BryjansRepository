@@ -33,7 +33,10 @@ def receive_input(matchInfo):
             return matchInfo.pov.moveMech(matchInfo, playerInput)
         
         case "r":
-            return printUnreads(matchInfo)
+            return matchInfo.pov.toggleRadar(matchInfo)
+
+        case "p":
+            return matchInfo.pov.pulseRadar(matchInfo)
         
         case "end":
             # This is the sole command that hands control to the next squad.
@@ -49,9 +52,6 @@ def receive_input(matchInfo):
         case "f" | "F":
             return fire(matchInfo)
         
-        case "radar":
-            return radarToggle(matchInfo)
-
         case _:
             print("Input not recognized. Try again.")
             return
@@ -60,12 +60,6 @@ def receive_input(matchInfo):
 def recieveInput(matchInfo):
     """Compatibility wrapper for the original misspelled command function."""
     return receive_input(matchInfo)
-
-def radarToggle(matchInfo):
-    """Switch the current mech's active radar state."""
-    mech = matchInfo.pov
-    mech.radarOn = not mech.radarOn
-    print("Radar toggled on" if mech.radarOn else "Radar toggled off")
 
 def fire(matchInfo):
     """Fire the selected default weapon, prompting when none is selected."""
@@ -196,7 +190,8 @@ def helpCommand(matchInfo): #TODO update with all commands
     """Show the currently supported command shortcuts."""
     print ("Here are the list of commands available to you:")
     print ("Use 'w,a,s,d' and their diagonals 'q,e,z,c' to move the mech")
-    print ("Type 'r' to see your team's unread reports, 'rep' will prompt you for page number for full the report log")
+    print ("Type 'r' to toggle continuous radar, or 'p' for a one-turn radar pulse")
+    print ("Type 'rep1' to see unread reports, 'rep' will prompt you for a full report-log page")
     print ("Type 'next' to switch to the next mech in you squad")
     matchInfo.advTurn = False
 

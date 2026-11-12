@@ -347,7 +347,10 @@ class Entity: #a character on the map
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
         self.radarPower = self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
-        self.radarOn = True
+        # Active radar starts silent.  The pilot can enable continuous scans or
+        # spend energy on a single-turn pulse.
+        self.radarOn = False
+        self.radarPulseActive = False
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
@@ -378,9 +381,18 @@ class Entity: #a character on the map
         self.ap = int(self.mechClass.apMax)
         self.mp = int(self.mechClass.mpMax)
 
+        # A pulse only lasts for the squad turn in which it was ordered.
+        self.radarPulseActive = False
+
         self.energy += self.mechClass.energyGen
         if self.energy > self.mechClass.energyMax:
             self.energy = int(self.mechClass.energyMax)
+
+        # Continuous radar consumes its configured scan cost once per turn.
+        # Shut it down automatically if the mech cannot sustain the draw.
+        if self.radarOn and not self._spend_radar_energy(matchInfo):
+            self.radarOn = False
+            self.report(matchInfo, "Radar shut down: insufficient energy.")
 
         #get visuals
         self.getVisuals(matchInfo)
@@ -481,6 +493,47 @@ class Entity: #a character on the map
         self.pos = list(targetPos)
         self.speed += 1
         matchInfo.advTurn = True
+
+    def _spend_radar_energy(self, matchInfo):
+        """Spend this mech's configured radar cost, if it can afford one scan."""
+        cost = self.mechClass.radarEnergyCost
+        if self.energy < cost:
+            return False
+        self.energy -= cost
+        return True
+
+    def toggleRadar(self, matchInfo):
+        """Enable or disable continuous active radar for the current mech."""
+        if self.radarOn:
+            self.radarOn = False
+            matchInfo.clearRadar()
+            print("Continuous radar off.")
+            return
+
+        if self.mechClass.radarPower <= 0:
+            print("This mech has no active radar.")
+            return
+        if not self._spend_radar_energy(matchInfo):
+            print("Not enough energy to activate continuous radar.")
+            return
+
+        self.radarOn = True
+        print("Continuous radar on.")
+
+    def pulseRadar(self, matchInfo):
+        """Spend energy to make radar returns available for this squad turn."""
+        if self.mechClass.radarPower <= 0:
+            print("This mech has no active radar.")
+            return
+        if self.radarOn:
+            print("Continuous radar is already active.")
+            return
+        if not self._spend_radar_energy(matchInfo):
+            print("Not enough energy for a radar pulse.")
+            return
+
+        self.radarPulseActive = True
+        print("Radar pulse sent.")
     
     def getVis(self, matchInfo):
         """Project this entity's visual range through terrain absorption."""
@@ -524,7 +577,7 @@ class Entity: #a character on the map
         map = matchInfo.map
         startingCell = map[self.pos[1]][self.pos[0]]
         self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
-        if self.radarPower <= 0 or self.radarOn == False: #checks if entity has radar.
+        if self.radarPower <= 0 or not (self.radarOn or self.radarPulseActive):
             return
 
         startingCell.radarPower = int(self.radarPower)

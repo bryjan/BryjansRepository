@@ -10,7 +10,8 @@ def displayHUD(matchInfo):
     print (mech.pilot.name + " | Coordinates: " + str(mech.pos) +" | Status: " + str(condPercent) + "% | Current Tile: ", end =" ") 
     matchInfo.map[mech.pos[1]][mech.pos[0]].terrain.displayTerrain()
     print()
-    print("AP: "+ str(mech.ap) + "/" + str(mech.mechClass.apMax) + " | " + "MP: " + str(mech.mp)+"/"+str(mech.mechClass.mpMax) + " | " + "Energy: " + str(mech.energy) + "/" + str(mech.mechClass.energyMax) + " Regen:" + str(mech.mechClass.energyGen) + " Speed:" + str(mech.speed))
+    radarStatus = "ON" if mech.radarOn else "PULSE" if mech.radarPulseActive else "OFF"
+    print("AP: "+ str(mech.ap) + "/" + str(mech.mechClass.apMax) + " | " + "MP: " + str(mech.mp)+"/"+str(mech.mechClass.mpMax) + " | " + "Energy: " + str(mech.energy) + "/" + str(mech.mechClass.energyMax) + " Regen:" + str(mech.mechClass.energyGen) + " Speed:" + str(mech.speed) + " Radar:" + radarStatus)
     print()
     
 def report(matchInfo, mech, message, teamReport = False, critical = False): #TODO add messages to a report log
