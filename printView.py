@@ -3,6 +3,8 @@ import printHUD as ph
 import textwrap
 from mechgame.coordinates import get_coordinate_input
 
+SIDE_PANEL_WIDTH = 34
+
 
 def _print_panel_text(text, width):
     """Print wrapped panel text without exceeding the tactical-map width."""
@@ -16,6 +18,34 @@ def _print_tactical_footer(width):
     print(divider)
     _print_panel_text("'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'n' Next | '?' Help | 'end' End Turn", width)
     print(divider)
+
+
+def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
+    """Build a fixed-height active-mech summary for the tactical side panel."""
+    mech = matchInfo.pov
+    default_weapon = next(
+        (weapon.name for weapon in mech.mechClass.gunList if weapon.defaultGun),
+        "None selected",
+    )
+    abilities = ", ".join(
+        f"{ability.name} {'∞' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
+        for ability in mech.mechClass.hull.abilities
+    ) or "None"
+    entries = [
+        f"{mech.pilot.name} — {mech.mechClass.name}",
+        f"Condition: {round(mech.mechClass.condition)}%",
+        f"Position: {mech.pos}",
+        f"AP: {mech.ap}/{mech.mechClass.apMax} | MP: {mech.mp}/{mech.mechClass.mpMax}",
+        f"Energy: {mech.energy}/{mech.mechClass.energyMax} | Regen: {mech.mechClass.energyGen}",
+        f"Radar: {'ON' if mech.radarOn else 'OFF'} | Speed: {mech.speed}",
+        f"Weapon: {default_weapon}",
+        f"Abilities: {abilities}",
+    ]
+    lines = []
+    for entry in entries:
+        lines.extend(textwrap.wrap(entry, width=width) or [""])
+    lines = lines[:height]
+    return [f"|{line:<{width}}|" for line in lines] + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
 
 def printPOV(matchInfo, povX, povY):
     """Render a rectangular tactical window centered on the supplied map position."""
@@ -57,11 +87,13 @@ def printPOV(matchInfo, povX, povY):
     # Each map cell renders as a symbol plus one trailing space, so the frame
     # width scales with the configured horizontal view dimension.
     panelWidth = windowWidth * 2
-    divider = "+" + ("-" * panelWidth) + "+"
-    print(divider)
-    for y in mapWindow:
+    mapDivider = "+" + ("-" * panelWidth) + "+"
+    sideDivider = "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
+    sideLines = _side_panel_lines(matchInfo, windowHeight)
+    print(f"{mapDivider} {sideDivider}")
+    for row, sideLine in zip(mapWindow, sideLines):
         print("|", end="")
-        for cell in y:
+        for cell in row:
             if cell.terrain == matchInfo.border:
                 cell.terrain.displayTerrain() #display borders
             elif cell.canSee == True:
@@ -70,7 +102,8 @@ def printPOV(matchInfo, povX, povY):
                     cell.displayRadarReturn(matchInfo)
             else:
                  print(" ", end = " ")
-        print("|")
+        print(f"| {sideLine}")
+    print(f"{mapDivider} {sideDivider}")
     _print_tactical_footer(panelWidth)
     return
     
