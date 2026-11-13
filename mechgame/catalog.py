@@ -265,6 +265,15 @@ def _scout_rifle():
     return WeaponLimb("Scout Rifle", 6, 24, [create_module("holosight")], damage=10, accuracy=30, soundRep=20, charges=60)
 
 
+def _plasma_lance():
+    """A short-reach anti-armor weapon that lets a Lancer threaten larger mechs."""
+    return WeaponLimb(
+        "Plasma Lance", 7, 26, [], damage=18, accuracy=24, soundRep=8,
+        charges=None, apCost=2, energyCost=4, armorPiercing=True,
+        maxRange=1.5, melee=True,
+    )
+
+
 def _lancer_mortar():
     """A single-shell 2-AP launcher for indirect fire and support payloads."""
     return WeaponLimb(
@@ -374,6 +383,7 @@ PART_FACTORIES = {
         "lancer.standard_legs": _standard_lancer_legs,
         "pathfinder.legs": _pathfinder_lancer_legs,
         "chaingun": _chaingun,
+        "plasma_lance": _plasma_lance,
         "scout_rifle": _scout_rifle,
         "lancer_mortar": _lancer_mortar,
     },
@@ -422,7 +432,7 @@ def _lancer_type_a():
         create_part(2, "lancer.standard_hull"),
         create_part(2, "lancer.standard_helm"),
         create_part(2, "lancer.standard_legs"),
-        [create_part(2, "chaingun")],
+        [create_part(2, "chaingun"), create_part(2, "plasma_lance")],
     )
 
 

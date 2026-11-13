@@ -116,12 +116,10 @@ class ArtilleryTests(unittest.TestCase):
     def test_fire_damage_reports_critical_only_after_penetrating_armor(self):
         mech = self.match.pov
         limb = mech.mechClass.legs
-        fire = effects.FireEffect()
 
         # The Lancer's legs have less than eight armor, so this fire hit
         # reaches HP and must be displayed as a critical warning.
-        with patch("mechgame.effects.random.choice", return_value=limb):
-            fire.on_enter(self.match, mech)
+        limb.damage(self.match, 8, "fire")
         self.assertTrue(any(
             critical and "hit by a fire" in report
             for report, critical, _ in mech.squad.reportLog
@@ -129,8 +127,7 @@ class ArtilleryTests(unittest.TestCase):
 
         mech.squad.reportLog.clear()
         limb.armor = 8
-        with patch("mechgame.effects.random.choice", return_value=limb):
-            fire.on_enter(self.match, mech)
+        limb.damage(self.match, 8, "fire")
         self.assertFalse(any("hit by a fire" in report for report, _, _ in mech.squad.reportLog))
 
     def test_fire_keeps_smoke_and_draws_above_it(self):

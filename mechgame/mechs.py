@@ -318,9 +318,12 @@ class WeaponLimb(MechPart):
     A launcher draws its profiles from selectable ammunition. Each ammunition
     type supplies three range-band arrays:
     ``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``.
-    Direct weapons leave ``ammoTypes`` as ``None`` and resolve at once.
+    Direct weapons leave ``ammoTypes`` as ``None`` and resolve at once. A
+    melee weapon is a direct weapon with ``melee=True`` and a short
+    ``maxRange``; this deliberately keeps its accuracy and armor rules the
+    same as every other direct attack.
     """
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0, ammoTypes = None):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0, ammoTypes = None, melee = False):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.desc = desc
@@ -364,6 +367,7 @@ class WeaponLimb(MechPart):
         # Holosight is only one example of such a module.
         self.accuracyMultiplier = 1
         self.maxRange = maxRange
+        self.isMelee = melee
         self.blastRadius = blastRadius
         self.blastSize = blastSize
         self.ammoTypes = copy.deepcopy(ammoTypes) if ammoTypes else []
@@ -575,8 +579,9 @@ class WeaponLimb(MechPart):
     def printShortDesc(self):
 
         charges = "Unlimited" if self.charges is None else f"{self.charges}/{self.maxCharges}"
-        weaponType = "Launcher" if self.isLauncher else "Weapon"
-        return f"[{weaponType}: {self.name} | Charges:({charges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
+        weaponType = "Launcher" if self.isLauncher else ("Melee" if self.isMelee else "Weapon")
+        reach = f" Reach:{self.maxRange}" if self.isMelee else ""
+        return f"[{weaponType}: {self.name} | Charges:({charges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}{reach}]"
 
 
 #clean up module system and make it work (not updating)

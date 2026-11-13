@@ -3,6 +3,7 @@ import unittest
 
 from mechgame.match import MatchInfo
 from mechgame.runner import Game
+from mechgame.catalog import create_mech
 from mechgame.world import MapGenerator
 
 
@@ -35,3 +36,13 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertIn("B — Lancer Type.S Pathfinder", roster)
         self.assertIn("at [", roster)
+
+    def test_standard_lancer_has_short_range_plasma_lance(self):
+        lancer = create_mech("lancer.type_a")
+        lance = next(weapon for weapon in lancer.gunList if weapon.name == "Plasma Lance")
+
+        self.assertTrue(lance.isMelee)
+        self.assertEqual(lance.maxRange, 1.5)
+        self.assertEqual(lance.accuracy, 24)
+        self.assertEqual(lance.dmg, 18)
+        self.assertTrue(lance.piercing)
