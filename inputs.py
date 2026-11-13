@@ -24,14 +24,13 @@ def receive_input(matchInfo):
             return helpCommand(matchInfo)
         
         case "rep":
-            return printReportLogPrompt(matchInfo)
+            return reportMenu(matchInfo)
         
         case "rep1":
-            return printReportLog(matchInfo)
+            return unreadReportMenu(matchInfo)
 
         case "st" | "status":
-            print(matchInfo.pov.statusReport())
-            return
+            return statusPanel(matchInfo)
 
         case "sq" | "squad":
             return squadMenu(matchInfo)
@@ -88,6 +87,15 @@ def radarToggle(matchInfo):
         return mech.toggleRadar(matchInfo)
     # Lightweight callers such as command tests may only supply a radar flag.
     mech.radarOn = not mech.radarOn
+
+
+def statusPanel(matchInfo):
+    """Open the normal tactical view as an explicit status reference."""
+    pv.printPOV(
+        matchInfo, *matchInfo.pov.pos,
+        command_text="Status: 'Enter' or 'x' return",
+    )
+    input("Status: ")
 
 
 def abilityMenu(matchInfo):
@@ -746,50 +754,50 @@ def gunMenu(matchInfo, target=None): #TODO add ability to exit
 def nextMech(matchInfo):
     matchInfo.nextMechinTeam()
 
-def printReportLogPrompt(matchInfo):
-    """Ask for a report-log page before rendering it."""
-    inpPage = input("Page number: ")
-    if inpPage.isdigit():
-        inpPage = int(inpPage)
-    if type(inpPage) != int:
-        return print(f" {inpPage} is not a valid page number.")
-    printReportLog(matchInfo, page=int(inpPage))
-
-def printReportLog(matchInfo,page=1):
-    """Print one fixed-size page of the current squad's reports."""
-    mech = matchInfo.pov
-    matchInfo.advTurn = False
-    pageTotal = len(mech.squad.reportLog)
-    pageSize = 40
-    pageMax = (pageTotal/pageSize)+1
-    pageNum = page
-    if pageNum > pageMax:
-        print("There is only "+str(int(pageMax))+" pages of reports")
-        print()
-        return
-    numrep = 0
-    print(f"Report Log Page: {pageNum}")
-    for rep in mech.squad.reportLog[(pageNum * pageSize) - pageSize:(pageNum * pageSize)]:
-        print (rep[0])
-        numrep+=1
-        if numrep > pageSize:
+def reportMenu(matchInfo):
+    """Browse the squad report log inside the right tactical panel."""
+    reports = matchInfo.pov.squad.reportLog
+    pageSize = max(1, matchInfo.windowHeight - 2)
+    page = 1
+    pageMax = max(1, (len(reports) + pageSize - 1) // pageSize)
+    while True:
+        start = (page - 1) * pageSize
+        entries = [report[0] for report in reports[start:start + pageSize]] or ["No squad reports."]
+        pv.printPOV(
+            matchInfo, *matchInfo.pov.pos,
+            command_text="Reports: 'n' next | 'p' previous | 'x' exit",
+            right_panel=(f"REPORTS {page}/{pageMax}", entries),
+        )
+        choice = input("Reports: ").strip().lower()
+        if choice in ("", "x"):
             return
-    print()
+        if choice == "n" and page < pageMax:
+            page += 1
+        elif choice == "p" and page > 1:
+            page -= 1
+        else:
+            print("Choose 'n', 'p', or 'x'.")
 
-def printUnreads(matchInfo):
-    """Print unread squad reports and mark each displayed entry as read."""
-    mech = matchInfo.pov
-    matchInfo.advTurn = False
-    pageSize = 100
-    numrep = 0
-    for rep in mech.squad.reportLog:
-        if rep[2] == False:
-            print (rep[0])
-            rep[2] = True
-        numrep+=1
-        if numrep > pageSize:
-            return
-    print()
+
+def unreadReportMenu(matchInfo):
+    """Display unread reports in the right panel and mark them as read."""
+    unread = [report for report in matchInfo.pov.squad.reportLog if not report[2]]
+    for report in unread:
+        report[2] = True
+    entries = [report[0] for report in unread] or ["No unread reports."]
+    pv.printPOV(
+        matchInfo, *matchInfo.pov.pos,
+        command_text="Unread reports: 'Enter' or 'x' return",
+        right_panel=("UNREAD REPORTS", entries),
+    )
+    input("Unread reports: ")
+
+
+# Compatibility aliases retain the original callable names while using the
+# panel-based report views.
+printReportLogPrompt = reportMenu
+printReportLog = reportMenu
+printUnreads = unreadReportMenu
 
 def helpCommand(matchInfo):
     """Show a concise reference for every command accepted at the main prompt."""
@@ -802,7 +810,7 @@ def helpCommand(matchInfo):
     print("'rd' — view shared team radar contacts and fire at one.")
     print("'ab' or 'abilities' — open the active mech's hull abilities.")
     print("'look' or 'l' — inspect the tactical view around map coordinates.")
-    print("'st' or 'status' — show the active mech's integrity, modules, weapons, and abilities.")
+    print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
     print("'o' or 'options' — change display options, including tactical width and height.")

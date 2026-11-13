@@ -76,6 +76,20 @@ class InputTests(unittest.TestCase):
         self.assertIn("Sensors: Visual", panel)
         self.assertIn("Tracked contacts:", panel)
 
+    def test_status_and_reports_use_tactical_panels(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
+
+        with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
+            inputs.statusPanel(match)
+        self.assertNotIn("right_panel", view_mock.call_args.kwargs)
+
+        with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
+            inputs.unreadReportMenu(match)
+        title, entries = view_mock.call_args.kwargs["right_panel"]
+        self.assertEqual(title, "UNREAD REPORTS")
+        self.assertIn("Test report", entries[0])
+
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
         match = Game(map_size=20, window_size=9).create_match()
         shooter = match.pov
