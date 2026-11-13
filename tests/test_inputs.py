@@ -47,6 +47,8 @@ class InputTests(unittest.TestCase):
 
     def test_tactical_side_panel_summarizes_the_active_mech(self):
         match = Game(map_size=20, window_size=9).create_match()
+        match.pov.mechClass.legs.limbCon = 0.5
+        match.pov.cockpit.status = 1
 
         lines = printView._side_panel_lines(match, height=19)
 
@@ -54,6 +56,10 @@ class InputTests(unittest.TestCase):
         self.assertTrue(all(len(line) == printView.SIDE_PANEL_WIDTH + 2 for line in lines))
         panel = "\n".join(lines)
         self.assertIn("B - Lancer Type.S Pathfinder", panel)
+        self.assertIn("Most damaged: Pathfinder Lancer", panel)
+        self.assertIn("Legs (50%)", panel)
+        self.assertIn("Pilot: Injured (cockpit damaged)", panel)
+        self.assertIn("Weapons:", panel)
         self.assertIn("Abilities: Dash 2/2", panel)
 
     def test_target_summary_shows_distance_and_visual_hit_chance(self):

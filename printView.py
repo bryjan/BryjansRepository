@@ -43,30 +43,62 @@ def _centered_mech_lines(condition, width):
     return lines
 
 
+def _weapon_status(weapon):
+    """Describe one weapon and its usable ammunition for the side panel."""
+    if weapon.isLauncher:
+        ammunition = ", ".join(
+            f"{ammo.name} {ammo.charges}/{ammo.maxCharges}"
+            if ammo.charges is not None else f"{ammo.name} Unlimited"
+            for ammo in weapon.ammoTypes
+        )
+    else:
+        ammunition = (
+            "Unlimited" if weapon.charges is None
+            else f"{weapon.charges}/{weapon.maxCharges}"
+        )
+    return f"{weapon.name}: {ammunition}"
+
+
+def _panel_text_lines(text, width):
+    """Wrap one status entry into already-bordered side-panel rows."""
+    return [f"|{line:<{width}}|" for line in textwrap.wrap(text, width=width) or [""]]
+
+
 def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     """Build a fixed-height active-mech summary for the tactical side panel."""
     mech = matchInfo.pov
-    default_weapon = next(
-        (weapon.name for weapon in mech.mechClass.gunList if weapon.defaultGun),
-        "None selected",
-    )
     abilities = ", ".join(
-        f"{ability.name} {'∞' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
+        f"{ability.name} {'Unlimited' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
         for ability in mech.mechClass.hull.abilities
     ) or "None"
+    weakest_limb = min(mech.mechClass.limbList, key=lambda limb: limb.limbCon)
+    weakest_condition = round(weakest_limb.limbCon * 100)
     entries = [
-        f"{mech.pilot.name} - {mech.mechClass.name}",
         f"Condition: {round(mech.mechClass.condition)}%",
-        f"Position: {mech.pos}",
+        f"Most damaged: {weakest_limb.name} ({weakest_condition}%)",
+    ]
+    if mech.cockpit.status < 2:
+        pilot_condition = "Injured" if mech.cockpit.status == 1 else "Lost"
+        entries.append(f"Pilot: {pilot_condition} (cockpit damaged)")
+    entries.extend([
         f"AP: {mech.ap}/{mech.mechClass.apMax} | MP: {mech.mp}/{mech.mechClass.mpMax}",
         f"Energy: {mech.energy}/{mech.mechClass.energyMax} | Regen: {mech.mechClass.energyGen}",
-        f"Radar: {'ON' if mech.radarOn else 'OFF'} | Speed: {mech.speed}",
-        f"Weapon: {default_weapon}",
+        "Weapons:",
+        *(_weapon_status(weapon) for weapon in mech.mechClass.gunList),
         f"Abilities: {abilities}",
+        f"Radar: {'ON' if mech.radarOn else 'OFF'} | Speed: {mech.speed}",
+    ])
+    # The upper block stays visually stable: silhouette, breathing room,
+    # centered identity, then a right-panel-only divider before live details.
+    identity = f"{mech.pilot.name} - {mech.mechClass.name}"[:width]
+    lines = [
+        *_centered_mech_lines(mech.mechClass.condition, width),
+        f"|{'':<{width}}|",
+        f"|{identity:^{width}}|",
+        "+" + ("-" * width) + "+",
     ]
-    lines = _centered_mech_lines(mech.mechClass.condition, width)
     for entry in entries:
-        lines.extend(f"|{line:<{width}}|" for line in textwrap.wrap(entry, width=width) or [""])
+        lines.extend(_panel_text_lines(entry, width))
     lines = lines[:height]
     return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
 
@@ -87,7 +119,9 @@ def _hud_lines(matchInfo, width):
     ]
     lines = []
     for entry in entries:
-        lines.extend(textwrap.wrap(entry, width=width) or [""])
+        # A wrapped command separator can otherwise begin the next row with
+        # ``|`` and look like a second left-hand border.
+        lines.extend(line.lstrip("| ") for line in textwrap.wrap(entry, width=width) or [""])
     return lines
 
 def printPOV(matchInfo, povX, povY):
