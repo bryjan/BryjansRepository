@@ -3,19 +3,33 @@
 import textwrap
 
 
-# Keep the complete frame below 80 columns so standard Windows terminals do
-# not wrap its right edge onto a second line.
-FRAME_WIDTH = 70
+# Leave generous room beside the frame for narrow terminal windows and the
+# input prompt, preventing the closing border from wrapping.
+FRAME_WIDTH = 60
 CONTENT_WIDTH = FRAME_WIDTH - 2
 
-MENU_SCENE = (
-    "M   M  EEEEE  CCCCC  H   H       GGGG   AAA  M   M EEEEE",
-    "MM MM  E      C      H   H      G      A   A MMM M E",
-    "M M M  EEEE   C      HHHHH      G GGG  AAAAA M M M EEEE",
-    "M   M  E      C      H   H      G   G  A   A M   M E",
-    "M   M  EEEEE  CCCCC  H   H       GGG   A   A M   M EEEEE",
-    "                         D E M O",
-)
+ASCII_FONT = {
+    "A": (" ### ", "#   #", "#####", "#   #", "#   #"),
+    "C": (" ####", "#    ", "#    ", "#    ", " ####"),
+    "D": ("#### ", "#   #", "#   #", "#   #", "#### "),
+    "E": ("#####", "#    ", "#### ", "#    ", "#####"),
+    "G": (" ####", "#    ", "# ###", "#   #", " ####"),
+    "H": ("#   #", "#   #", "#####", "#   #", "#   #"),
+    "M": ("#   #", "## ##", "# # #", "#   #", "#   #"),
+    "O": (" ### ", "#   #", "#   #", "#   #", " ### "),
+    "-": ("     ", "     ", " ### ", "     ", "     "),
+}
+
+
+def _ascii_banner(text):
+    """Render a small, dependency-free block-letter banner."""
+    return tuple(
+        " ".join(ASCII_FONT[character][row] for character in text)
+        for row in range(5)
+    )
+
+
+MENU_SCENE = (*_ascii_banner("MECH-GAME"), "", *_ascii_banner("DEMO"))
 
 
 MENU_HELP = (

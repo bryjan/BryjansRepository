@@ -12,7 +12,7 @@ class StartMenuTests(unittest.TestCase):
         output = []
 
         self.assertTrue(show_start_menu(lambda _: "", output.append))
-        self.assertEqual(output[1], "+" + ("-" * 70) + "+")
+        self.assertEqual(output[1], "+" + ("-" * 60) + "+")
         self.assertIn("'Enter' or '1' Start random skirmish", "\n".join(output))
 
     def test_help_can_be_followed_by_quit(self):
