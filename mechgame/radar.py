@@ -242,3 +242,16 @@ def contact_details(observer, match_info, target):
         "movement": movement,
         "visually_confirmed": directly_visible,
     }
+
+
+def can_aim_at_contact(observer, match_info, target):
+    """Return whether sensors resolve individual mech parts well enough to aim.
+
+    A visual sighting always resolves limbs. Radar must reach the highest
+    contact level—twice the target's detection threshold—before it is precise
+    enough to support deliberately aiming at a specific limb.
+    """
+    if target in observer.directlyVisibleEnemies:
+        return True
+    radar_power = match_info.map[target.pos[1]][target.pos[0]].radarPower
+    return radar_power >= entity_detection_threshold(target.radarSig) * 2

@@ -231,13 +231,21 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
-        print("Press 'Enter' or 'f' to fire. 'a' aim limb (+1 AP) | 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel")
+        canAim = radar.can_aim_at_contact(mech, matchInfo, defaultTarget)
+        prompt = "Press 'Enter' or 'f' to fire."
+        if canAim:
+            prompt += " 'a' aim limb (+1 AP) |"
+        prompt += " 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
+        print(prompt)
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
             return list(defaultTarget.pos), None
-        if choice == "a":
+        if choice == "a" and canAim:
             aimedLimb = chooseAimedLimb(defaultTarget)
             return None if aimedLimb is None else (list(defaultTarget.pos), aimedLimb)
+        if choice == "a":
+            print("Limb aiming requires direct visual contact or a fully identified radar return.")
+            return None
     else:
         print("Fire target: 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel")
         choice = _read_nonempty("Target: ").lower()
@@ -254,7 +262,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
             print("No previous firing location.")
             return None
         target = next((enemy for enemy in mech.trackedEnemies if enemy.pos == mech.lastFiredAt), None)
-        return chooseTargetAction(target) if target is not None else (list(mech.lastFiredAt), None)
+        return chooseTargetAction(matchInfo, target) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
         print("Choose 't', 'l', 'c', or 'x'.")
         return None
@@ -262,7 +270,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         print("No enemy mechs are currently tracked.")
         return None
     if len(mech.trackedEnemies) == 1:
-        return chooseTargetAction(mech.trackedEnemies[0])
+        return chooseTargetAction(matchInfo, mech.trackedEnemies[0])
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         print(f"{index}. {enemy.pilot.name} — {enemy.mechClass.name} at {enemy.pos}")
@@ -270,17 +278,21 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return chooseTargetAction(mech.trackedEnemies[int(selection) - 1])
+    return chooseTargetAction(matchInfo, mech.trackedEnemies[int(selection) - 1])
 
 
-def chooseTargetAction(target):
+def chooseTargetAction(matchInfo, target):
     """Confirm a tracked target and optionally select a specific mech part."""
     print(f"Target: {target.pilot.name} — {target.mechClass.name} at {target.pos}")
-    choice = input("Press 'Enter' or 'f' to fire, or 'a' to aim at a limb (+1 AP): ").strip().lower()
+    canAim = radar.can_aim_at_contact(matchInfo.pov, matchInfo, target)
+    prompt = "Press 'Enter' or 'f' to fire"
+    if canAim:
+        prompt += ", or 'a' to aim at a limb (+1 AP)"
+    choice = input(f"{prompt}: ").strip().lower()
     if choice in ("", "f"):
         return list(target.pos), None
-    if choice != "a":
-        print("Choose 'Enter', 'f', or 'a'.")
+    if choice != "a" or not canAim:
+        print("Choose 'Enter' or 'f'." if not canAim else "Choose 'Enter', 'f', or 'a'.")
         return None
 
     aimedLimb = chooseAimedLimb(target)
