@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import inputs
+import printView
 from mechgame.runner import Game
 
 
@@ -114,3 +115,31 @@ class InputTests(unittest.TestCase):
             original_menu(match, selected_target)
 
         fire_mock.assert_called_once_with(match, selected_target)
+
+    def test_non_explosive_launcher_ammo_hides_damage_in_its_profile(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        mortar = match.teamList[0].squadsList[0].mechList[3]
+        launcher = mortar.mechClass.gunList[0]
+        launcher.select_ammo(1)  # Smoke is the second catalogued mortar shell.
+
+        with patch("builtins.print") as print_mock:
+            inputs.printLauncherProfile(mortar, launcher, [10, 10])
+
+        output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("Smoke", output)
+        self.assertNotIn("damage", output)
+
+    def test_help_lists_every_main_command_and_footer_prioritizes_abilities(self):
+        match = SimpleNamespace(advTurn=True)
+        with patch("builtins.print") as print_mock:
+            inputs.helpCommand(match)
+        help_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'st'", "'sq'", "'rep'", "'o'", "'next'", "'end'", "'?'"):
+            self.assertIn(command, help_output)
+        self.assertFalse(match.advTurn)
+
+        with patch("builtins.print") as print_mock:
+            printView._print_tactical_footer(80)
+        footer_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("'ab' abilities", footer_output)
+        self.assertNotIn("'st' status", footer_output)

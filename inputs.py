@@ -228,11 +228,15 @@ def printLauncherProfile(mech, launcher, position):
     ammo = launcher.selected_ammo
     damage = max(0, launcher.dmg + ammo.damageModifier - profile["damage_falloff"])
     charges = "unlimited" if ammo.charges is None else f"{ammo.charges}/{ammo.maxCharges}"
-    print(
+    details = (
         f"{ammo.name} ({ammo.payload}) | distance {distance:.1f} tiles | "
         f"{profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
         f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} turn(s) | "
-        f"damage {damage} | rounds {charges}"
+    )
+    if ammo.payload == "explosive":
+        details += f"damage {damage} | "
+    print(
+        details + f"rounds {charges}"
     )
     return profile
 
@@ -634,19 +638,24 @@ def printUnreads(matchInfo):
             return
     print()
 
-def helpCommand(matchInfo): #TODO update with all commands
-    """Show the currently supported command shortcuts."""
-    print ("Here are the list of commands available to you:")
-    print ("Move with 'w', 'a', 's', 'd' and diagonals 'q', 'e', 'z', 'c'.")
-    print ("'r' toggles continuous radar; it costs energy to start and each turn it stays on.")
-    print ("'p' sends a one-turn radar pulse; it costs energy once and shuts off at turn end.")
-    print ("'rd' lists radar contacts shared by your entire team; select one for details.")
-    print ("'ab' opens the active mech's hull abilities.")
-    print ("'f' targets the nearest tracked enemy; use 'a' to aim or 'w' to switch weapons.")
-    print ("'rep1' shows unread reports; 'rep' opens the full report log.")
-    print ("'st' shows mech integrity, modules, and ammunition.")
-    print ("'sq' opens squad status and switching options.")
-    print ("'o' opens display options, including tactical window size.")
-    print ("'next' switches to the next mech in your squad; 'end' ends the squad turn.")
+def helpCommand(matchInfo):
+    """Show a concise reference for every command accepted at the main prompt."""
+    print("Main commands:")
+    print("'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' — move in the matching direction.")
+    print("'f' — fire the selected weapon at the nearest tracked contact; menus offer more targeting choices.")
+    print("'fire' — choose the default weapon used by 'f'.")
+    print("'r' or 'radar' — toggle continuous active radar; it has an energy cost each turn.")
+    print("'p' — send a one-turn active-radar pulse.")
+    print("'rd' — view shared team radar contacts and fire at one.")
+    print("'ab' or 'abilities' — open the active mech's hull abilities.")
+    print("'look' or 'l' — inspect the tactical view around map coordinates.")
+    print("'st' or 'status' — show the active mech's integrity, modules, weapons, and abilities.")
+    print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
+    print("'rep1' — show unread reports. 'rep' — open the full report log.")
+    print("'o' or 'options' — change display options, including tactical window size.")
+    print("'next' — switch to another mech in the active squad without ending its turn.")
+    print("'end' — hand the squad turn to the next squad.")
+    print("'?' — show this command reference.")
+    print("Context menus always list their own available keys; use 'x' to cancel where offered.")
     matchInfo.advTurn = False
 
