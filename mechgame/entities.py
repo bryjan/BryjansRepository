@@ -162,6 +162,10 @@ class Entity: #a character on the map
         """Remove temporary hull-ability effects as this mech begins a new turn."""
         self.sensorBoostMultiplier = 1
         self.visPower = int(self.mechClass.visPower)
+        for weapon in self.mechClass.gunList:
+            if weapon.turnDamageBonus:
+                weapon.turnDamageBonus = 0
+                weapon.updateWeaponStats()
 
 
 

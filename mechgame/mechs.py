@@ -74,12 +74,19 @@ class DashAbility(Ability):
         entity.pos = landing
         entity.speed += steps_taken
         self.charges -= 1
+        # Dash momentum makes the Lancer's close-combat strike more decisive.
+        # The bonus is temporary and intentionally does not stack across two
+        # dashes in the same squad turn.
+        for weapon in entity.mechClass.gunList:
+            if weapon.isMelee:
+                weapon.turnDamageBonus = 3
+                weapon.updateWeaponStats()
         # The dash skips intermediate terrain; only the landing cell can
         # trigger a persistent hazard such as fire.
         from . import effects
         effects.apply_entry_effects(matchInfo, entity)
         matchInfo.advTurn = True
-        print(f"{entity.pilot.name} dashes {steps_taken} tile(s).")
+        print(f"{entity.pilot.name} dashes {steps_taken} tile(s); melee damage +3 this turn.")
         return True
 
 
@@ -512,6 +519,7 @@ class WeaponLimb(MechPart):
         self.bonusDmg = 0
         self.multiDmg = 1
         self.dmg = (self.baseDmg * self.multiDmg) + self.bonusDmg
+        self.turnDamageBonus = 0
 
 
         self.baseAccuracy = accuracy #affected by visAbsorb of tiles, higher means more accuracy
@@ -555,6 +563,9 @@ class WeaponLimb(MechPart):
         self.isLauncher = bool(self.ammoTypes)
 
     def updateWeaponStats(self):
+        self.dmg = int(
+            (self.baseDmg * self.multiDmg) + self.bonusDmg + self.turnDamageBonus
+        )
         self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
         self.accuracy = int((self.baseAccuracy * self.multiAccuracy) + self.bonusAccuracy)
         self.soundReport = int((self.baseSoundReport * self.multiSoundReport) + self.bonusSoundReport)

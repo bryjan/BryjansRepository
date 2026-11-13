@@ -79,6 +79,19 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lancer.speed, 3)
         self.assertEqual(dash.charges, 1)
 
+    def test_dash_boosts_plasma_lance_damage_until_turn_end(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        lancer = match.teamList[0].squadsList[0].mechList[1]
+        lancer.pos = [4, 4]
+        dash = lancer.mechClass.hull.abilities[0]
+        lance = next(weapon for weapon in lancer.mechClass.gunList if weapon.isMelee)
+
+        self.assertTrue(dash.use(match, lancer, "d"))
+        self.assertEqual(lance.dmg, 21)
+
+        lancer.clearTurnAbilities()
+        self.assertEqual(lance.dmg, 18)
+
     def test_kestrel_sensor_overdrive_boosts_and_then_clears_sensors(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
         kestrel = match.teamList[1].squadsList[0].mechList[1]
