@@ -2,3 +2,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+# PyInstaller creates local release artifacts; distribute the ZIP, not these
+# generated files through source control.
+build/
+dist/
+*.spec
