@@ -1,9 +1,9 @@
-# ASCII Mech Game
+# ASCII Mech Game — Demo
 
-An in-progress, terminal-based mech tactics game. It explores land combat where
-terrain, visibility, and radar matter as much as raw firepower.
+A terminal-based tactical mech skirmish. Terrain, line of sight, radar,
+artillery, damage to individual parts, and squad coordination all matter.
 
-## Run it
+## Start the demo
 
 Requires Python 3.10 or later.
 
@@ -12,31 +12,32 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-For a quick manual test, type `end` twice after the map appears. The first
-command moves the active turn to the opposing squad; the second begins a new
-round and returns it to the player squad.
+Choose **Start random skirmish** from the opening menu. Every match generates a
+new map and randomized safe spawn positions.
 
-## Project map
+## Demo scenario
 
-- `main.py` starts the application.
-- `mechgame/runner.py` owns match setup and the command-line loop.
-- `mechgame/catalog.py` is the reusable library of named mech, part, and module
-  factories, grouped by size class.
-- `mechgame/content.py` assembles the playable sensor-Lancer demo scenario.
-- `mechgame/world.py` defines terrain and generates maps.
-- `mechgame/coordinates.py` owns tactical coordinate validation and direction
-  labels. Positions are written `[x, y]`; map storage is indexed `[y][x]`.
-- `mechgame/match.py` owns match-wide state and turn calculations.
-- `mechgame/terrain.py` defines terrain and map cells.
-- `mechgame/radar.py` owns active scans, terrain absorption, radar contacts,
-  passive-radar warnings, and radar reports.
-- `mechgame/artillery.py` owns delayed launcher impacts, travel timing, and
-  landing scatter, including selectable shell payloads.
-- `mechgame/effects.py` owns smoke and fire behavior on terrain cells.
-- `mechgame/entities.py` defines live mech behavior, movement, and sensing.
-- `mechgame/mechs.py` defines mech blueprints, parts, weapons, and modules.
-- `mechgame/teams.py` defines squad coordination, reports, and spawning.
-- `tests/` contains automated checks for the world-generation boundary.
+Your squad fields a sensor Lancer, three standard Lancers, and a mortar Lancer.
+They face two Bastions and a Kestrel. The scenario is designed to try radar
+spotting, artillery payloads, direct combat, dash movement, and hull abilities.
+
+## Essential controls
+
+| Input | Action |
+| --- | --- |
+| `q w e / a d / z x c` | Move in eight directions. |
+| `f` | Fire the selected weapon; defaults to the nearest tracked contact. |
+| `r` / `p` | Toggle continuous radar / send a one-turn radar pulse. |
+| `rd` | Open team radar contacts. |
+| `ab` | Use the active mech's hull ability. |
+| `sq` | View squad readiness and switch mechs. |
+| `rep1` / `rep` | Read new reports / browse the report log. |
+| `n` | Switch to another mech in the active squad. |
+| `end` | Finish the squad's turn. |
+| `?` | Show the complete in-game command reference. |
+
+Context menus list their available keys at the bottom of the tactical screen.
+Use `x` to cancel most of them.
 
 ## Test
 
@@ -44,23 +45,11 @@ round and returns it to the player squad.
 python -m unittest discover -s tests
 ```
 
-Current playable features include map generation, spawning, movement, visual
-range, radar reports, weapon selection, and a two-team turn cycle. Combat, AI,
-campaign flow, saves, and a full test suite are still in development.
+## Project layout
 
-## Content catalog
-
-Use stable IDs when constructing content. Every catalog call returns a fresh
-object, so match damage never leaks into another mech or match.
-
-```python
-from mechgame.catalog import create_mech, create_module, create_part
-
-pathfinder = create_mech("lancer.pathfinder")
-rifle = create_part(2, "scout_rifle")
-holosight = create_module("holosight")
-```
-
-`list_catalog()` lists entries grouped under class sizes from flat through
-titanic. The current test match includes Kiki's Pathfinder and Bryan's Bastion
-against two enemy Kestrels.
+- `main.py` starts the opening menu and demo.
+- `mechgame/content.py` assembles the playable scenario.
+- `mechgame/catalog.py` provides reusable named mech, part, and module factories.
+- `mechgame/runner.py` owns match setup and the interactive match loop.
+- `mechgame/radar.py`, `artillery.py`, and `effects.py` own the major tactical systems.
+- `tests/` contains automated regression tests.
