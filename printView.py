@@ -1,6 +1,5 @@
 import termcolor
 import textwrap
-from mechgame.coordinates import get_coordinate_input
 from mechgame.mechs import MAX_HULL_ART_HEIGHT
 from mechgame import radar
 
@@ -135,8 +134,8 @@ def _own_mech_panel_lines(mech, height, width):
         f"Abilities: {abilities}",
         f"Radar: {'ON' if mech.radarOn else 'OFF'} | Speed: {mech.speed}",
     ])
-    # The upper block stays visually stable: silhouette, breathing room,
-    # centered identity, then a right-panel-only divider before live details.
+    # The upper block stays visually stable: silhouette, centered identity,
+    # then a right-panel-only divider before live details.
     identity = f"{mech.pilot.name} - {mech.mechClass.name}"[:width]
     lines = [
         *_centered_mech_lines(mech, width),
@@ -300,10 +299,3 @@ def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):
     print(fullDivider)
     return
     
-def lookAt(matchInfo): #TODO parse text to make input smoother
-    """Prompt for a coordinate and display the tactical view around it."""
-    
-    coord = get_coordinate_input(matchInfo, "View coordinates")
-    printPOV(matchInfo, coord[0], coord[1])
-        
-    return input("Press 'Enter' to return")

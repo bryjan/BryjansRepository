@@ -25,6 +25,14 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.pov.radarOn)
 
+    def test_look_can_cancel_without_rendering_a_view(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.input", return_value="x"), patch("printView.printPOV") as view_mock:
+            inputs.lookAt(match)
+
+        view_mock.assert_not_called()
+
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=20, window_size=9).create_match()
         active_mech = match.pov

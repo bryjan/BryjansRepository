@@ -360,7 +360,8 @@ class Entity: #a character on the map
         radar.refresh(matchInfo)
 
 
-    def report(self, matchInfo, message, teamReport = False, critical = False): #TODO add messages to a report log
+    def report(self, matchInfo, message, teamReport = False, critical = False):
+        """Store one deduplicated squad report for later panel display."""
         matchRound = matchInfo.matchRound
         critMessage = ""
         if critical == True:
@@ -372,21 +373,6 @@ class Entity: #a character on the map
         self.squad.reportLog.insert(0,[report, critical, False]) #[report, critical?, already display?]
         if teamReport == True:
             self.team.reportLog.insert(0,[report, critical, False])
-
-    def criticalReports(matchInfo):
-        mech = matchInfo.pov
-        matchInfo.pov= False
-        pageSize = 40
-        numrep = 0
-        for rep in mech.squad.reportLog:
-            if rep[2] == False and rep[1] == True:
-                print (rep[0])
-                rep[2] = True
-
-            numrep+=1
-            if numrep > pageSize:
-                return
-        print()
 
     def displayObject(self, active=False):
         """Render a mech symbol, emphasizing the currently controlled mech."""

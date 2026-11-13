@@ -62,23 +62,18 @@ def receive_input(matchInfo):
             return
             
         case "look" | "l":
-            return pv.lookAt(matchInfo)
+            return lookAt(matchInfo)
         
         case "fire":
             return gunMenu(matchInfo)
         
-        case "f" | "F":
+        case "f":
             return fire(matchInfo)
         
         case _:
             print("Input not recognized. Try again.")
             return
     
-
-def recieveInput(matchInfo):
-    """Compatibility wrapper for the original misspelled command function."""
-    return receive_input(matchInfo)
-
 
 def radarToggle(matchInfo):
     """Toggle the active scanner, retaining a small helper for simple callers."""
@@ -87,6 +82,15 @@ def radarToggle(matchInfo):
         return mech.toggleRadar(matchInfo)
     # Lightweight callers such as command tests may only supply a radar flag.
     mech.radarOn = not mech.radarOn
+
+
+def lookAt(matchInfo):
+    """Prompt for a coordinate and render the tactical view around it."""
+    coordinate = get_coordinate_input(matchInfo, "View coordinates")
+    if coordinate == "x":
+        return
+    pv.printPOV(matchInfo, *coordinate)
+    input("Press 'Enter' to return")
 
 
 def statusPanel(matchInfo):
@@ -751,9 +755,6 @@ def gunMenu(matchInfo, target=None): #TODO add ability to exit
         gunMenu(matchInfo, target)
 
 
-def nextMech(matchInfo):
-    matchInfo.nextMechinTeam()
-
 def reportMenu(matchInfo):
     """Browse the squad report log inside the right tactical panel."""
     reports = matchInfo.pov.squad.reportLog
@@ -792,12 +793,6 @@ def unreadReportMenu(matchInfo):
     )
     input("Unread reports: ")
 
-
-# Compatibility aliases retain the original callable names while using the
-# panel-based report views.
-printReportLogPrompt = reportMenu
-printReportLog = reportMenu
-printUnreads = unreadReportMenu
 
 def helpCommand(matchInfo):
     """Show a concise reference for every command accepted at the main prompt."""
