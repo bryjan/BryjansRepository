@@ -369,21 +369,28 @@ def radarMenu(matchInfo):
 
 def optionsMenu(matchInfo):
     """Offer display preferences that do not alter match state."""
-    print(f"Options: 'w' tactical window size (currently {matchInfo.windowSize}) | 'x' exit")
+    print(
+        f"Options: 'w' tactical width ({matchInfo.windowWidth}) | "
+        f"'h' tactical height ({matchInfo.windowHeight}) | 'x' exit"
+    )
     choice = input("Options: ").strip().lower()
     if choice in ("", "x"):
         return
-    if choice != "w":
-        print("Choose 'w' or 'x'.")
+    if choice not in ("w", "h"):
+        print("Choose 'w', 'h', or 'x'.")
         return
 
+    dimension = "width" if choice == "w" else "height"
     while True:
-        size = input("Tactical window size (odd whole number, at least 5; 'x' to cancel): ").strip().lower()
+        size = input(f"Tactical {dimension} (odd whole number, at least 5; 'x' to cancel): ").strip().lower()
         if size == "x":
             return
         if size.isdigit() and int(size) >= 5 and int(size) % 2 == 1:
-            matchInfo.windowSize = int(size)
-            print(f"Tactical window size set to {matchInfo.windowSize}.")
+            if choice == "w":
+                matchInfo.windowWidth = int(size)
+            else:
+                matchInfo.windowHeight = int(size)
+            print(f"Tactical {dimension} set to {size}.")
             return
         print("Enter an odd whole number of at least 5, or 'x' to cancel.")
 
@@ -652,7 +659,7 @@ def helpCommand(matchInfo):
     print("'st' or 'status' — show the active mech's integrity, modules, weapons, and abilities.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
-    print("'o' or 'options' — change display options, including tactical window size.")
+    print("'o' or 'options' — change display options, including tactical width and height.")
     print("'n' or 'next' — switch to another mech in the active squad without ending its turn.")
     print("'end' — hand the squad turn to the next squad.")
     print("'?' — show this command reference.")

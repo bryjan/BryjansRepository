@@ -34,6 +34,17 @@ class InputTests(unittest.TestCase):
 
         self.assertIsNot(match.pov, active_mech)
 
+    def test_options_can_change_tactical_width_and_height_independently(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.input", side_effect=["w", "15"]), patch("builtins.print"):
+            inputs.optionsMenu(match)
+        with patch("builtins.input", side_effect=["h", "11"]), patch("builtins.print"):
+            inputs.optionsMenu(match)
+
+        self.assertEqual(match.windowWidth, 15)
+        self.assertEqual(match.windowHeight, 11)
+
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
         match = Game(map_size=20, window_size=9).create_match()
         shooter = match.pov

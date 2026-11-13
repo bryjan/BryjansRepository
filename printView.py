@@ -18,26 +18,28 @@ def _print_tactical_footer(width):
     print(divider)
 
 def printPOV(matchInfo, povX, povY):
-    """Render a square tactical window centered on the supplied map position."""
+    """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
 
-    #makes window
+    # Small maps should not look empty merely because one requested dimension
+    # exceeds the generated world. Each dimension stays odd so the point of
+    # view remains centered independently on both axes.
+    windowWidth = min(matchInfo.windowWidth, matchInfo.mapWidth)
+    windowHeight = min(matchInfo.windowHeight, matchInfo.mapHeight)
+    if windowWidth % 2 == 0:
+        windowWidth -= 1
+    if windowHeight % 2 == 0:
+        windowHeight -= 1
+    widthExtend = (windowWidth - 1) // 2
+    heightExtend = (windowHeight - 1) // 2
+
+    # Make the rectangular cell window.
     mapWindow = []
-
-    # A small map should not look empty simply because the normal tactical
-    # window is larger than one of its dimensions. Keep the displayed window
-    # odd so the active coordinate remains centered.
-    windowSize = min(matchInfo.windowSize, matchInfo.mapWidth, matchInfo.mapHeight)
-    if windowSize % 2 == 0:
-        windowSize -= 1
-    windowExtend = windowSize - 1
-    windowExtend = int(windowExtend / 2) #half the window size extended from the center will make up the window
-
     xRow = []
-    y = povY - windowExtend
-    while y <= povY + windowExtend:
-        x = povX - windowExtend
-        while x <= povX + windowExtend:
+    y = povY - heightExtend
+    while y <= povY + heightExtend:
+        x = povX - widthExtend
+        while x <= povX + widthExtend:
             if y < 0 or y >= matchInfo.mapHeight or x < 0 or x >= matchInfo.mapWidth:
                 # Mark space beyond the generated world as a border rather
                 # than blank terrain, making map limits immediately obvious.
@@ -53,8 +55,8 @@ def printPOV(matchInfo, povX, povY):
 
     
     # Each map cell renders as a symbol plus one trailing space, so the frame
-    # width scales with the configured tactical window rather than map size.
-    panelWidth = windowSize * 2
+    # width scales with the configured horizontal view dimension.
+    panelWidth = windowWidth * 2
     divider = "+" + ("-" * panelWidth) + "+"
     print(divider)
     for y in mapWindow:

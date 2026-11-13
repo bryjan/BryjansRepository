@@ -17,7 +17,11 @@ class MatchInfo:
         self.mapSize = mapSize
         self.mapWidth = mapSize
         self.mapHeight = mapSize if mapHeight is None else mapHeight
+        # Keep the original square setting for compatibility while rendering
+        # reads these independent dimensions for a rectangular tactical view.
         self.windowSize = windowSize
+        self.windowWidth = windowSize
+        self.windowHeight = windowSize
         self.teamList = teams #team0 are nuetral entities
         self.playerSquad = ""
         self.entities = []
