@@ -1,5 +1,6 @@
 """Persistent terrain effects created by shells and advanced each match round."""
 
+from collections import deque
 import random
 
 
@@ -164,10 +165,12 @@ def scout_visible_cells(match_info, team):
 def _project_flare_vision(starting_cell, vision_power):
     """Flood optical vision from a flare without resetting ordinary mech sight."""
     best_power = {tuple(starting_cell.pos): vision_power}
-    frontier = [starting_cell]
+    # A deque avoids repeatedly shifting a Python list as long-range flares
+    # spread through open terrain.
+    frontier = deque([starting_cell])
     visible = []
     while frontier:
-        cell = frontier.pop(0)
+        cell = frontier.popleft()
         power = best_power[tuple(cell.pos)]
         cell.canSee = True
         visible.append(cell)

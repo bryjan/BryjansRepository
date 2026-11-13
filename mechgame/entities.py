@@ -197,9 +197,6 @@ class Entity: #a character on the map
         moveCost = targetCell.terrain.moveCost[self.size]
 
         #checks for viability
-        if moveCost > self.energy:
-            print("Not enough energy to pass over this terrain.")
-
         if targetCell.terrain.passable == False: #checks if it's passable terrain
             print("This cell's terrain is impassable.")
             return
@@ -220,7 +217,7 @@ class Entity: #a character on the map
                 print(f"You need {moveCost} Energy to fly.")
                 return
 
-        if targetCell.terrain.requireFloat == True and self.float == False and self.flying == False: #checks for float conditions then flying
+        if targetCell.terrain.requireFloat and not self.mechClass.canFloat and not self.flying:
             print("Your mech can't travel over water.")
             return
 

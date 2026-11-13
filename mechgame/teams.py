@@ -55,6 +55,20 @@ class Squad:
         ammoByWeapon = {}
         for mech in self.mechList:
             for weapon in mech.mechClass.gunList:
+                # Launchers hold multiple independently counted shell types;
+                # report each payload rather than the launcher's empty tube.
+                if weapon.isLauncher:
+                    for ammo in weapon.ammoTypes:
+                        ammunition = ammoByWeapon.setdefault(
+                            ammo.name,
+                            {"current": 0, "maximum": 0, "unlimited": False},
+                        )
+                        if ammo.charges is None:
+                            ammunition["unlimited"] = True
+                        else:
+                            ammunition["current"] += ammo.charges
+                            ammunition["maximum"] += ammo.maxCharges
+                    continue
                 ammunition = ammoByWeapon.setdefault(
                     weapon.name,
                     {"current": 0, "maximum": 0, "unlimited": False},
@@ -84,9 +98,10 @@ class Squad:
 
 
     def calcEffectiveness(self):
+        """Recalculate aggregate squad integrity from the live mech blueprints."""
         status = 0
         for mech in self.mechList:
-            status += (mech.condition)
+            status += mech.mechClass.condition
 
         self.effectiveness = (status/len(self.mechList))*100
 

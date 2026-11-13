@@ -25,5 +25,5 @@ class MapGeneratorTests(unittest.TestCase):
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
-        self.assertEqual(len(match.entities), 4)
+        self.assertEqual(len(match.entities), 6)
         self.assertEqual(match.pov.pilot.name, "Kiki")

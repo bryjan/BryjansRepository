@@ -30,6 +30,8 @@ class LauncherAmmo:
             raise ValueError("Launcher ammunition payload must be explosive, smoke, incendiary, or scout.")
         if payload == "scout" and scoutVision <= 0:
             raise ValueError("Scout ammunition needs positive scoutVision.")
+        if not 0 <= igniteChance <= 1:
+            raise ValueError("Launcher ammunition igniteChance must be between 0 and 1.")
         if set(rangeBands) != {"close", "medium", "far"}:
             raise ValueError("Launcher ammunition needs close, medium, and far bands.")
         for band, values in rangeBands.items():
