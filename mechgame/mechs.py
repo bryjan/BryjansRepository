@@ -485,7 +485,10 @@ class WeaponLimb(MechPart):
         artillery.schedule_impact(
             matchInfo,
             impactPosition,
-            profile["turns"],
+            # The firing squad's turn is still in progress.  Add one pending
+            # handoff so a one-turn shell lands only after one *complete*
+            # future squad turn, rather than as soon as the player ends now.
+            profile["turns"] + 1,
             ammo.blastRadius,
             ammo.blastSize,
             max(0, self.dmg + ammo.damageModifier - profile["damage_falloff"]),
@@ -497,7 +500,10 @@ class WeaponLimb(MechPart):
             matchInfo.pov.team,
             ammo.igniteChance,
         )
-        print(f"{self.name} fired on its {profile['name']} profile. Impact expected in {profile['turns']} turn(s).")
+        print(
+            f"{self.name} fired on its {profile['name']} profile. "
+            f"Impact expected after {profile['turns']} completed turn(s)."
+        )
         matchInfo.advTurn = True
 
     def launcher_profile(self, distance):

@@ -47,8 +47,6 @@ class MatchInfo:
 
     def nextSquadTurn(self):
         """Advance the point of view to the first mech in the next squad."""
-        artillery.advance_impacts(self)
-
         # A pulse is active only for the squad turn in which it was ordered.
         # Clear every squad member so changing the point of view cannot let a
         # previous pilot's pulse survive into the next squad turn.
@@ -80,6 +78,11 @@ class MatchInfo:
         self.clearVisuals()
         self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
         self.pov.squad.roundRefresh(self)
+
+        # Resolve shells only after the new squad has been selected.  This
+        # makes impacts belong to the new turn and prevents fresh smoke or
+        # fire from being immediately aged during a round-boundary refresh.
+        artillery.advance_impacts(self)
         self.advTurn = False
         self.turnEnded = False
 
