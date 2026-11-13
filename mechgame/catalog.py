@@ -131,7 +131,7 @@ def _pathfinder_sensor_helm():
             create_module("passive_radar_detector"),
             create_module("standard_active_radar_array"),
         ],
-        ap=6, visualPower=14, radarPower=0, radarEnergyCost=0,
+        ap=6, visualPower=15, radarPower=0, radarEnergyCost=0,
     )
 
 
@@ -206,8 +206,8 @@ def _kestrel_legs():
 
 def _kestrel_energy_beam():
     return WeaponLimb(
-        "Kestrel Energy Beam", 8, 30, [], damage=12, accuracy=34,
-        soundRep=20, charges=None, apCost=2, energyCost=4, maxRange=32,
+        "Kestrel Energy Beam", 8, 30, [], damage=14, accuracy=35,
+        soundRep=15, charges=None, apCost=2, energyCost=3, maxRange=33,
     )
 
 
