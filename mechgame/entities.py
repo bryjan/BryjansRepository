@@ -310,6 +310,12 @@ class Entity: #a character on the map
                         calcList.append(n)
                         dontCalcList.append(n)
 
+        # A friendly scout flare acts as a temporary forward visual source.
+        # Its cells become visible to this team without replacing the mech's
+        # own sight calculation.
+        self.visibleCells.extend(effects.scout_visible_cells(matchInfo, self.team))
+        self.visibleCells = list(dict.fromkeys(self.visibleCells))
+
         self.directlyVisibleEnemies = [
             entity
             for entity in matchInfo.entities

@@ -12,7 +12,7 @@ class LauncherAmmo:
 
     def __init__(self, name, rangeBands, payload="explosive", charges=None,
                  damageModifier=0, blastRadius=0, blastSize=0,
-                 effectRadius=0, effectTurns=2):
+                 effectRadius=0, effectTurns=2, scoutVision=0):
         self.name = name
         self.rangeBands = rangeBands
         self.payload = payload
@@ -23,9 +23,12 @@ class LauncherAmmo:
         self.blastSize = blastSize
         self.effectRadius = effectRadius
         self.effectTurns = effectTurns
+        self.scoutVision = scoutVision
 
-        if payload not in {"explosive", "smoke", "incendiary"}:
-            raise ValueError("Launcher ammunition payload must be explosive, smoke, or incendiary.")
+        if payload not in {"explosive", "smoke", "incendiary", "scout"}:
+            raise ValueError("Launcher ammunition payload must be explosive, smoke, incendiary, or scout.")
+        if payload == "scout" and scoutVision <= 0:
+            raise ValueError("Scout ammunition needs positive scoutVision.")
         if set(rangeBands) != {"close", "medium", "far"}:
             raise ValueError("Launcher ammunition needs close, medium, and far bands.")
         for band, values in rangeBands.items():
@@ -64,6 +67,8 @@ class ScheduledImpact:
     payload: str
     effect_radius: int
     effect_turns: int
+    scout_vision: int
+    owner_team: object
 
 
 def scatter_position(match_info, target, inherent_inaccuracy):
@@ -86,11 +91,12 @@ def scatter_position(match_info, target, inherent_inaccuracy):
 
 
 def schedule_impact(match_info, position, turns, radius, size, damage, weapon_name,
-                    payload="explosive", effect_radius=0, effect_turns=2):
+                    payload="explosive", effect_radius=0, effect_turns=2,
+                    scout_vision=0, owner_team=None):
     """Store one delayed shell on the match until turn advancement resolves it."""
     impact = ScheduledImpact(
         list(position), turns, radius, size, damage, weapon_name,
-        payload, effect_radius, effect_turns,
+        payload, effect_radius, effect_turns, scout_vision, owner_team,
     )
     match_info.pendingImpacts.append(impact)
     return impact
@@ -108,7 +114,7 @@ def advance_impacts(match_info):
         print(f"{impact.weapon_name} impacts at {impact.position}!")
         if impact.payload == "explosive":
             match_info.explosion(impact.position, impact.radius, impact.size, impact.damage)
-        else:
+        elif impact.payload in {"smoke", "incendiary"}:
             for row in match_info.map:
                 for cell in row:
                     if math.dist(cell.pos, impact.position) <= impact.effect_radius:
@@ -116,4 +122,9 @@ def advance_impacts(match_info):
                             effects.add_smoke(cell, impact.effect_turns)
                         else:
                             effects.add_fire(cell, impact.effect_turns)
+        else:
+            cell = match_info.map[impact.position[1]][impact.position[0]]
+            effects.add_scout_flare(
+                cell, impact.owner_team, impact.scout_vision, impact.effect_turns,
+            )
     match_info.pendingImpacts = remaining

@@ -27,6 +27,7 @@ these bands on ``artillery.LauncherAmmo`` objects passed to a launcher's
 """
 
 from .mechs import Helm, Hull, Legs, MechClass, Module, WeaponLimb
+from .artillery import LauncherAmmo
 
 
 SIZE_CLASS_NAMES = {
@@ -138,6 +139,39 @@ def create_module(module_id):
         return MODULE_FACTORIES[module_id]()
     except KeyError as error:
         raise ValueError(f"Unknown module '{module_id}'.") from error
+
+
+# ---------------------------------------------------------------------------
+# Launcher ammunition
+# ---------------------------------------------------------------------------
+
+def _scout_flare_round():
+    """Launch a short-lived forward visual source instead of causing damage."""
+    return LauncherAmmo(
+        "Scout Flare Round",
+        {
+            "close": [35, 1, 1],
+            "medium": [75, 3, 2],
+            "far": [120, 5, 3],
+        },
+        payload="scout",
+        charges=4,
+        effectTurns=1,
+        scoutVision=18,
+    )
+
+
+AMMO_FACTORIES = {
+    "scout_flare_round": _scout_flare_round,
+}
+
+
+def create_ammo(ammo_id):
+    """Build a fresh launcher ammunition type from its stable catalog ID."""
+    try:
+        return AMMO_FACTORIES[ammo_id]()
+    except KeyError as error:
+        raise ValueError(f"Unknown ammunition '{ammo_id}'.") from error
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +435,7 @@ def list_catalog(size=None):
             "mechs": tuple(MECH_FACTORIES.get(class_size, {})),
             "parts": tuple(PART_FACTORIES.get(class_size, {})),
             "modules": tuple(MODULE_FACTORIES) if class_size in PART_FACTORIES else (),
+            "ammo": tuple(AMMO_FACTORIES),
         }
         for class_size, class_name in sizes.items()
     }

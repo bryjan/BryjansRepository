@@ -490,6 +490,8 @@ class WeaponLimb(MechPart):
             ammo.payload,
             ammo.effectRadius,
             ammo.effectTurns,
+            ammo.scoutVision,
+            matchInfo.pov.team,
         )
         print(f"{self.name} fired on its {profile['name']} profile. Impact expected in {profile['turns']} turn(s).")
         matchInfo.advTurn = True
