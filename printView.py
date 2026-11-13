@@ -195,7 +195,8 @@ def printPOV(matchInfo, povX, povY):
     print(fullDivider)
     for line in _hud_lines(matchInfo, fullPanelWidth):
         print(f"|{line:<{fullPanelWidth}}|")
-    print(fullDivider)
+    # This segmented edge simultaneously closes the HUD and opens the map and
+    # active-mech panels, keeping the entire console in one shared frame.
     print(topDivider)
     for row, sideLine in zip(mapWindow, sideLines):
         print("|", end="")
