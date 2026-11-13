@@ -40,6 +40,9 @@ class Entity: #a character on the map
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
         self.radarPower = self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
+        # Hull abilities can temporarily amplify both visual range and the
+        # radar source projected by this individual mech.
+        self.sensorBoostMultiplier = 1
         # Active radar starts silent.  The pilot can enable continuous scans or
         # spend energy on a single-turn pulse.
         self.radarOn = False
@@ -91,7 +94,8 @@ class Entity: #a character on the map
         if hullAbilities:
             lines.append(
                 "Hull abilities: " + ", ".join(
-                    f"{ability.name} {ability.charges}/{ability.maxCharges}"
+                    f"{ability.name} "
+                    f"{'unlimited' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
                     for ability in hullAbilities
                 )
             )
@@ -121,6 +125,7 @@ class Entity: #a character on the map
         """Restore per-round state and refresh the mech's derived statistics."""
 
         #basic stats
+        self.clearTurnAbilities()
         self.turnStartPos = list(self.pos)
         self.speed = 0
 
@@ -152,6 +157,11 @@ class Entity: #a character on the map
         #ai flags calc
         if self.ap == 0 or self.mp == 0 or self.energy <= (self.mechClass.energyMax * .4):
             self.needrest = True
+
+    def clearTurnAbilities(self):
+        """Remove temporary hull-ability effects as this mech begins a new turn."""
+        self.sensorBoostMultiplier = 1
+        self.visPower = int(self.mechClass.visPower)
 
 
 

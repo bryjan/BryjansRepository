@@ -79,6 +79,44 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lancer.speed, 3)
         self.assertEqual(dash.charges, 1)
 
+    def test_kestrel_sensor_overdrive_boosts_and_then_clears_sensors(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        kestrel = match.teamList[1].squadsList[0].mechList[1]
+        overdrive = kestrel.mechClass.hull.abilities[0]
+        starting_energy = kestrel.energy
+        base_visual = kestrel.mechClass.visPower
+        base_radar = kestrel.mechClass.radarPower
+
+        self.assertTrue(overdrive.use(match, kestrel))
+        self.assertEqual(kestrel.energy, starting_energy - 4)
+        self.assertEqual(kestrel.visPower, int(base_visual * 1.4))
+        self.assertEqual(kestrel.radarPower, int(base_radar * 1.4))
+        self.assertTrue(kestrel.radarPulseActive)
+
+        kestrel.clearTurnAbilities()
+        self.assertEqual(kestrel.visPower, base_visual)
+        self.assertEqual(kestrel.sensorBoostMultiplier, 1)
+
+    def test_bastion_field_repair_restores_parts_and_modules(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        bastion = match.teamList[1].squadsList[0].mechList[0]
+        repair = bastion.mechClass.hull.abilities[0]
+        legs, hull = bastion.mechClass.legs, bastion.mechClass.hull
+        legs.hp, legs.armor, legs.limbCon = 1, 0, 0.1
+        hull.hp, hull.armor, hull.limbCon = 2, 0, 0.2
+        destroyed_module = hull.modsList[0]
+        damaged_module = hull.modsList[1]
+        destroyed_module.status = 0
+        damaged_module.status = 1
+
+        self.assertTrue(repair.use(match, bastion))
+        self.assertEqual(legs.hp, legs.startingHP)
+        self.assertEqual(hull.armor, hull.startingArmor)
+        self.assertEqual(destroyed_module.status, 1)
+        self.assertEqual(damaged_module.status, 2)
+        self.assertEqual(bastion.ap, 0)
+        self.assertEqual(repair.charges, 0)
+
     def test_bastion_heavy_beam_accuracy_is_reduced(self):
         bastion = create_mech("bastion")
         beam = next(weapon for weapon in bastion.gunList if weapon.name == "Heavy Melting Beam")

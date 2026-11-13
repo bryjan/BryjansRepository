@@ -6,7 +6,7 @@ import random
 
 from . import artillery
 
-__all__ = ["Ability", "Cockpit", "DashAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "WeaponLimb"]
+__all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
 
 class Ability:
@@ -22,7 +22,8 @@ class Ability:
 
     def short_description(self):
         """Return one menu-ready line with the ability's remaining uses."""
-        return f"{self.name} {self.charges}/{self.maxCharges} — {self.description}"
+        charges = "unlimited" if self.maxCharges is None else f"{self.charges}/{self.maxCharges}"
+        return f"{self.name} {charges} — {self.description}"
 
 
 class DashAbility(Ability):
@@ -79,6 +80,102 @@ class DashAbility(Ability):
         effects.apply_entry_effects(matchInfo, entity)
         matchInfo.advTurn = True
         print(f"{entity.pilot.name} dashes {steps_taken} tile(s).")
+        return True
+
+
+class SensorOverdriveAbility(Ability):
+    """Temporarily overclock a mech's visual and active-radar systems."""
+
+    def __init__(self, energy_cost=4, multiplier=1.4):
+        super().__init__(
+            "Sensor Overdrive", None,
+            f"{multiplier}x visual/radar for this turn; costs {energy_cost} energy",
+        )
+        self.energyCost = energy_cost
+        self.multiplier = multiplier
+
+    def use(self, matchInfo, entity, direction=None):
+        """Spend energy for a one-turn enhanced visual range and radar pulse."""
+        if entity.sensorBoostMultiplier > 1:
+            print("Sensor Overdrive is already active this turn.")
+            return False
+        if entity.energy < self.energyCost:
+            print("Not enough energy for Sensor Overdrive.")
+            return False
+
+        entity.energy -= self.energyCost
+        entity.sensorBoostMultiplier = self.multiplier
+        entity.visPower = int(entity.mechClass.visPower * self.multiplier)
+        # The overdrive includes a one-turn active radar burst. The normal
+        # pulse charge is not spent because this ability already paid for it.
+        entity.radarOn = True
+        entity.radarPulseActive = True
+        matchInfo.clearVisuals()
+        entity.getVisuals(matchInfo)
+        matchInfo.advTurn = True
+        print(f"{entity.pilot.name} activates Sensor Overdrive.")
+        return True
+
+
+class FieldRepairAbility(Ability):
+    """Restore the Bastion's most damaged components during a full action."""
+
+    def __init__(self, charges=1, ap_cost=7):
+        super().__init__(
+            "Field Repair", charges,
+            f"restore 2 limbs and repair 2 modules; costs {ap_cost} AP",
+        )
+        self.apCost = ap_cost
+
+    def use(self, matchInfo, entity, direction=None):
+        """Fully restore two damaged limbs and improve two damaged modules."""
+        if self.charges <= 0:
+            print("Field Repair has no charges remaining.")
+            return False
+        if entity.ap < self.apCost:
+            print(f"Field Repair needs {self.apCost} AP.")
+            return False
+
+        damaged_limbs = sorted(
+            (limb for limb in entity.mechClass.limbList if limb.limbCon < 1),
+            key=lambda limb: limb.limbCon,
+        )[:2]
+        damaged_modules = sorted(
+            (
+                module
+                for limb in entity.mechClass.limbList
+                for module in limb.modsList
+                if not isinstance(module, Cockpit) and module.status < 2
+            ),
+            key=lambda module: module.status,
+        )[:2]
+        if not damaged_limbs and not damaged_modules:
+            print("Field Repair has nothing to repair.")
+            return False
+
+        for limb in damaged_limbs:
+            limb.armor = limb.startingArmor
+            limb.hp = limb.startingHP
+            limb.armorCon = limb.hpCon = limb.limbCon = 1
+        for module in damaged_modules:
+            module.repair()
+
+        # Restored modules can change derived resource limits. Recalculate the
+        # chassis before restoring the aggregate condition readout.
+        entity.mechClass.statUpdate()
+        entity.mechClass.condition = round(
+            sum(limb.limbCon for limb in entity.mechClass.limbList)
+            / len(entity.mechClass.limbList) * 100
+        )
+        entity.energy = min(entity.energy, entity.mechClass.energyMax)
+        entity.mp = min(entity.mp, entity.mechClass.mpMax)
+        entity.ap -= self.apCost
+        self.charges -= 1
+        matchInfo.advTurn = True
+        print(
+            f"{entity.pilot.name} completes Field Repair: "
+            f"{len(damaged_limbs)} limb(s), {len(damaged_modules)} module(s)."
+        )
         return True
 
 
@@ -143,6 +240,7 @@ class MechClass: #a constructed mech not a npc or player
     def statUpdate(self):
         """Recalculate derived mech statistics after a part or module changes."""
         #retrieve limb passed stats
+        self.limbsConditionList = []
         for limb in self.limbList:
             limb.updateModules()
             self.limbsConditionList.append(limb.limbCon)

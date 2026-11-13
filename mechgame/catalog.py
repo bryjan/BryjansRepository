@@ -27,7 +27,7 @@ these bands on ``artillery.LauncherAmmo`` objects passed to a launcher's
 ``ammoTypes`` list, so smoke and incendiary rounds can fly differently.
 """
 
-from .mechs import DashAbility, Helm, Hull, Legs, MechClass, Module, WeaponLimb
+from .mechs import DashAbility, FieldRepairAbility, Helm, Hull, Legs, MechClass, Module, SensorOverdriveAbility, WeaponLimb
 from .artillery import LauncherAmmo
 
 
@@ -322,6 +322,7 @@ def _kestrel_hull():
             create_module("kestrel_reserve_capacitor"),
         ],
         pwrCapacity=40, pwrGen=3, radarSig=250, size=3,
+        abilities=[SensorOverdriveAbility()],
     )
 
 
@@ -357,6 +358,7 @@ def _bastion_hull():
             create_module("efficient_combat_reactor"),
         ],
         pwrCapacity=26, pwrGen=5, radarSig=320, size=3,
+        abilities=[FieldRepairAbility()],
     )
 
 

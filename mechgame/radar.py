@@ -72,6 +72,7 @@ def refresh(match_info):
             tuple(entity.pos),
             entity.speed,
             entity.mechClass.radarPower,
+            entity.sensorBoostMultiplier,
         )
         for entity in sources
     )
@@ -100,7 +101,10 @@ def project_scan(source, match_info):
     """
     game_map = match_info.map
     starting_cell = game_map[source.pos[1]][source.pos[0]]
-    source_power = int(source.mechClass.radarPower / (1 + (source.speed * .25)))
+    source_power = int(
+        (source.mechClass.radarPower * source.sensorBoostMultiplier)
+        / (1 + (source.speed * .25))
+    )
     if source_power <= 0:
         return
 

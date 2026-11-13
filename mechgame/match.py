@@ -51,6 +51,7 @@ class MatchInfo:
         # Clear every squad member so changing the point of view cannot let a
         # previous pilot's pulse survive into the next squad turn.
         for mech in self.pov.squad.mechList:
+            mech.clearTurnAbilities()
             if mech.radarPulseActive:
                 mech.radarOn = False
                 mech.radarPulseActive = False
