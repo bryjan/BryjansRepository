@@ -26,4 +26,4 @@ class MapGeneratorTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
         self.assertEqual(len(match.entities), 6)
-        self.assertEqual(match.pov.pilot.name, "Kiki")
+        self.assertEqual(match.pov.pilot.name, "B")

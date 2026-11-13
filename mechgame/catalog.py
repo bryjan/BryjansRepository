@@ -268,9 +268,9 @@ def _scout_rifle():
 def _lancer_mortar():
     """A single-shell 2-AP launcher for indirect fire and support payloads."""
     return WeaponLimb(
-        # Standard Lancers see 14 tiles.  The mortar is deliberately quiet:
-        # enemies hear its launch only a tile beyond that usual sight range.
-        "Lancer Mortar", 6, 24, [], damage=20, accuracy=0, soundRep=15,
+        # Standard Lancers see 14 tiles. The mortar remains fairly quiet:
+        # enemies hear its launch only modestly beyond usual sight range.
+        "Lancer Mortar", 6, 24, [], damage=20, accuracy=0, soundRep=18,
         charges=None, apCost=2, energyCost=0,
         ammoTypes=[
             create_ammo("he_mortar_round"),

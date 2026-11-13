@@ -8,14 +8,14 @@ from .teams import Squad, Team
 def create_demo_teams():
     """Create the playable sensor-and-artillery test match."""
     player_mechs = [
-        Entity(create_mech("lancer.pathfinder"), Pilot("Kiki")),
-        Entity(create_mech("lancer.mortar"), Pilot("Rook")),
-        Entity(create_mech("lancer.mortar"), Pilot("Mira")),
+        Entity(create_mech("lancer.pathfinder"), Pilot("B")),
+        Entity(create_mech("lancer.mortar"), Pilot("MagikP")),
+        Entity(create_mech("lancer.mortar"), Pilot("Xactly")),
     ]
     enemy_mechs = [
-        Entity(create_mech("bastion"), Pilot("Bryan")),
-        Entity(create_mech("kestrel"), Pilot("Wraith")),
-        Entity(create_mech("lancer.type_a"), Pilot("Panda")),
+        Entity(create_mech("bastion"), Pilot("Blastra")),
+        Entity(create_mech("kestrel"), Pilot("UncLord")),
+        Entity(create_mech("lancer.type_a"), Pilot("Sybis")),
     ]
     player = Team("Player Team", [Squad("Player Squad", player_mechs, "Combat", playerControlled=True)])
     enemies = Team("Enemy Team", [Squad("Enemy Squad", enemy_mechs, "Combat")])
