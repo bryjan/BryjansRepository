@@ -1,12 +1,17 @@
 """Small entry menu for the playable terminal demo."""
 
 
-TITLE_ART = (
-    "   ___   ____   ____ ___   __  __ _____ ____ _   _ ",
-    "  / _ \\ / ___| / ___|_ _| |  \\/  | ____/ ___| | | |",
-    " | | | |\\___ \\| |    | |  | |\\/| |  _|| |   | |_| |",
-    " | |_| | ___) | |___ | |  | |  | | |__| |___|  _  _|",
-    "  \\___/ |____/ \\____|___| |_|  |_|_____\\____|_| |_|",
+MENU_SCENE = (
+    "       ^       ^       ^       ^",
+    "      /|\\     /|\\     /|\\     /|\\",
+    "     /|||\\   /|||\\   /|||\\   /|||\\",
+    "      |||     |||     |||     |||",
+    "                 /\\",
+    "                /##\\",
+    "               | [] |",
+    "               |____|",
+    "                /  \\",
+    "               /_/\\_\\",
 )
 
 
@@ -18,9 +23,8 @@ def show_start_menu(input_func=input, output_func=print):
     """
     while True:
         output_func("")
-        for line in TITLE_ART:
+        for line in MENU_SCENE:
             output_func(line)
-        output_func("Terminal mech tactics demo")
         output_func("")
         output_func("'Enter' or '1' Start random skirmish")
         output_func("'?' Quick controls")
