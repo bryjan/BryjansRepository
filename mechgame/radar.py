@@ -243,6 +243,15 @@ def tracked_contacts(observer):
     )
 
 
+def team_has_visual_contact(observer, target):
+    """Return whether any friendly mech currently has direct sight of target."""
+    return any(
+        target in getattr(friendly, "directlyVisibleEnemies", [])
+        for squad in observer.team.squadsList
+        for friendly in squad.mechList
+    )
+
+
 def panel_focus(observer):
     """Use a valid chosen contact, otherwise the nearest current contact."""
     contacts = tracked_contacts(observer)

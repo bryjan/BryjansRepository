@@ -174,13 +174,22 @@ def launcherFireMenu(matchInfo, launcher, target=None):
             f"| distance {detail['distance']:.1f} tiles"
         )
         printLauncherProfile(mech, launcher, defaultPosition)
-        prompt = "Launch: 'Enter' or 'f' default | 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        prompt = launcherFirePrompt(matchInfo, launcher, defaultTarget, hasDefault=True)
     else:
-        prompt = "Launch: 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        prompt = launcherFirePrompt(matchInfo, launcher, None)
 
     view_position = defaultPosition if defaultPosition is not None else mech.pos
     pv.printPOV(matchInfo, *view_position, command_text=prompt)
-    choice = input("Launch: ").strip().lower()
+    raw_choice = input("Launch: ").strip()
+    if raw_choice == "L":
+        position = predictLauncherLead(matchInfo, launcher, defaultTarget)
+        if position is None:
+            print("Auto lead needs a visually confirmed or fully identified radar target.")
+            return
+        print(f"Auto lead projects the target at {position} when the shell lands.")
+        choice = "auto_lead"
+    else:
+        choice = raw_choice.lower()
     if choice in ("", "f") and defaultPosition is not None:
         return launcher.launchAt(matchInfo, defaultPosition)
     if choice == "t":
@@ -211,6 +220,8 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         return
     elif choice == "w":
         return gunMenu(matchInfo, target)
+    elif choice == "auto_lead":
+        pass
     elif choice in ("", "f", "x"):
         return
     else:
@@ -226,6 +237,65 @@ def launcherFireMenu(matchInfo, launcher, target=None):
             confirm = input("Press 'Enter' or 'f' to launch, or 'x' to cancel: ").strip().lower()
             if confirm in ("", "f"):
                 launcher.launchAt(matchInfo, position)
+
+
+def launcherFirePrompt(matchInfo, launcher, target=None, hasDefault=False):
+    """Return only launcher choices that are valid for the current sensors."""
+    prompt = "Launch: "
+    if hasDefault:
+        prompt += "'Enter' or 'f' default | "
+    prompt += "'a' ammo | 't' tracked target | "
+    if launcherAutoLeadAvailable(matchInfo, target):
+        # Uppercase L is deliberately distinct from lowercase l (last shot).
+        prompt += "'L' auto lead | "
+    return prompt + "'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+
+
+def predictLauncherLead(matchInfo, launcher, target):
+    """Project a fully resolved contact forward by the shell's travel time."""
+    observer = matchInfo.pov
+    if not launcherAutoLeadAvailable(matchInfo, target):
+        return None
+
+    detail = radar.contact_details(observer, matchInfo, target)
+    visual_contact = radar.team_has_visual_contact(observer, target)
+    position = list(target.pos) if visual_contact else list(detail["position"])
+    if visual_contact:
+        turn_start, speed = target.turnStartPos, target.speed
+    else:
+        memory = observer.team.radarContacts[target]
+        turn_start, speed = memory["turn_start_pos"], memory["speed"]
+
+    delta_x = position[0] - turn_start[0]
+    delta_y = position[1] - turn_start[1]
+    direction_x = (delta_x > 0) - (delta_x < 0)
+    direction_y = (delta_y > 0) - (delta_y < 0)
+    projected = list(position)
+    # A projected location can cross into a slower range band. Re-evaluate the
+    # band a few times so the final lead uses the shell's actual flight time.
+    for _ in range(3):
+        profile = launcher.launcher_profile(math.dist(observer.pos, projected))
+        if profile is None:
+            return None
+        updated = [
+            position[0] + (direction_x * speed * profile["turns"]),
+            position[1] + (direction_y * speed * profile["turns"]),
+        ]
+        if updated == projected:
+            break
+        projected = updated
+
+    if not (1 <= projected[0] < matchInfo.mapWidth - 1 and 1 <= projected[1] < matchInfo.mapHeight - 1):
+        return None
+    return projected
+
+
+def launcherAutoLeadAvailable(matchInfo, target):
+    """Require team sight or the highest radar ID before predicting movement."""
+    return target is not None and (
+        radar.team_has_visual_contact(matchInfo.pov, target)
+        or radar.can_aim_at_contact(matchInfo.pov, matchInfo, target)
+    )
 
 
 def printLauncherProfile(mech, launcher, position):

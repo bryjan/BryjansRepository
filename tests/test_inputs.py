@@ -141,6 +141,21 @@ class InputTests(unittest.TestCase):
 
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
 
+    def test_launcher_auto_lead_projects_visual_contact_by_flight_time(self):
+        match = Game(map_size=30, window_size=9).create_match()
+        launcher_mech = match.teamList[0].squadsList[0].mechList[3]
+        launcher = launcher_mech.mechClass.gunList[0]
+        target = match.teamList[1].squadsList[0].mechList[0]
+        match.pov = launcher_mech
+        launcher_mech.pos = [4, 4]
+        target.pos = [10, 10]
+        target.turnStartPos = [8, 10]
+        target.speed = 2
+        launcher_mech.directlyVisibleEnemies = [target]
+
+        self.assertEqual(inputs.predictLauncherLead(match, launcher, target), [12, 10])
+        self.assertIn("'L' auto lead", inputs.launcherFirePrompt(match, launcher, target))
+
     def test_direct_fire_target_selection_reopens_the_full_target_menu(self):
         match = Game(map_size=20, window_size=9).create_match()
         default_target = match.teamList[1].squadsList[0].mechList[0]
