@@ -193,6 +193,6 @@ class InputTests(unittest.TestCase):
             printView._print_tactical_footer(80)
         footer_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("'ab' Abilities", footer_output)
+        self.assertIn("'o' Options", footer_output)
         self.assertIn("'n' Next", footer_output)
         self.assertNotIn("'st' status", footer_output)
-        self.assertNotIn("'o' Options", footer_output)

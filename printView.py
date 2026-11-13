@@ -27,7 +27,7 @@ def _print_tactical_footer(width):
     """Print the command row in a standalone frame for menu-only callers."""
     divider = "+" + ("-" * width) + "+"
     print(divider)
-    _print_panel_text("'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'n' Next | '?' Help | 'end' End Turn", width)
+    _print_panel_text("'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'o' Options | 'n' Next | '?' Help | 'end' End Turn", width)
     print(divider)
 
 
@@ -193,7 +193,7 @@ def _command_lines(width):
     """Build the command-only panel kept beneath the tactical view."""
     command_text = (
         "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | "
-        "'n' Next | '?' Help | 'end' End Turn"
+        "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
     )
     return [line.lstrip("| ") for line in textwrap.wrap(command_text, width=width)]
 
