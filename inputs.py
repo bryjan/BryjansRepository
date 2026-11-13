@@ -98,9 +98,15 @@ def abilityMenu(matchInfo):
         print("This mech has no hull abilities.")
         return
 
-    print("Hull abilities:")
-    for index, ability in enumerate(abilities, start=1):
-        print(f"'{index}' {ability.short_description()}")
+    entries = [
+        f"'{index}' {ability.short_description()}"
+        for index, ability in enumerate(abilities, start=1)
+    ]
+    pv.printPOV(
+        matchInfo, *mech.pos,
+        command_text="Abilities: enter a listed number | 'x' cancel",
+        right_panel=("HULL ABILITIES", entries),
+    )
     choice = input("Ability ('x' to cancel): ").strip().lower()
     if choice in ("", "x"):
         return
@@ -111,6 +117,11 @@ def abilityMenu(matchInfo):
     ability = abilities[int(choice) - 1]
     direction = None
     if ability.requiresDirection:
+        pv.printPOV(
+            matchInfo, *mech.pos,
+            command_text="Dash direction: 'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' | 'x' cancel",
+            right_panel=("HULL ABILITIES", entries),
+        )
         direction = input("Dash direction ('q', 'w', 'e', 'a', 's', 'd', 'z', or 'c'; 'x' to cancel): ").strip().lower()
         if direction == "x":
             return
@@ -399,9 +410,12 @@ def nearestTrackedEnemy(matchInfo, mech):
 def squadMenu(matchInfo):
     """Show squad readiness and roster before player-facing squad controls."""
     squad = matchInfo.pov.squad
-    print(squad.statusReport())
-    print(squad.rosterReport())
-    print("Squad options: 'm' switch mech | 's' switch controllable squad | 'x' exit")
+    entries = [*squad.statusReport().splitlines(), *squad.rosterReport().splitlines()]
+    pv.printPOV(
+        matchInfo, *matchInfo.pov.pos,
+        command_text="Squad: 'm' switch mech | 's' switch controllable squad | 'x' exit",
+        right_panel=("SQUAD", entries),
+    )
     choice = input("Squad: ").strip().lower()
 
     if choice in ("", "x"):
@@ -421,13 +435,19 @@ def radarMenu(matchInfo):
         print("No enemy radar contacts are currently shared with your team.")
         return
 
-    print("Team radar contacts — nearest first")
+    entries = []
     for index, contact in enumerate(contacts, start=1):
         detail = radar.contact_details(observer, matchInfo, contact)
-        print(
+        entries.append(
             f"'{index}' {detail['classification']} at {detail['position']} "
             f"| {detail['distance']:.1f} tiles"
         )
+
+    pv.printPOV(
+        matchInfo, *observer.pos,
+        command_text="Radar: enter a listed contact number | 'x' exit",
+        right_panel=("TEAM RADAR — NEAREST FIRST", entries),
+    )
 
     selection = input("Select a contact for details, or 'x' to exit: ").strip().lower()
     if selection in ("", "x"):
@@ -440,11 +460,17 @@ def radarMenu(matchInfo):
     observer.focusedEnemy = selected_target
     detail = radar.contact_details(observer, matchInfo, selected_target)
     confirmation = "yes" if detail["visually_confirmed"] else "no"
-    print("Radar contact details")
-    print(f"Classification: {detail['classification']}")
-    print(f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles")
-    print(f"Movement: {detail['movement']} | Visually confirmed: {confirmation}")
-    print(f"Radar return: {detail['return_power']} / {detail['threshold']} required")
+    detail_entries = [
+        f"Classification: {detail['classification']}",
+        f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles",
+        f"Movement: {detail['movement']} | Visually confirmed: {confirmation}",
+        f"Radar return: {detail['return_power']} / {detail['threshold']} required",
+    ]
+    pv.printPOV(
+        matchInfo, *detail["position"],
+        command_text="Radar contact: 'f' fire at this contact | 'x' exit",
+        right_panel=("RADAR CONTACT", detail_entries),
+    )
     action = input("Radar contact: 'f' fire at this contact | 'x' exit: ").strip().lower()
     if action == "f":
         return fire(matchInfo, selected_target)
@@ -483,9 +509,18 @@ def optionsMenu(matchInfo):
 
 def selectSquadMech(matchInfo, squad):
     """Switch the point of view to a mech in the current squad."""
-    for index, mech in enumerate(squad.mechList, start=1):
-        print(f"{index}. {mech.pilot.name} — {mech.mechClass.name} ({round(mech.mechClass.condition)}%)")
+    entries = [
+        f"'{index}' {mech.pilot.name} — {mech.mechClass.name} ({round(mech.mechClass.condition)}%)"
+        for index, mech in enumerate(squad.mechList, start=1)
+    ]
+    pv.printPOV(
+        matchInfo, *matchInfo.pov.pos,
+        command_text="Mech: enter a listed number | 'x' cancel",
+        right_panel=("SWITCH MECH", entries),
+    )
     selection = _read_nonempty("Mech: ")
+    if selection.lower() == "x":
+        return
     if not selection.isdigit() or not 1 <= int(selection) <= len(squad.mechList):
         print("Choose a listed mech number.")
         return
@@ -504,9 +539,18 @@ def selectControllableSquad(matchInfo):
     if not squads:
         print("No controllable squads are available.")
         return
-    for index, squad in enumerate(squads, start=1):
-        print(f"{index}. {squad.name} — {len(squad.mechList)} mechs")
+    entries = [
+        f"'{index}' {squad.name} — {len(squad.mechList)} mechs"
+        for index, squad in enumerate(squads, start=1)
+    ]
+    pv.printPOV(
+        matchInfo, *matchInfo.pov.pos,
+        command_text="Squad: enter a listed number | 'x' cancel",
+        right_panel=("SWITCH SQUAD", entries),
+    )
     selection = _read_nonempty("Squad: ")
+    if selection.lower() == "x":
+        return
     if not selection.isdigit() or not 1 <= int(selection) <= len(squads):
         print("Choose a listed squad number.")
         return

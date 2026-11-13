@@ -27,7 +27,7 @@ def _print_tactical_footer(width):
     """Print the command row in a standalone frame for menu-only callers."""
     divider = "+" + ("-" * width) + "+"
     print(divider)
-    _print_panel_text("'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'o' Options | 'n' Next | '?' Help | 'end' End Turn", width)
+    _print_panel_text("'f' Fire | 'r' Toggle Radar | 'rd' Contacts | 'ab' Abilities | 'sq' Squad | 'o' Options | 'n' Next | '?' Help | 'end' End Turn", width)
     print(divider)
 
 
@@ -86,6 +86,17 @@ def _finish_panel_lines(lines, height, width):
     """Clip low-priority rows and pad the panel to match the map height."""
     lines = lines[:height]
     return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+
+
+def menu_panel_lines(title, entries, height, width=SIDE_PANEL_WIDTH):
+    """Build a temporary right-panel menu with a title and wrapped entries."""
+    lines = [
+        f"|{title[:width]:^{width}}|",
+        "+" + ("-" * width) + "+",
+    ]
+    for entry in entries:
+        lines.extend(_panel_text_lines(entry, width))
+    return _finish_panel_lines(lines, height, width)
 
 
 def _own_mech_panel_lines(mech, height, width):
@@ -193,14 +204,14 @@ def _command_lines(width, command_text=None):
     """Build either the normal commands or the active menu's available keys."""
     if command_text is None:
         command_text = (
-            "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | "
+            "Commands | 'f' Fire | 'r' Toggle Radar | 'rd' Contacts | 'ab' Abilities | 'sq' Squad | "
             "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
         )
     # Separators may land at a wrap boundary; trimming both edges prevents a
     # separator from visually merging with the panel's actual border.
     return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
-def printPOV(matchInfo, povX, povY, command_text=None):
+def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):
     """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
 
@@ -247,7 +258,10 @@ def printPOV(matchInfo, povX, povY, command_text=None):
     topDivider = "+" + ("-" * panelWidth) + "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
     fullPanelWidth = panelWidth + SIDE_PANEL_WIDTH + 1
     fullDivider = "+" + ("-" * fullPanelWidth) + "+"
-    sideLines = _side_panel_lines(matchInfo, windowHeight)
+    sideLines = (
+        menu_panel_lines(right_panel[0], right_panel[1], windowHeight)
+        if right_panel is not None else _side_panel_lines(matchInfo, windowHeight)
+    )
     # The HUD remains in one dependable place above the map, independent of
     # how much detail the active mech panel can fit at this window height.
     print(fullDivider)
