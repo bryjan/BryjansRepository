@@ -8,28 +8,19 @@ import textwrap
 FRAME_WIDTH = 60
 CONTENT_WIDTH = FRAME_WIDTH - 2
 
-ASCII_FONT = {
-    "A": (" ### ", "#   #", "#####", "#   #", "#   #"),
-    "C": (" ####", "#    ", "#    ", "#    ", " ####"),
-    "D": ("#### ", "#   #", "#   #", "#   #", "#### "),
-    "E": ("#####", "#    ", "#### ", "#    ", "#####"),
-    "G": (" ####", "#    ", "# ###", "#   #", " ####"),
-    "H": ("#   #", "#   #", "#####", "#   #", "#   #"),
-    "M": ("#   #", "## ##", "# # #", "#   #", "#   #"),
-    "O": (" ### ", "#   #", "#   #", "#   #", " ### "),
-    "-": ("     ", "     ", " ### ", "     ", "     "),
-}
-
-
-def _ascii_banner(text):
-    """Render a small, dependency-free block-letter banner."""
-    return tuple(
-        " ".join(ASCII_FONT[character][row] for character in text)
-        for row in range(5)
-    )
-
-
-MENU_SCENE = (*_ascii_banner("MECH-GAME"), "", *_ascii_banner("DEMO"))
+# A compact standard-style banner, kept below the frame width so every letter
+# remains recognizable in ordinary Windows console fonts.
+MENU_SCENE = (
+    " __  __ ___ ___ _  _       ___   _   __  __ ___",
+    "|  \\/  | __/ __| || |-----| __| /_\\ |  \\/  | __|",
+    "| |\\/| | _| (__| __ |     | _| / _ \\| |\\/| | _|",
+    "|_|  |_|___\\___|_||_|     |___/_/ \\_\\_|  |_|___|",
+    "",
+    " ___  ___ __  __  ___",
+    "|   \\| __|  \\/  |/ _ \\",
+    "| |) | _|| |\\/| | (_) |",
+    "|___/|___|_|  |_|\\___/",
+)
 
 
 MENU_HELP = (
