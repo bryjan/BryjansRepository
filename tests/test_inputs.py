@@ -73,3 +73,18 @@ class InputTests(unittest.TestCase):
 
         self.assertEqual(match.pov.pos, [7, 4])
         self.assertEqual(match.pov.mechClass.hull.abilities[0].charges, 1)
+
+    def test_launcher_target_selection_reopens_the_launcher_menu(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        launcher_mech = match.teamList[0].squadsList[0].mechList[3]
+        launcher = launcher_mech.mechClass.gunList[0]
+        selected_target = match.teamList[1].squadsList[0].mechList[0]
+        match.pov = launcher_mech
+        original_menu = inputs.launcherFireMenu
+
+        with patch("builtins.input", return_value="t"), patch(
+            "inputs.chooseLauncherTrackedContact", return_value=selected_target
+        ), patch("inputs.launcherFireMenu") as reopened_menu:
+            original_menu(match, launcher)
+
+        reopened_menu.assert_called_once_with(match, launcher, selected_target)

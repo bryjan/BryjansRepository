@@ -177,7 +177,13 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     if choice in ("", "f") and defaultPosition is not None:
         return launcher.launchAt(matchInfo, defaultPosition)
     if choice == "t":
-        position = chooseLauncherTrackedTarget(matchInfo)
+        selectedTarget = chooseLauncherTrackedContact(matchInfo)
+        if selectedTarget is None:
+            return
+        # Reopen the complete launcher menu with this contact as its default.
+        # This keeps lead offset and ammunition selection available after
+        # changing target instead of forcing an immediate launch confirmation.
+        return launcherFireMenu(matchInfo, launcher, selectedTarget)
     elif choice == "c":
         position = get_coordinate_input(matchInfo, "Enter launch coordinates")
         if position == "x":
@@ -263,14 +269,14 @@ def getLauncherLeadOffset(matchInfo, basePosition):
         print("The offset must place the impact inside the map border.")
 
 
-def chooseLauncherTrackedTarget(matchInfo):
-    """Select a remembered or visible contact as a launcher impact location."""
+def chooseLauncherTrackedContact(matchInfo):
+    """Select a remembered or visible contact for a launcher target menu."""
     mech = matchInfo.pov
     if not mech.trackedEnemies:
         print("No enemy mechs are currently tracked.")
         return None
     if len(mech.trackedEnemies) == 1:
-        return radar.contact_position(mech, mech.trackedEnemies[0])
+        return mech.trackedEnemies[0]
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         detail = radar.contact_details(mech, matchInfo, enemy)
@@ -282,7 +288,15 @@ def chooseLauncherTrackedTarget(matchInfo):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return radar.contact_position(mech, mech.trackedEnemies[int(selection) - 1])
+    return mech.trackedEnemies[int(selection) - 1]
+
+
+def chooseLauncherTrackedTarget(matchInfo):
+    """Return the selected contact's position for lead-offset calculations."""
+    target = chooseLauncherTrackedContact(matchInfo)
+    if target is None:
+        return None
+    return radar.contact_position(matchInfo.pov, target)
 
 
 def nearestTrackedEnemy(matchInfo, mech):
