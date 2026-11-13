@@ -4,6 +4,7 @@ import math
 import random
 
 from . import artillery
+from . import effects
 from . import radar
 
 
@@ -67,6 +68,7 @@ class MatchInfo:
 
         if nextTeamIndex >= len(self.teamList): #start of new round
             self.matchRound += 1
+            effects.advance_effects(self)
             # Radar contacts are tactical memory for one full match round.
             # They survive friendly squad changes, then expire together when a
             # fresh round begins.

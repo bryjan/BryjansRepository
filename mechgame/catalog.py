@@ -11,17 +11,19 @@ How to add a mech by hand:
 Use catalog IDs (lowercase, with dots or underscores) for references. The
 display name, map symbol, and color are the player-facing values.
 
-Launcher authoring uses three named arrays. Each is
+Launcher ammunition authoring uses three named arrays. Each is
 ``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``:
 
-    launcherRanges={
+    rangeBands={
         "close": [30, 1, 1],
         "medium": [70, 3, 2, 2],
         "far": [120, 6, 3, 5],
     }
 
 The first band able to reach the selected location is used. Damage falloff is
-flat damage removed from the weapon's normal damage when that band lands.
+flat damage removed from the weapon's normal damage when that band lands. Put
+these bands on ``artillery.LauncherAmmo`` objects passed to a launcher's
+``ammoTypes`` list, so smoke and incendiary rounds can fly differently.
 """
 
 from .mechs import Helm, Hull, Legs, MechClass, Module, WeaponLimb

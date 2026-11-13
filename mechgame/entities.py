@@ -6,6 +6,7 @@ import random
 
 from termcolor import colored
 
+from . import effects
 from .mechs import Cockpit
 from . import radar
 
@@ -125,6 +126,10 @@ class Entity: #a character on the map
             self.radarOn = False
             self.report(matchInfo, "Radar shut down: insufficient energy.")
 
+        effects.apply_turn_start_effects(matchInfo, self)
+        if self.destroyed:
+            return
+
         #get visuals
         self.getVisuals(matchInfo)
 
@@ -217,6 +222,7 @@ class Entity: #a character on the map
         self.mp = int(self.mp - 1)
         self.pos = list(targetPos)
         self.speed += 1
+        effects.apply_entry_effects(matchInfo, self)
         matchInfo.advTurn = True
 
     def _spend_radar_energy(self):
@@ -275,7 +281,7 @@ class Entity: #a character on the map
             for tile in y:
                 tile.visPower = 0
 
-        startingCell.visPower = int(self.visPower + startingCell.terrain.visAbsorb)
+        startingCell.visPower = int(self.visPower + startingCell.visualAbsorption)
 
         calcList = [] #cells queued to be calced
         dontCalcList= [startingCell] #cells exempt from calcs
@@ -290,7 +296,7 @@ class Entity: #a character on the map
         for cell in calcList:
             dontCalcList.append(cell)
             closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
-            visualLoss = int(closestNeighbor.terrain.visAbsorb) + round(math.dist(startingCell.pos,cell.pos),0)
+            visualLoss = int(closestNeighbor.visualAbsorption) + round(math.dist(startingCell.pos,cell.pos),0)
             cell.visPower = int(closestNeighbor.visPower) - visualLoss
 
             if cell.visPower < 0:

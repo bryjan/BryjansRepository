@@ -31,7 +31,8 @@ round and returns it to the player squad.
 - `mechgame/radar.py` owns active scans, terrain absorption, radar contacts,
   passive-radar warnings, and radar reports.
 - `mechgame/artillery.py` owns delayed launcher impacts, travel timing, and
-  landing scatter.
+  landing scatter, including selectable shell payloads.
+- `mechgame/effects.py` owns smoke and fire behavior on terrain cells.
 - `mechgame/entities.py` defines live mech behavior, movement, and sensing.
 - `mechgame/mechs.py` defines mech blueprints, parts, weapons, and modules.
 - `mechgame/teams.py` defines squad coordination, reports, and spawning.

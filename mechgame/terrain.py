@@ -42,6 +42,7 @@ class Cell:
         self.pos = xyPosition
         self.nList = [] #list of neighbor positions for calculations
 
+        self.effects = []
         self.onFire = 0
         self.onSmoke = 0
         self.onChaff = 0
@@ -50,6 +51,21 @@ class Cell:
         self.visualPower = 0
         self.canSee = False
         self.radarReturn = False
+
+    def refresh_effect_flags(self):
+        """Keep legacy flags synchronized with the object-based effect list."""
+        self.onFire = sum(effect.name == "fire" for effect in self.effects)
+        self.onSmoke = sum(effect.name == "smoke" for effect in self.effects)
+
+    @property
+    def visualAbsorption(self):
+        """Return terrain absorption plus active smoke and similar effects."""
+        return self.terrain.visAbsorb + sum(effect.visual_absorption for effect in self.effects)
+
+    @property
+    def radarAbsorption(self):
+        """Return terrain radar loss plus active smoke and similar effects."""
+        return self.terrain.radarAbsorb + sum(effect.radar_absorption for effect in self.effects)
         
     def refNeighbors(self,map): #gets a list of neighbor cells to refernce for calculations
         """Populate adjacent-cell references once the full map grid exists."""
@@ -118,6 +134,10 @@ class Cell:
             if entity.pos == self.pos:
                 entity.displayObject(active=entity is matchInfo.pov)
                 return
+        if self.effects:
+            effect = self.effects[-1]
+            print(colored(effect.symbol, effect.color), end=" ")
+            return
         else:
             self.terrain.displayTerrain()
             return

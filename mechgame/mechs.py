@@ -311,11 +311,12 @@ class Helm(MechPart):
 class WeaponLimb(MechPart):
     """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats.
 
-    A launcher supplies three range-band arrays through ``launcherRanges``:
+    A launcher draws its profiles from selectable ammunition. Each ammunition
+    type supplies three range-band arrays:
     ``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``.
-    Direct weapons leave ``launcherRanges`` as ``None`` and resolve at once.
+    Direct weapons leave ``ammoTypes`` as ``None`` and resolve at once.
     """
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0, ammoTypes = None):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.desc = desc
@@ -359,21 +360,18 @@ class WeaponLimb(MechPart):
         # Holosight is only one example of such a module.
         self.accuracyMultiplier = 1
         self.maxRange = maxRange
-        self.launcherRanges = launcherRanges
         self.blastRadius = blastRadius
         self.blastSize = blastSize
-        self.isLauncher = launcherRanges is not None
-
-        if self.isLauncher:
-            requiredBands = ("close", "medium", "far")
-            if set(self.launcherRanges) != set(requiredBands):
-                raise ValueError("Launcher ranges must contain close, medium, and far bands.")
-            for band in requiredBands:
-                values = self.launcherRanges[band]
-                if len(values) not in (3, 4):
-                    raise ValueError(f"Launcher {band} band needs 3 or 4 values.")
-                if values[0] <= 0 or values[1] < 0 or values[2] < 1:
-                    raise ValueError(f"Launcher {band} needs positive range/turns and nonnegative scatter.")
+        self.ammoTypes = copy.deepcopy(ammoTypes) if ammoTypes else []
+        # Accept the previous launcher argument while normalizing it into one
+        # selectable standard shell. New content should pass ``ammoTypes``.
+        if launcherRanges is not None and not self.ammoTypes:
+            self.ammoTypes.append(artillery.LauncherAmmo(
+                "Standard Shell", launcherRanges, charges=charges,
+                blastRadius=blastRadius, blastSize=blastSize,
+            ))
+        self.selectedAmmoIndex = 0
+        self.isLauncher = bool(self.ammoTypes)
 
     def updateWeaponStats(self):
         self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
@@ -429,7 +427,7 @@ class WeaponLimb(MechPart):
 
         accuracyRequired = 0
         for n in path:
-            accuracyRequired += n.terrain.visAbsorb
+            accuracyRequired += n.visualAbsorption
 
         target = next((entity for entity in matchInfo.entities if entity.pos == pos), None)
 
@@ -454,13 +452,14 @@ class WeaponLimb(MechPart):
 
     def launchAt(self, matchInfo, targetPosition):
         """Fire a delayed shell that scatters and resolves on a future turn."""
-        if self.charges is not None and self.charges < 1:
+        ammo = self.selected_ammo
+        if ammo.charges is not None and ammo.charges < 1:
             print("Out of ammo!")
             return
         distance = math.dist(matchInfo.pov.pos, targetPosition)
         profile = self.launcher_profile(distance)
         if profile is None:
-            farRange = self.launcherRanges["far"][0]
+            farRange = ammo.rangeBands["far"][0]
             print(f"Target is beyond this launcher's {farRange}-tile far range.")
             return
         if matchInfo.pov.ap < self.apCost:
@@ -470,8 +469,8 @@ class WeaponLimb(MechPart):
             print("Not enough energy to fire!")
             return
 
-        if self.charges is not None:
-            self.charges -= 1
+        if ammo.charges is not None:
+            ammo.charges -= 1
         matchInfo.pov.ap -= self.apCost
         matchInfo.pov.energy -= self.energyCost
         matchInfo.pov.lastFiredAt = list(targetPosition)
@@ -484,10 +483,13 @@ class WeaponLimb(MechPart):
             matchInfo,
             impactPosition,
             profile["turns"],
-            self.blastRadius,
-            self.blastSize,
-            max(0, self.dmg - profile["damage_falloff"]),
-            self.name,
+            ammo.blastRadius,
+            ammo.blastSize,
+            max(0, self.dmg + ammo.damageModifier - profile["damage_falloff"]),
+            f"{self.name} {ammo.name}",
+            ammo.payload,
+            ammo.effectRadius,
+            ammo.effectTurns,
         )
         print(f"{self.name} fired on its {profile['name']} profile. Impact expected in {profile['turns']} turn(s).")
         matchInfo.advTurn = True
@@ -496,19 +498,18 @@ class WeaponLimb(MechPart):
         """Return the first range band able to reach ``distance``, if any."""
         if not self.isLauncher:
             return None
-        for name in ("close", "medium", "far"):
-            values = self.launcherRanges[name]
-            maxRange, inaccuracy, turns = values[:3]
-            damageFalloff = values[3] if len(values) == 4 else 0
-            if distance <= maxRange:
-                return {
-                    "name": name,
-                    "max_range": maxRange,
-                    "inaccuracy": inaccuracy,
-                    "turns": turns,
-                    "damage_falloff": damageFalloff,
-                }
-        return None
+        return self.selected_ammo.profile(distance)
+
+    @property
+    def selected_ammo(self):
+        """Return the ammunition currently loaded in this launcher."""
+        return self.ammoTypes[self.selectedAmmoIndex]
+
+    def select_ammo(self, index):
+        """Load one available ammunition type by its zero-based menu index."""
+        if not 0 <= index < len(self.ammoTypes):
+            raise ValueError("Ammo index is not available on this launcher.")
+        self.selectedAmmoIndex = index
 
     def _hit_chance(self, shooter, target, effectiveAccuracy, accuracyRequired):
         """Return the per-projectile hit chance after terrain and size effects."""

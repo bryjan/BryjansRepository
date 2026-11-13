@@ -126,9 +126,9 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         defaultPosition = detail["position"]
         print(f"Launcher target: {detail['classification']} at {defaultPosition}")
         printLauncherProfile(mech, launcher, defaultPosition)
-        prompt = "Launch: 'Enter' or 'f' default | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        prompt = "Launch: 'Enter' or 'f' default | 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
     else:
-        prompt = "Launch: 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        prompt = "Launch: 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
 
     print(prompt)
     choice = input("Launch: ").strip().lower()
@@ -150,6 +150,10 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         if basePosition is None:
             return
         position = getLauncherLeadOffset(matchInfo, basePosition)
+    elif choice == "a":
+        if chooseLauncherAmmo(launcher):
+            return launcherFireMenu(matchInfo, launcher, target)
+        return
     elif choice == "w":
         return gunMenu(matchInfo)
     elif choice in ("", "f", "x"):
@@ -170,16 +174,32 @@ def printLauncherProfile(mech, launcher, position):
     distance = math.dist(mech.pos, position)
     profile = launcher.launcher_profile(distance)
     if profile is None:
-        print(f"Out of range: far profile reaches {launcher.launcherRanges['far'][0]} tiles.")
+        print(f"Out of range: far profile reaches {launcher.selected_ammo.rangeBands['far'][0]} tiles.")
         return None
 
-    damage = max(0, launcher.dmg - profile["damage_falloff"])
+    ammo = launcher.selected_ammo
+    damage = max(0, launcher.dmg + ammo.damageModifier - profile["damage_falloff"])
+    charges = "unlimited" if ammo.charges is None else f"{ammo.charges}/{ammo.maxCharges}"
     print(
-        f"{profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
+        f"{ammo.name} ({ammo.payload}) | {profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
         f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} turn(s) | "
-        f"damage {damage}"
+        f"damage {damage} | rounds {charges}"
     )
     return profile
+
+
+def chooseLauncherAmmo(launcher):
+    """Select which projectile type supplies this launcher's range profile."""
+    for index, ammo in enumerate(launcher.ammoTypes, start=1):
+        charges = "unlimited" if ammo.charges is None else f"{ammo.charges}/{ammo.maxCharges}"
+        loaded = " (loaded)" if index - 1 == launcher.selectedAmmoIndex else ""
+        print(f"'{index}' {ammo.name} — {ammo.payload}, rounds {charges}{loaded}")
+    selection = input("Ammo: ").strip()
+    if not selection.isdigit() or not 1 <= int(selection) <= len(launcher.ammoTypes):
+        print("Choose a listed ammunition number.")
+        return False
+    launcher.select_ammo(int(selection) - 1)
+    return True
 
 
 def getLauncherLeadOffset(matchInfo, basePosition):

@@ -121,7 +121,7 @@ def project_scan(source, match_info):
         cell.radarReturn = True
 
         for neighbor in cell.nList:
-            next_power = power - radar_step_loss(neighbor.terrain.radarAbsorb)
+            next_power = power - radar_step_loss(neighbor.radarAbsorption)
             neighbor_pos = tuple(neighbor.pos)
             if next_power < propagation_cutoff or next_power <= best_power.get(neighbor_pos, -1):
                 continue
