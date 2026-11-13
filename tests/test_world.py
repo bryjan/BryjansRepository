@@ -143,10 +143,13 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertEqual(beam.accuracy, 27)
 
-    def test_squad_ammo_report_excludes_unlimited_weapons(self):
+    def test_squad_ammo_report_uses_each_mechs_average_ammo_percent(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
         report = match.pov.squad.statusReport()
 
-        self.assertIn("ChainGun", report)
+        self.assertIn("Ammo readiness:", report)
+        self.assertIn("MagikP 100%", report)
+        self.assertIn("Chiki 100%", report)
+        self.assertNotIn("ChainGun", report)
         self.assertNotIn("Plasma Lance", report)

@@ -52,43 +52,28 @@ class Squad:
         )
         mostDamaged = min(self.mechList, key=lambda mech: mech.mechClass.condition)
 
-        ammoByWeapon = {}
+        # The squad panel needs a readiness signal, not a long inventory.
+        # Average every finite ammunition pool carried by each mech; unlimited
+        # energy and melee weapons deliberately do not affect this percentage.
+        ammoSummary = []
         for mech in self.mechList:
+            ammoPercentages = []
             for weapon in mech.mechClass.gunList:
-                # Launchers hold multiple independently counted shell types;
-                # report each payload rather than the launcher's empty tube.
                 if weapon.isLauncher:
                     for ammo in weapon.ammoTypes:
-                        # Unlimited ammunition never needs readiness tracking.
-                        if ammo.charges is None:
-                            continue
-                        ammunition = ammoByWeapon.setdefault(
-                            ammo.name,
-                            {"current": 0, "maximum": 0},
-                        )
-                        ammunition["current"] += ammo.charges
-                        ammunition["maximum"] += ammo.maxCharges
+                        if ammo.charges is not None and ammo.maxCharges:
+                            ammoPercentages.append(ammo.charges / ammo.maxCharges)
                     continue
-                # Energy and melee weapons with unlimited charges do not
-                # belong in an ammunition-depletion report.
-                if weapon.charges is None:
-                    continue
-                ammunition = ammoByWeapon.setdefault(
-                    weapon.name,
-                    {"current": 0, "maximum": 0},
-                )
-                ammunition["current"] += weapon.charges
-                ammunition["maximum"] += weapon.maxCharges
-
-        ammoSummary = []
-        for weaponName, ammo in ammoByWeapon.items():
-            ammoSummary.append(f"{weaponName} {ammo['current']}/{ammo['maximum']}")
-        ammunition = ", ".join(ammoSummary) if ammoSummary else "none"
+                if weapon.charges is not None and weapon.maxCharges:
+                    ammoPercentages.append(weapon.charges / weapon.maxCharges)
+            averageAmmo = round((sum(ammoPercentages) / len(ammoPercentages)) * 100) if ammoPercentages else 100
+            ammoSummary.append(f"{mech.pilot.name} {averageAmmo}%")
+        ammunition = " | ".join(ammoSummary) if ammoSummary else "none"
 
         return "\n".join([
             f"{self.name} squad status",
             f"Average integrity: {round(averageIntegrity)}% | Damaged modules: {damagedModules}/{totalModules}",
-            f"Ammunition: {ammunition}",
+            f"Ammo readiness: {ammunition}",
             f"Most damaged: {mostDamaged.pilot.name} — {mostDamaged.mechClass.name} ({round(mostDamaged.mechClass.condition)}%)",
         ])
 
