@@ -1,5 +1,4 @@
 import termcolor
-import printHUD as ph
 import textwrap
 from mechgame.coordinates import get_coordinate_input
 from mechgame.mechs import MAX_HULL_ART_HEIGHT
@@ -86,6 +85,20 @@ def _finish_panel_lines(lines, height, width):
     """Clip low-priority rows and pad the panel to match the map height."""
     lines = lines[:height]
     return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+
+
+def _add_critical_warning(matchInfo, lines, height, width):
+    """Reserve the final default-panel row for unread critical reports."""
+    if not any(critical and not read for _, critical, read in matchInfo.pov.squad.reportLog):
+        return lines
+    warning = "Critical reports!"
+    left_padding = (width - len(warning)) // 2
+    right_padding = width - len(warning) - left_padding
+    lines[-1] = (
+        f"|{' ' * left_padding}{termcolor.colored(warning, 'yellow')}"
+        f"{' ' * right_padding}|"
+    )
+    return lines
 
 
 def menu_panel_lines(title, entries, height, width=SIDE_PANEL_WIDTH):
@@ -175,8 +188,10 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     contacts = radar.tracked_contacts(observer)
     focus = radar.panel_focus(observer)
     if focus is not None:
-        return _focused_contact_panel_lines(matchInfo, contacts, focus, height, width)
-    return _own_mech_panel_lines(observer, height, width)
+        lines = _focused_contact_panel_lines(matchInfo, contacts, focus, height, width)
+    else:
+        lines = _own_mech_panel_lines(observer, height, width)
+    return _add_critical_warning(matchInfo, lines, height, width)
 
 
 def _hud_lines(matchInfo, width):
@@ -214,10 +229,6 @@ def _command_lines(width, command_text=None):
 def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):
     """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
-
-    # Critical reports remain above the console so urgent combat information
-    # is never buried by the regularly refreshed tactical display.
-    ph.criticalReports(matchInfo)
 
     # Small maps should not look empty merely because one requested dimension
     # exceeds the generated world. Each dimension stays odd so the point of

@@ -76,6 +76,14 @@ class InputTests(unittest.TestCase):
         self.assertIn("Sensors: Visual", panel)
         self.assertIn("Tracked contacts:", panel)
 
+    def test_tactical_side_panel_warns_about_unread_critical_reports(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        match.pov.squad.reportLog.append(["CRITICAL MESSAGE! Test", True, False])
+
+        lines = printView._side_panel_lines(match, height=19)
+
+        self.assertIn("Critical reports!", lines[-1])
+
     def test_status_and_reports_use_tactical_panels(self):
         match = Game(map_size=20, window_size=9).create_match()
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
