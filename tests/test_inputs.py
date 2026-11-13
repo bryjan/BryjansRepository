@@ -25,6 +25,15 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.pov.radarOn)
 
+    def test_n_switches_to_the_next_mech_in_the_squad(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        active_mech = match.pov
+
+        with patch("builtins.input", return_value="n"), patch("builtins.print"):
+            inputs.receive_input(match)
+
+        self.assertIsNot(match.pov, active_mech)
+
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
         match = Game(map_size=20, window_size=9).create_match()
         shooter = match.pov
@@ -134,7 +143,7 @@ class InputTests(unittest.TestCase):
         with patch("builtins.print") as print_mock:
             inputs.helpCommand(match)
         help_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
-        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'st'", "'sq'", "'rep'", "'o'", "'next'", "'end'", "'?'"):
+        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
             self.assertIn(command, help_output)
         self.assertFalse(match.advTurn)
 
@@ -142,5 +151,6 @@ class InputTests(unittest.TestCase):
             printView._print_tactical_footer(80)
         footer_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("'ab' Abilities", footer_output)
+        self.assertIn("'n' Next", footer_output)
         self.assertNotIn("'st' status", footer_output)
         self.assertNotIn("'o' Options", footer_output)

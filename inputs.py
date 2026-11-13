@@ -39,7 +39,7 @@ def receive_input(matchInfo):
         case "o" | "options":
             return optionsMenu(matchInfo)
         
-        case "next":
+        case "n" | "next":
             return matchInfo.nextMechinTeam()
         
         case "q" | "w" | "e" | "a" | "s" | "d" | "z" | "c":
@@ -653,7 +653,7 @@ def helpCommand(matchInfo):
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
     print("'o' or 'options' — change display options, including tactical window size.")
-    print("'next' — switch to another mech in the active squad without ending its turn.")
+    print("'n' or 'next' — switch to another mech in the active squad without ending its turn.")
     print("'end' — hand the squad turn to the next squad.")
     print("'?' — show this command reference.")
     print("Context menus always list their own available keys; use 'x' to cancel where offered.")
