@@ -3,7 +3,6 @@
 import random
 
 import inputs
-import printHUD
 import printView
 from .match import MatchInfo
 
@@ -48,7 +47,6 @@ class Game:
         match.pov.squad.roundRefresh(match)
         while True:
             match.pov.getVisuals(match)
-            printHUD.displayHUD(match)
             printView.printPOV(match, *match.pov.pos)
             inputs.receive_input(match)
             self.advance_turn_if_requested(match)

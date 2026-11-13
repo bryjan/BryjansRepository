@@ -13,11 +13,34 @@ def _print_panel_text(text, width):
 
 
 def _print_tactical_footer(width):
-    """Show the most useful options and log commands below the map frame."""
+    """Print the command row in a standalone frame for menu-only callers."""
     divider = "+" + ("-" * width) + "+"
     print(divider)
     _print_panel_text("'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'n' Next | '?' Help | 'end' End Turn", width)
     print(divider)
+
+
+def _condition_color(condition):
+    """Choose an immediately readable color for a mech's average condition."""
+    if condition <= 34:
+        return "red"
+    if condition <= 66:
+        return "yellow"
+    return "green"
+
+
+def _centered_mech_lines(condition, width):
+    """Return a tiny mech silhouette, centered and colored by condition."""
+    mech_art = (" /\\ ", "/##\\", " /\\ ")
+    color = _condition_color(condition)
+    lines = []
+    for art_line in mech_art:
+        left_padding = (width - len(art_line)) // 2
+        right_padding = width - len(art_line) - left_padding
+        lines.append(
+            f"|{' ' * left_padding}{termcolor.colored(art_line, color)}{' ' * right_padding}|"
+        )
+    return lines
 
 
 def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
@@ -32,7 +55,7 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
         for ability in mech.mechClass.hull.abilities
     ) or "None"
     entries = [
-        f"{mech.pilot.name} — {mech.mechClass.name}",
+        f"{mech.pilot.name} - {mech.mechClass.name}",
         f"Condition: {round(mech.mechClass.condition)}%",
         f"Position: {mech.pos}",
         f"AP: {mech.ap}/{mech.mechClass.apMax} | MP: {mech.mp}/{mech.mechClass.mpMax}",
@@ -41,15 +64,39 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
         f"Weapon: {default_weapon}",
         f"Abilities: {abilities}",
     ]
+    lines = _centered_mech_lines(mech.mechClass.condition, width)
+    for entry in entries:
+        lines.extend(f"|{line:<{width}}|" for line in textwrap.wrap(entry, width=width) or [""])
+    lines = lines[:height]
+    return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+
+
+def _hud_lines(matchInfo, width):
+    """Build the full-width resource and command panel beneath the tactical view."""
+    mech = matchInfo.pov
+    condition = round(mech.mechClass.condition)
+    terrain = matchInfo.map[mech.pos[1]][mech.pos[0]].terrain.name
+    entries = [
+        f"HUD | {mech.pilot.name} | Pos: {mech.pos} | {condition}% | Tile: {terrain}",
+        (
+            f"AP {mech.ap}/{mech.mechClass.apMax} | MP {mech.mp}/{mech.mechClass.mpMax} | "
+            f"EN {mech.energy}/{mech.mechClass.energyMax} +{mech.mechClass.energyGen} | "
+            f"SPD {mech.speed} | RADAR {'ON' if mech.radarOn else 'OFF'}"
+        ),
+        "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'n' Next | '?' Help | 'end' End Turn",
+    ]
     lines = []
     for entry in entries:
         lines.extend(textwrap.wrap(entry, width=width) or [""])
-    lines = lines[:height]
-    return [f"|{line:<{width}}|" for line in lines] + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+    return lines
 
 def printPOV(matchInfo, povX, povY):
     """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
+
+    # Critical reports remain above the console so urgent combat information
+    # is never buried by the regularly refreshed tactical display.
+    ph.criticalReports(matchInfo)
 
     # Small maps should not look empty merely because one requested dimension
     # exceeds the generated world. Each dimension stays odd so the point of
@@ -87,10 +134,11 @@ def printPOV(matchInfo, povX, povY):
     # Each map cell renders as a symbol plus one trailing space, so the frame
     # width scales with the configured horizontal view dimension.
     panelWidth = windowWidth * 2
-    mapDivider = "+" + ("-" * panelWidth) + "+"
-    sideDivider = "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
+    topDivider = "+" + ("-" * panelWidth) + "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
+    fullPanelWidth = panelWidth + SIDE_PANEL_WIDTH + 1
+    fullDivider = "+" + ("-" * fullPanelWidth) + "+"
     sideLines = _side_panel_lines(matchInfo, windowHeight)
-    print(f"{mapDivider} {sideDivider}")
+    print(topDivider)
     for row, sideLine in zip(mapWindow, sideLines):
         print("|", end="")
         for cell in row:
@@ -102,16 +150,18 @@ def printPOV(matchInfo, povX, povY):
                     cell.displayRadarReturn(matchInfo)
             else:
                  print(" ", end = " ")
-        print(f"| {sideLine}")
-    print(f"{mapDivider} {sideDivider}")
-    _print_tactical_footer(panelWidth)
+        print(sideLine)
+    # This shared divider closes both upper panels and opens the HUD panel.
+    print(fullDivider)
+    for line in _hud_lines(matchInfo, fullPanelWidth):
+        print(f"|{line:<{fullPanelWidth}}|")
+    print(fullDivider)
     return
     
 def lookAt(matchInfo): #TODO parse text to make input smoother
     """Prompt for a coordinate and display the tactical view around it."""
     
     coord = get_coordinate_input(matchInfo, "View coordinates")
-    ph.displayHUD(matchInfo)
     printPOV(matchInfo, coord[0], coord[1])
         
     return input("Press 'Enter' to return")

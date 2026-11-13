@@ -48,12 +48,12 @@ class InputTests(unittest.TestCase):
     def test_tactical_side_panel_summarizes_the_active_mech(self):
         match = Game(map_size=20, window_size=9).create_match()
 
-        lines = printView._side_panel_lines(match, height=9)
+        lines = printView._side_panel_lines(match, height=19)
 
-        self.assertEqual(len(lines), 9)
+        self.assertEqual(len(lines), 19)
         self.assertTrue(all(len(line) == printView.SIDE_PANEL_WIDTH + 2 for line in lines))
         panel = "\n".join(lines)
-        self.assertIn("B — Lancer Type.S Pathfinder", panel)
+        self.assertIn("B - Lancer Type.S Pathfinder", panel)
         self.assertIn("Abilities: Dash 2/2", panel)
 
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
