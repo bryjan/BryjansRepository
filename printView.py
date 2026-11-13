@@ -1,7 +1,7 @@
-import functions as f
 import termcolor
 import printHUD as ph
 import textwrap
+from mechgame.coordinates import get_coordinate_input
 
 
 def _print_panel_text(text, width):
@@ -75,7 +75,7 @@ def printPOV(matchInfo, povX, povY):
 def lookAt(matchInfo): #TODO parse text to make input smoother
     """Prompt for a coordinate and display the tactical view around it."""
     
-    coord = f.getCoordinateInput(matchInfo, "View coordinates")
+    coord = get_coordinate_input(matchInfo, "View coordinates")
     ph.displayHUD(matchInfo)
     printPOV(matchInfo, coord[0], coord[1])
         

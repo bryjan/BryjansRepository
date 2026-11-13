@@ -7,10 +7,10 @@ are gradually split into focused systems. Map construction lives in
 
 import heapq
 import math
-import functions as f
 import copy
 import random
 from termcolor import colored, cprint #print(colored(string, color as string),attrs=[bold,dark,underline,blink,reverse,concealed],end='')
+from .coordinates import nesw_direction
 from .radar import entity_detection_threshold, radar_step_loss
 
 class MatchInfo:
@@ -687,7 +687,7 @@ class Entity: #a character on the map
         map = matchInfo.map
         repCritical = False
         emittorCell = map[emittor.pos[1]][emittor.pos[0]]
-        direction = f.neswDirection(self.pos, emittorCell.pos)
+        direction = nesw_direction(self.pos, emittorCell.pos)
 
         if self.team.name == emittor.team.name:
             return
@@ -729,7 +729,7 @@ class Entity: #a character on the map
         if target.speed == 0:
             moveDirection = f", not moving"
         else:
-            moveDir = f.neswDirection(target.turnStartPos, target.pos)
+            moveDir = nesw_direction(target.turnStartPos, target.pos)
             moveDirection = f", moving {moveDir}"
 
         if radarPower >= threshold * 2:

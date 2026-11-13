@@ -52,6 +52,8 @@ class MapGenerator:
         for name, value in terrain.items():
             setattr(match, name, value)
 
+        # Grid storage is always rows first: grid[y][x]. Player-facing
+        # positions remain [x, y], so every system can use one convention.
         grid = []
         for y in range(self.height):
             row = []

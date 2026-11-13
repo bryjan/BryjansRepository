@@ -1,9 +1,7 @@
 import math
 
-import math
-
 import printView as pv
-import functions as f
+from mechgame.coordinates import get_coordinate_input
 
 
 def _read_nonempty(prompt):
@@ -206,7 +204,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
     if choice == "w":
         return "weapon"
     if choice == "c":
-        target = f.getCoordinateInput(matchInfo, "Enter coordinates to shoot at")
+        target = get_coordinate_input(matchInfo, "Enter coordinates to shoot at")
         return None if target == "x" else (target, None)
     if choice == "l":
         if mech.lastFiredAt is None:

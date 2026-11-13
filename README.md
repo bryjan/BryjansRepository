@@ -24,6 +24,8 @@ round and returns it to the player squad.
   factories, grouped by size class.
 - `mechgame/content.py` assembles the playable sensor-Lancer demo scenario.
 - `mechgame/world.py` defines terrain and generates maps.
+- `mechgame/coordinates.py` owns tactical coordinate validation and direction
+  labels. Positions are written `[x, y]`; map storage is indexed `[y][x]`.
 - `mechgame/match.py` owns match-wide state and turn calculations.
 - `mechgame/terrain.py` defines terrain and map cells.
 - `mechgame/entities.py`, `mechgame/mechs.py`, and `mechgame/teams.py` are the
@@ -31,6 +33,8 @@ round and returns it to the player squad.
 - `mechgame/combat.py` contains the shared combat implementation behind the
   focused entity, mech, and team modules.
 - `gameClasses.py` preserves the original top-level import path.
+- `functions.py` preserves older helper imports while forwarding to the
+  package module.
 - `tests/` contains automated checks for the world-generation boundary.
 
 ## Test

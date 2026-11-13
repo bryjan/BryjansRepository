@@ -163,7 +163,11 @@ class MatchInfo:
         return [slope, yIntercept]
 
     def ListInterceptingSquares(self, point1, point2):
-        """Return approximate cells crossed by a line of sight or projectile path."""
+        """Return approximate cells crossed by a line of sight or projectile path.
+
+        Positions are [x, y], while the backing map is indexed [y][x]. The
+        explicit order below keeps shot paths correct on rectangular maps.
+        """
         interceptingCells = []
         
         if point1[0] == point2[0]:

@@ -22,12 +22,16 @@ class Game:
     def create_match(self):
         match = MatchInfo(self.map_width, self.window_size, create_demo_teams(), "", self.map_height)
         match.mapInit()
+        # Spawn points are kept away from the impassable map border, but their
+        # margin scales down safely for compact custom maps.
         xMargin = min(40, max(2, self.map_width // 4))
         yMargin = min(40, max(2, self.map_height // 4))
         for team in match.teamList:
             for squad in team.squadsList:
                 if squad.playerControlled:
                     match.playerSquad = squad
+                # Match-wide queries (vision, radar, targeting) operate on
+                # this flat list; squads retain turn order and ownership.
                 match.entities.extend(squad.mechList)
                 squad.spawnSquad(
                     match.map,
