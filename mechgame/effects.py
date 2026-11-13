@@ -43,6 +43,20 @@ class SmokeEffect(TerrainEffect):
         return self.turns_remaining > 0 and random.random() >= 0.35
 
 
+class ChaffEffect(SmokeEffect):
+    """Fine debris that hides radar returns while leaving sight mostly clear.
+
+    Lancer dashes use this mechanically as chaff, even though the in-world
+    source is dirt and exhaust churned up by the rapid movement.
+    """
+
+    name = "chaff"
+    symbol = "~"
+    color = "light_grey"
+    visual_absorption = 3
+    radar_absorption = 12
+
+
 class FireEffect(TerrainEffect):
     """Burning terrain that harms mechs and reacts to the terrain beneath it."""
 
@@ -133,6 +147,11 @@ def add_effect(cell, effect):
 
 def add_smoke(cell, turns=2):
     add_effect(cell, SmokeEffect(turns))
+
+
+def add_chaff(cell, turns=2):
+    """Place a temporary radar-obscuring debris cloud on a cell."""
+    add_effect(cell, ChaffEffect(turns))
 
 
 def add_fire(cell, turns=3):

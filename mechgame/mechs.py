@@ -89,9 +89,16 @@ class DashAbility(Ability):
             if weapon.isMelee:
                 weapon.turnDamageBonus = 3
                 weapon.updateWeaponStats()
-        # The dash skips intermediate terrain; only the landing cell can
-        # trigger a persistent hazard such as fire.
+        # A high-speed Lancer throws up dirt and exhaust over every entered
+        # cell. The smoke blocks sight, while the debris acts as radar chaff.
         from . import effects
+        traversed_path = path[:path.index(landing) + 1]
+        for x, y in traversed_path:
+            cell = matchInfo.map[y][x]
+            effects.add_smoke(cell)
+            effects.add_chaff(cell)
+        # Intermediate tiles are crossed rather than occupied, so only the
+        # final landing tile can apply a persistent entry hazard such as fire.
         effects.apply_entry_effects(matchInfo, entity)
         matchInfo.advTurn = True
         print(f"{entity.pilot.name} dashes {steps_taken} tile(s); melee damage +3 this turn.")

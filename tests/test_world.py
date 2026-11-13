@@ -1,6 +1,7 @@
 import random
 import unittest
 
+from mechgame import effects
 from mechgame.match import MatchInfo
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
@@ -78,6 +79,10 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lancer.mp, 0)
         self.assertEqual(lancer.speed, 3)
         self.assertEqual(dash.charges, 1)
+        for x in (5, 6, 7):
+            trail_effects = match.map[4][x].effects
+            self.assertTrue(any(isinstance(effect, effects.SmokeEffect) for effect in trail_effects))
+            self.assertTrue(any(isinstance(effect, effects.ChaffEffect) for effect in trail_effects))
 
     def test_dash_boosts_plasma_lance_damage_until_turn_end(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()

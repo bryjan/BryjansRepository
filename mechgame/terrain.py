@@ -56,6 +56,7 @@ class Cell:
         """Keep legacy flags synchronized with the object-based effect list."""
         self.onFire = sum(effect.name == "fire" for effect in self.effects)
         self.onSmoke = sum(effect.name == "smoke" for effect in self.effects)
+        self.onChaff = sum(effect.name == "chaff" for effect in self.effects)
 
     @property
     def visualAbsorption(self):

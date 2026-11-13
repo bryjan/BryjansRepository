@@ -39,6 +39,14 @@ class ArtilleryTests(unittest.TestCase):
         self.assertEqual(impact_cell.visualAbsorption, impact_cell.terrain.visAbsorb + 12)
         self.assertEqual(impact_cell.radarAbsorption, impact_cell.terrain.radarAbsorb + 2)
 
+    def test_chaff_obscures_radar_more_than_visuals(self):
+        cell = self.match.map[10][10]
+        effects.add_chaff(cell)
+
+        self.assertEqual(cell.onChaff, 1)
+        self.assertEqual(cell.visualAbsorption, cell.terrain.visAbsorb + 3)
+        self.assertEqual(cell.radarAbsorption, cell.terrain.radarAbsorb + 12)
+
     def test_one_turn_shell_waits_through_a_complete_future_squad_turn(self):
         smoke = artillery.LauncherAmmo(
             "Test Smoke", self.bands, payload="smoke", charges=1,
