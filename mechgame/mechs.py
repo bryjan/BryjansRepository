@@ -6,7 +6,80 @@ import random
 
 from . import artillery
 
-__all__ = ["Cockpit", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "WeaponLimb"]
+__all__ = ["Ability", "Cockpit", "DashAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "WeaponLimb"]
+
+
+class Ability:
+    """A finite-use action installed on a hull rather than a weapon limb."""
+
+    requiresDirection = False
+
+    def __init__(self, name, charges, description):
+        self.name = name
+        self.maxCharges = charges
+        self.charges = charges
+        self.description = description
+
+    def short_description(self):
+        """Return one menu-ready line with the ability's remaining uses."""
+        return f"{self.name} {self.charges}/{self.maxCharges} — {self.description}"
+
+
+class DashAbility(Ability):
+    """Move a mech straight ahead while bypassing normal terrain movement costs."""
+
+    requiresDirection = True
+    DIRECTION_DELTAS = {
+        "q": (-1, 1), "w": (0, 1), "e": (1, 1), "a": (-1, 0),
+        "s": (0, -1), "d": (1, 0), "z": (-1, -1), "c": (1, -1),
+    }
+
+    def __init__(self, charges=2, distance=3):
+        super().__init__("Dash", charges, f"up to {distance} tiles straight; ignores terrain costs")
+        self.distance = distance
+
+    def use(self, matchInfo, entity, direction):
+        """Dash in one direction, stopping only for impassable terrain or map edge.
+
+        The dash crosses occupied and otherwise restrictive terrain, but it
+        cannot end in an occupied cell. It selects the furthest open cell
+        reached before an impassable tile or map edge.
+        """
+        if self.charges <= 0:
+            print(f"{self.name} has no charges remaining.")
+            return False
+        if direction not in self.DIRECTION_DELTAS:
+            print("Choose a movement direction for Dash.")
+            return False
+
+        delta_x, delta_y = self.DIRECTION_DELTAS[direction]
+        path = []
+        for step in range(1, self.distance + 1):
+            position = [entity.pos[0] + (delta_x * step), entity.pos[1] + (delta_y * step)]
+            x, y = position
+            if not (0 <= x < matchInfo.mapWidth and 0 <= y < matchInfo.mapHeight):
+                break
+            if not matchInfo.map[y][x].terrain.passable:
+                break
+            path.append(position)
+
+        occupied = {tuple(other.pos) for other in matchInfo.entities if other is not entity}
+        landing = next((position for position in reversed(path) if tuple(position) not in occupied), None)
+        if landing is None:
+            print("No open landing cell is available for Dash.")
+            return False
+
+        steps_taken = max(abs(landing[0] - entity.pos[0]), abs(landing[1] - entity.pos[1]))
+        entity.pos = landing
+        entity.speed += steps_taken
+        self.charges -= 1
+        # The dash skips intermediate terrain; only the landing cell can
+        # trigger a persistent hazard such as fire.
+        from . import effects
+        effects.apply_entry_effects(matchInfo, entity)
+        matchInfo.advTurn = True
+        print(f"{entity.pilot.name} dashes {steps_taken} tile(s).")
+        return True
 
 
 class MechClass: #a constructed mech not a npc or player
@@ -252,7 +325,7 @@ class Legs(MechPart): #subclass mechpart
 
 class Hull(MechPart):
     """Mech part that supplies power, signature, and chassis size."""
-    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = ""):
+    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = "", abilities=None):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.size = size
@@ -271,6 +344,8 @@ class Hull(MechPart):
         self.bonusEnergyGen = 0
         self.multiEnergyGen = 1
         self.energyGen = (self.baseEnergyGen * self.multiEnergyGen) + self.bonusEnergyGen
+        # Hulls own tactical abilities, so each live mech has its own charge pool.
+        self.abilities = copy.deepcopy(abilities) if abilities else []
 
     def updateHullStats(self):
         self.radarSig = int((self.baseRadarSig * self.multiRadarSig) + self.bonusRadarSig)

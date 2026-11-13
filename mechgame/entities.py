@@ -87,6 +87,15 @@ class Entity: #a character on the map
             f"Damaged modules: {damagedModules}/{totalModules}",
         ]
 
+        hullAbilities = self.mechClass.hull.abilities
+        if hullAbilities:
+            lines.append(
+                "Hull abilities: " + ", ".join(
+                    f"{ability.name} {ability.charges}/{ability.maxCharges}"
+                    for ability in hullAbilities
+                )
+            )
+
         for part in parts:
             partDamagedModules = sum(module.status < 2 for module in part.modsList)
             modules = f"modules {partDamagedModules}/{len(part.modsList)} damaged"

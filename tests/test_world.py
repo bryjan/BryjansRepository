@@ -63,6 +63,22 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lance.energyCost, 0)
         self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)
 
+    def test_lancer_hull_dash_crosses_restrictive_terrain_without_cost(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        lancer = match.pov
+        dash = lancer.mechClass.hull.abilities[0]
+        lancer.pos = [4, 4]
+        lancer.energy = 0
+        lancer.mp = 0
+        match.map[4][5].terrain = match.forest
+
+        self.assertTrue(dash.use(match, lancer, "d"))
+        self.assertEqual(lancer.pos, [7, 4])
+        self.assertEqual(lancer.energy, 0)
+        self.assertEqual(lancer.mp, 0)
+        self.assertEqual(lancer.speed, 3)
+        self.assertEqual(dash.charges, 1)
+
     def test_bastion_heavy_beam_accuracy_is_reduced(self):
         bastion = create_mech("bastion")
         beam = next(weapon for weapon in bastion.gunList if weapon.name == "Heavy Melting Beam")

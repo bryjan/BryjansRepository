@@ -51,6 +51,9 @@ def receive_input(matchInfo):
         case "p":
             return matchInfo.pov.pulseRadar(matchInfo)
 
+        case "ab" | "abilities":
+            return abilityMenu(matchInfo)
+
         case "rd":
             return radarMenu(matchInfo)
         
@@ -85,6 +88,33 @@ def radarToggle(matchInfo):
         return mech.toggleRadar(matchInfo)
     # Lightweight callers such as command tests may only supply a radar flag.
     mech.radarOn = not mech.radarOn
+
+
+def abilityMenu(matchInfo):
+    """Select and activate one of the active mech's hull-mounted abilities."""
+    mech = matchInfo.pov
+    abilities = mech.mechClass.hull.abilities
+    if not abilities:
+        print("This mech has no hull abilities.")
+        return
+
+    print("Hull abilities:")
+    for index, ability in enumerate(abilities, start=1):
+        print(f"'{index}' {ability.short_description()}")
+    choice = input("Ability ('x' to cancel): ").strip().lower()
+    if choice in ("", "x"):
+        return
+    if not choice.isdigit() or not 1 <= int(choice) <= len(abilities):
+        print("Choose a listed ability number or 'x'.")
+        return
+
+    ability = abilities[int(choice) - 1]
+    direction = None
+    if ability.requiresDirection:
+        direction = input("Dash direction ('q', 'w', 'e', 'a', 's', 'd', 'z', or 'c'; 'x' to cancel): ").strip().lower()
+        if direction == "x":
+            return
+    ability.use(matchInfo, mech, direction)
 
 def fire(matchInfo, target=None):
     """Fire the selected weapon, optionally starting from a chosen target."""
@@ -608,6 +638,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("'r' toggles continuous radar; it costs energy to start and each turn it stays on.")
     print ("'p' sends a one-turn radar pulse; it costs energy once and shuts off at turn end.")
     print ("'rd' lists radar contacts shared by your entire team; select one for details.")
+    print ("'ab' opens the active mech's hull abilities.")
     print ("'f' targets the nearest tracked enemy; use 'a' to aim or 'w' to switch weapons.")
     print ("'rep1' shows unread reports; 'rep' opens the full report log.")
     print ("'st' shows mech integrity, modules, and ammunition.")

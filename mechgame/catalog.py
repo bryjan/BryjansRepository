@@ -27,7 +27,7 @@ these bands on ``artillery.LauncherAmmo`` objects passed to a launcher's
 ``ammoTypes`` list, so smoke and incendiary rounds can fly differently.
 """
 
-from .mechs import Helm, Hull, Legs, MechClass, Module, WeaponLimb
+from .mechs import DashAbility, Helm, Hull, Legs, MechClass, Module, WeaponLimb
 from .artillery import LauncherAmmo
 
 
@@ -230,11 +230,17 @@ def _pathfinder_sensor_helm():
 
 
 def _standard_lancer_hull():
-    return Hull("Lancer Power Armor", 5, 25, [], pwrCapacity=20, pwrGen=3, radarSig=100, size=2)
+    return Hull(
+        "Lancer Power Armor", 5, 25, [], pwrCapacity=20, pwrGen=3,
+        radarSig=100, size=2, abilities=[DashAbility()],
+    )
 
 
 def _pathfinder_lancer_hull():
-    return Hull("Pathfinder Lancer Hull", 4, 22, [], pwrCapacity=20, pwrGen=3, radarSig=100, size=2)
+    return Hull(
+        "Pathfinder Lancer Hull", 4, 22, [], pwrCapacity=20, pwrGen=3,
+        radarSig=100, size=2, abilities=[DashAbility()],
+    )
 
 
 def _standard_lancer_legs():

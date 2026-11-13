@@ -60,3 +60,16 @@ class InputTests(unittest.TestCase):
 
         output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("Hit chance:", output)
+
+    def test_abilities_command_activates_the_selected_hull_ability(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        match.pov.pos = [4, 4]
+        for index, entity in enumerate(match.entities):
+            if entity is not match.pov:
+                entity.pos = [10 + index, 15]
+
+        with patch("builtins.input", side_effect=["ab", "1", "d"]), patch("builtins.print"):
+            inputs.receive_input(match)
+
+        self.assertEqual(match.pov.pos, [7, 4])
+        self.assertEqual(match.pov.mechClass.hull.abilities[0].charges, 1)
