@@ -3,18 +3,18 @@
 import textwrap
 
 
-FRAME_WIDTH = 78
+# Keep the complete frame below 80 columns so standard Windows terminals do
+# not wrap its right edge onto a second line.
+FRAME_WIDTH = 70
+CONTENT_WIDTH = FRAME_WIDTH - 2
 
 MENU_SCENE = (
-    "             .-----------------.",
-    "          .-'  .-----------.    '-.",
-    "         /    /   _     _   \\     \\",
-    "        |    |   | |___| |   |     |",
-    "        |    |   |  ___  |   |     |",
-    "        |    |   |_|   |_|   |     |",
-    "         \\    \\_____________/    /",
-    "          '._       | |       _.'",
-    "             '------|_|------'",
+    "M   M  EEEEE  CCCCC  H   H       GGGG   AAA  M   M EEEEE",
+    "MM MM  E      C      H   H      G      A   A MMM M E",
+    "M M M  EEEE   C      HHHHH      G GGG  AAAAA M M M EEEE",
+    "M   M  E      C      H   H      G   G  A   A M   M E",
+    "M   M  EEEEE  CCCCC  H   H       GGG   A   A M   M EEEEE",
+    "                         D E M O",
 )
 
 
@@ -54,10 +54,10 @@ def _print_frame(lines, output_func):
     output_func(border)
     for entry in lines:
         text, alignment = entry if isinstance(entry, tuple) else (entry, "left")
-        wrapped = textwrap.wrap(text, width=FRAME_WIDTH) or [""]
+        wrapped = textwrap.wrap(text, width=CONTENT_WIDTH) or [""]
         for line in wrapped:
-            content = line.center(FRAME_WIDTH) if alignment == "center" else line
-            output_func(f"|{content:<{FRAME_WIDTH}}|")
+            content = line.center(CONTENT_WIDTH) if alignment == "center" else line
+            output_func(f"| {content:<{CONTENT_WIDTH}} |")
     output_func(border)
 
 
