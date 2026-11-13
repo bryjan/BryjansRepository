@@ -16,19 +16,20 @@
   follow that rule.
 - Reusable mech, part, and module factories belong in `mechgame/catalog.py`.
   The scenario itself belongs in `mechgame/content.py`.
+- Combat implementation is split into `mechgame/entities.py` (live mechs and
+  sensing), `mechgame/mechs.py` (blueprints, parts, weapons, and modules), and
+  `mechgame/teams.py` (squads and teams). `mechgame/combat.py` is now a
+  compatibility import surface for older scripts.
 
 ## Suggested next work
 
 1. Add deterministic tests for rectangular maps: spawning, movement at each
    edge, coordinate targeting, and diagonal projectile paths.
-2. Split the remaining implementation in `mechgame/combat.py` into its focused
-   modules (`entities`, `mechs`, and `teams`). Those modules currently expose
-   compatibility imports while the implementation remains centralized.
-3. Replace older camel-case APIs with snake-case APIs gradually, retaining
+2. Replace older camel-case APIs with snake-case APIs gradually, retaining
    wrappers only until external scripts no longer use them.
-4. Decide the next terrain and sensor rules: passive radar, terrain signatures,
+3. Decide the next terrain and sensor rules: passive radar, terrain signatures,
    and how radar range should be communicated to players.
-5. Add a reproducible demo seed or scenario-selection menu once gameplay is
+4. Add a reproducible demo seed or scenario-selection menu once gameplay is
    stable enough to compare balance changes reliably.
 
 ## Important conventions

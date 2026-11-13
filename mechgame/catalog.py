@@ -2,6 +2,14 @@
 
 Factories return new objects every time. Match objects are mutable because
 they can take damage, so the catalog never shares an instance between callers.
+
+How to add a mech by hand:
+    1. Add any reusable module or part factory in its size-class section.
+    2. Add one short mech builder that combines those stable part IDs.
+    3. Register that builder in ``MECH_FACTORIES`` under its size class.
+
+Use catalog IDs (lowercase, with dots or underscores) for references. The
+display name, map symbol, and color are the player-facing values.
 """
 
 from .mechs import Helm, Hull, Legs, MechClass, Module, WeaponLimb
@@ -12,8 +20,11 @@ SIZE_CLASS_NAMES = {
     5: "huge", 6: "titanic",
 }
 
-# Module stat arrays always use this order: destroyed, damaged, intact.
-# Keeping that convention beside the factories makes balance values readable.
+# ---------------------------------------------------------------------------
+# Reusable modules
+# ---------------------------------------------------------------------------
+# Module stat arrays always use this order: destroyed, damaged, intact. Keep
+# each array to three entries so damage states remain easy to balance by hand.
 
 def _module_passive_radar_detector():
     return Module("Passive Radar Detector", ["passiveRadar"], 1, [[False, False, True]])
@@ -115,6 +126,12 @@ def create_module(module_id):
         raise ValueError(f"Unknown module '{module_id}'.") from error
 
 
+# ---------------------------------------------------------------------------
+# Size 2 parts — Lancer family
+# ---------------------------------------------------------------------------
+# A part factory should describe only that one part. Complete mech loadouts
+# are assembled later, which lets two designs share a named gun or sensor.
+
 def _standard_lancer_helm():
     return Helm(
         "Great Helm", 5, 30,
@@ -170,6 +187,10 @@ def _chaingun():
 def _scout_rifle():
     return WeaponLimb("Scout Rifle", 6, 24, [create_module("holosight")], damage=10, accuracy=30, soundRep=20, charges=60)
 
+
+# ---------------------------------------------------------------------------
+# Size 3 parts — Kestrel and Bastion families
+# ---------------------------------------------------------------------------
 
 def _kestrel_sensor_helm():
     return Helm(
@@ -284,6 +305,23 @@ def create_part(size, part_id):
         raise ValueError(f"Unknown size-{size} part '{part_id}'.") from error
 
 
+# ---------------------------------------------------------------------------
+# Complete mech blueprints
+# ---------------------------------------------------------------------------
+# Keep a blueprint small: it should state identity and loadout, while armor,
+# power, sensors, and weapon values live in the part factories above.
+#
+# Copy this shape for a new design:
+#
+# def _new_mech():
+#     return MechClass(
+#         "Display Name", "M", "color_name",
+#         create_part(SIZE, "hull_id"),
+#         create_part(SIZE, "helm_id"),
+#         create_part(SIZE, "legs_id"),
+#         [create_part(SIZE, "weapon_id")],
+#     )
+
 def _lancer_type_a():
     return MechClass(
         "Lancer Type.A", "p", "dark_grey",
@@ -325,6 +363,8 @@ def _bastion():
 
 
 MECH_FACTORIES = {
+    # Add a complete mech builder under its class size. ``create_mech`` then
+    # returns a fresh, damage-safe instance whenever the ID is requested.
     2: {"lancer.type_a": _lancer_type_a, "lancer.pathfinder": _lancer_pathfinder},
     3: {"bastion": _bastion, "kestrel": _kestrel},
 }
