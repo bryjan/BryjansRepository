@@ -2,6 +2,7 @@ import math
 
 import printView as pv
 from mechgame.coordinates import get_coordinate_input
+from mechgame import radar
 
 
 def _read_nonempty(prompt):
@@ -49,6 +50,9 @@ def receive_input(matchInfo):
 
         case "p":
             return matchInfo.pov.pulseRadar(matchInfo)
+
+        case "rd" | "radar":
+            return radarMenu(matchInfo)
         
         case "end":
             # This is the sole command that hands control to the next squad.
@@ -127,6 +131,38 @@ def squadMenu(matchInfo):
     if choice == "s":
         return selectControllableSquad(matchInfo)
     print("Choose 'm', 's', or 'x'.")
+
+
+def radarMenu(matchInfo):
+    """Show every friendly squad's radar contacts nearest to the active mech."""
+    observer = matchInfo.pov
+    contacts = radar.team_contacts(observer)
+    if not contacts:
+        print("No enemy radar contacts are currently shared with your team.")
+        return
+
+    print("Team radar contacts — nearest first")
+    for index, contact in enumerate(contacts, start=1):
+        detail = radar.contact_details(observer, matchInfo, contact)
+        print(
+            f"'{index}' {detail['classification']} at {detail['position']} "
+            f"| {detail['distance']:.1f} tiles"
+        )
+
+    selection = input("Select a contact for details, or 'x' to exit: ").strip().lower()
+    if selection in ("", "x"):
+        return
+    if not selection.isdigit() or not 1 <= int(selection) <= len(contacts):
+        print("Choose a listed contact number or 'x'.")
+        return
+
+    detail = radar.contact_details(observer, matchInfo, contacts[int(selection) - 1])
+    confirmation = "yes" if detail["visually_confirmed"] else "no"
+    print("Radar contact details")
+    print(f"Classification: {detail['classification']}")
+    print(f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles")
+    print(f"Movement: {detail['movement']} | Visually confirmed: {confirmation}")
+    print(f"Radar return: {detail['return_power']} / {detail['threshold']} required")
 
 
 def optionsMenu(matchInfo):
@@ -365,6 +401,7 @@ def helpCommand(matchInfo): #TODO update with all commands
     print ("Move with 'w', 'a', 's', 'd' and diagonals 'q', 'e', 'z', 'c'.")
     print ("'r' toggles continuous radar; it costs energy to start and each turn it stays on.")
     print ("'p' sends a one-turn radar pulse; it costs energy once and shuts off at turn end.")
+    print ("'rd' lists radar contacts shared by your entire team; select one for details.")
     print ("'f' targets the nearest tracked enemy; use 'a' to aim or 'w' to switch weapons.")
     print ("'rep1' shows unread reports; 'rep' opens the full report log.")
     print ("'st' shows mech integrity, modules, and ammunition.")

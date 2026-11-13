@@ -6,6 +6,7 @@ avoids circular imports between the game-domain modules.
 """
 
 import heapq
+import math
 
 from .coordinates import nesw_direction
 
@@ -191,3 +192,53 @@ def record_contact_report(source, match_info, radar_power, target):
         f"{size} sized object detected on radar!{identity} At {target.pos}{moving}.{speed}",
         critical=True,
     )
+
+
+def team_contacts(observer):
+    """Return unique team radar contacts nearest to ``observer`` first.
+
+    Squads own their contact lists because radar data is shared locally during
+    play. The radar menu combines those lists at display time so it can show
+    the player's whole team's picture without duplicating contact state.
+    """
+    contacts = {
+        contact
+        for squad in observer.team.squadsList
+        for contact in squad.radarTrackedEnemies
+        if contact.team != observer.team and not contact.destroyed
+    }
+    return sorted(contacts, key=lambda contact: math.dist(observer.pos, contact.pos))
+
+
+def contact_details(observer, match_info, target):
+    """Return player-facing detail for one radar contact without omniscience."""
+    radar_power = match_info.map[target.pos[1]][target.pos[0]].radarPower
+    threshold = entity_detection_threshold(target.radarSig)
+    directly_visible = target in observer.directlyVisibleEnemies
+    identified = directly_visible or radar_power >= threshold * 2
+    size_known = identified or radar_power >= threshold * 1.5
+
+    if identified:
+        classification = target.mechClass.name
+    elif size_known:
+        classification = f"{target.sizeStr.capitalize()}-class contact"
+    else:
+        classification = "Unclassified contact"
+
+    if identified:
+        movement = "stationary" if target.speed == 0 else (
+            f"moving {nesw_direction(target.turnStartPos, target.pos)} "
+            f"at {target.speed} tiles/turn"
+        )
+    else:
+        movement = "unresolved"
+
+    return {
+        "classification": classification,
+        "position": list(target.pos),
+        "distance": math.dist(observer.pos, target.pos),
+        "return_power": radar_power,
+        "threshold": threshold,
+        "movement": movement,
+        "visually_confirmed": directly_visible,
+    }
