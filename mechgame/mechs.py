@@ -9,6 +9,14 @@ from . import artillery
 __all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
 
+# Hull art belongs to chassis content rather than the UI so future mech
+# families can give themselves a distinct tactical silhouette. Variants can
+# be at most four characters wider and two lines taller than this baseline.
+DEFAULT_HULL_ART = (" /\\ ", "/##\\", " /\\ ")
+MAX_HULL_ART_WIDTH = max(map(len, DEFAULT_HULL_ART)) + 4
+MAX_HULL_ART_HEIGHT = len(DEFAULT_HULL_ART) + 2
+
+
 class Ability:
     """A finite-use action installed on a hull rather than a weapon limb."""
 
@@ -432,7 +440,7 @@ class Legs(MechPart): #subclass mechpart
 
 class Hull(MechPart):
     """Mech part that supplies power, signature, and chassis size."""
-    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = "", abilities=None):
+    def __init__ (self, name, armor, hp, moduleList, pwrCapacity, pwrGen, radarSig, size, desc = "", abilities=None, asciiArt=None):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.size = size
@@ -453,6 +461,16 @@ class Hull(MechPart):
         self.energyGen = (self.baseEnergyGen * self.multiEnergyGen) + self.bonusEnergyGen
         # Hulls own tactical abilities, so each live mech has its own charge pool.
         self.abilities = copy.deepcopy(abilities) if abilities else []
+        self.asciiArt = tuple(asciiArt or DEFAULT_HULL_ART)
+        if (
+            not self.asciiArt
+            or len(self.asciiArt) > MAX_HULL_ART_HEIGHT
+            or max(map(len, self.asciiArt)) > MAX_HULL_ART_WIDTH
+        ):
+            raise ValueError(
+                "Hull ASCII art must be no more than "
+                f"{MAX_HULL_ART_WIDTH} characters wide and {MAX_HULL_ART_HEIGHT} lines tall."
+            )
 
     def updateHullStats(self):
         self.radarSig = int((self.baseRadarSig * self.multiRadarSig) + self.bonusRadarSig)

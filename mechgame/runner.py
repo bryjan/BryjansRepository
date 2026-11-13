@@ -12,7 +12,7 @@ from .content import create_demo_teams
 class Game:
     """Owns match creation and the interactive loop."""
 
-    def __init__(self, map_size=100, window_size=19, rng=None, map_width=None, map_height=None):
+    def __init__(self, map_size=100, window_size=printView.MIN_TACTICAL_HEIGHT, rng=None, map_width=None, map_height=None):
         self.map_width = map_size if map_width is None else map_width
         self.map_height = map_size if map_height is None else map_height
         self.window_size = window_size

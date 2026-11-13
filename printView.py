@@ -2,8 +2,18 @@ import termcolor
 import printHUD as ph
 import textwrap
 from mechgame.coordinates import get_coordinate_input
+from mechgame.mechs import MAX_HULL_ART_HEIGHT
 
 SIDE_PANEL_WIDTH = 34
+# A damaged mortar Lancer is the tallest current detail set. Reserve space
+# for its cockpit warning and the largest allowed hull art, then round up to
+# an odd dimension so the tactical camera can stay centered.
+MAX_STATUS_DETAIL_ROWS = 13
+_minimum_side_panel_rows = MAX_HULL_ART_HEIGHT + 2 + MAX_STATUS_DETAIL_ROWS
+MIN_TACTICAL_HEIGHT = (
+    _minimum_side_panel_rows
+    if _minimum_side_panel_rows % 2 else _minimum_side_panel_rows + 1
+)
 
 
 def _print_panel_text(text, width):
@@ -29,9 +39,10 @@ def _condition_color(condition):
     return "green"
 
 
-def _centered_mech_lines(condition, width):
-    """Return a tiny mech silhouette, centered and colored by condition."""
-    mech_art = (" /\\ ", "/##\\", " /\\ ")
+def _centered_mech_lines(mech, width):
+    """Return this hull's centered silhouette, colored by average condition."""
+    mech_art = mech.mechClass.hull.asciiArt
+    condition = mech.mechClass.condition
     color = _condition_color(condition)
     lines = []
     for art_line in mech_art:
@@ -92,8 +103,7 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     # centered identity, then a right-panel-only divider before live details.
     identity = f"{mech.pilot.name} - {mech.mechClass.name}"[:width]
     lines = [
-        *_centered_mech_lines(mech.mechClass.condition, width),
-        f"|{'':<{width}}|",
+        *_centered_mech_lines(mech, width),
         f"|{identity:^{width}}|",
         "+" + ("-" * width) + "+",
     ]

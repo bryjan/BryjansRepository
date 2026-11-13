@@ -381,18 +381,19 @@ def optionsMenu(matchInfo):
         return
 
     dimension = "width" if choice == "w" else "height"
+    minimum = 5 if choice == "w" else pv.MIN_TACTICAL_HEIGHT
     while True:
-        size = input(f"Tactical {dimension} (odd whole number, at least 5; 'x' to cancel): ").strip().lower()
+        size = input(f"Tactical {dimension} (odd whole number, at least {minimum}; 'x' to cancel): ").strip().lower()
         if size == "x":
             return
-        if size.isdigit() and int(size) >= 5 and int(size) % 2 == 1:
+        if size.isdigit() and int(size) >= minimum and int(size) % 2 == 1:
             if choice == "w":
                 matchInfo.windowWidth = int(size)
             else:
                 matchInfo.windowHeight = int(size)
             print(f"Tactical {dimension} set to {size}.")
             return
-        print("Enter an odd whole number of at least 5, or 'x' to cancel.")
+        print(f"Enter an odd whole number of at least {minimum}, or 'x' to cancel.")
 
 
 def selectSquadMech(matchInfo, squad):

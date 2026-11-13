@@ -39,11 +39,11 @@ class InputTests(unittest.TestCase):
 
         with patch("builtins.input", side_effect=["w", "15"]), patch("builtins.print"):
             inputs.optionsMenu(match)
-        with patch("builtins.input", side_effect=["h", "11"]), patch("builtins.print"):
+        with patch("builtins.input", side_effect=["h", "19", "21"]), patch("builtins.print"):
             inputs.optionsMenu(match)
 
         self.assertEqual(match.windowWidth, 15)
-        self.assertEqual(match.windowHeight, 11)
+        self.assertEqual(match.windowHeight, 21)
 
     def test_tactical_side_panel_summarizes_the_active_mech(self):
         match = Game(map_size=20, window_size=9).create_match()
@@ -55,6 +55,7 @@ class InputTests(unittest.TestCase):
         self.assertEqual(len(lines), 19)
         self.assertTrue(all(len(line) == printView.SIDE_PANEL_WIDTH + 2 for line in lines))
         panel = "\n".join(lines)
+        self.assertEqual(match.pov.mechClass.hull.asciiArt, (" /\\ ", "/##\\", " /\\ "))
         self.assertIn("B - Lancer Type.S Pathfinder", panel)
         self.assertIn("Most damaged: Pathfinder Lancer", panel)
         self.assertIn("Legs (50%)", panel)
