@@ -311,11 +311,11 @@ class Helm(MechPart):
 class WeaponLimb(MechPart):
     """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats.
 
-    ``inherentInaccuracy`` is the maximum landing scatter in tiles for a
-    launcher. ``turnsPerTile`` turns a weapon into a delayed launcher; direct
-    weapons leave it as ``None`` and resolve immediately.
+    A launcher supplies three range-band arrays through ``launcherRanges``:
+    ``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``.
+    Direct weapons leave ``launcherRanges`` as ``None`` and resolve at once.
     """
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", inherentInaccuracy = 0, turnsPerTile = None, blastRadius = 0, blastSize = 0):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.desc = desc
@@ -359,11 +359,21 @@ class WeaponLimb(MechPart):
         # Holosight is only one example of such a module.
         self.accuracyMultiplier = 1
         self.maxRange = maxRange
-        self.inherentInaccuracy = inherentInaccuracy
-        self.turnsPerTile = turnsPerTile
+        self.launcherRanges = launcherRanges
         self.blastRadius = blastRadius
         self.blastSize = blastSize
-        self.isLauncher = turnsPerTile is not None
+        self.isLauncher = launcherRanges is not None
+
+        if self.isLauncher:
+            requiredBands = ("close", "medium", "far")
+            if set(self.launcherRanges) != set(requiredBands):
+                raise ValueError("Launcher ranges must contain close, medium, and far bands.")
+            for band in requiredBands:
+                values = self.launcherRanges[band]
+                if len(values) not in (3, 4):
+                    raise ValueError(f"Launcher {band} band needs 3 or 4 values.")
+                if values[0] <= 0 or values[1] < 0 or values[2] < 1:
+                    raise ValueError(f"Launcher {band} needs positive range/turns and nonnegative scatter.")
 
     def updateWeaponStats(self):
         self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
@@ -448,8 +458,10 @@ class WeaponLimb(MechPart):
             print("Out of ammo!")
             return
         distance = math.dist(matchInfo.pov.pos, targetPosition)
-        if self.maxRange is not None and distance > self.maxRange:
-            print(f"Target is beyond this launcher's {self.maxRange}-tile range.")
+        profile = self.launcher_profile(distance)
+        if profile is None:
+            farRange = self.launcherRanges["far"][0]
+            print(f"Target is beyond this launcher's {farRange}-tile far range.")
             return
         if matchInfo.pov.ap < self.apCost:
             print("Out of action points!")
@@ -465,21 +477,38 @@ class WeaponLimb(MechPart):
         matchInfo.pov.lastFiredAt = list(targetPosition)
         self.emitSound(matchInfo)
 
-        turns = artillery.turns_to_impact(distance, self.turnsPerTile)
         impactPosition = artillery.scatter_position(
-            matchInfo, targetPosition, self.inherentInaccuracy,
+            matchInfo, targetPosition, profile["inaccuracy"],
         )
         artillery.schedule_impact(
             matchInfo,
             impactPosition,
-            turns,
+            profile["turns"],
             self.blastRadius,
             self.blastSize,
-            self.dmg,
+            max(0, self.dmg - profile["damage_falloff"]),
             self.name,
         )
-        print(f"{self.name} fired. Impact expected in {turns} turn(s).")
+        print(f"{self.name} fired on its {profile['name']} profile. Impact expected in {profile['turns']} turn(s).")
         matchInfo.advTurn = True
+
+    def launcher_profile(self, distance):
+        """Return the first range band able to reach ``distance``, if any."""
+        if not self.isLauncher:
+            return None
+        for name in ("close", "medium", "far"):
+            values = self.launcherRanges[name]
+            maxRange, inaccuracy, turns = values[:3]
+            damageFalloff = values[3] if len(values) == 4 else 0
+            if distance <= maxRange:
+                return {
+                    "name": name,
+                    "max_range": maxRange,
+                    "inaccuracy": inaccuracy,
+                    "turns": turns,
+                    "damage_falloff": damageFalloff,
+                }
+        return None
 
     def _hit_chance(self, shooter, target, effectiveAccuracy, accuracyRequired):
         """Return the per-projectile hit chance after terrain and size effects."""

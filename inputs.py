@@ -2,7 +2,6 @@ import math
 
 import printView as pv
 from mechgame.coordinates import get_coordinate_input
-from mechgame import artillery
 from mechgame import radar
 
 
@@ -125,16 +124,11 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     if defaultTarget is not None:
         detail = radar.contact_details(mech, matchInfo, defaultTarget)
         defaultPosition = detail["position"]
-        turns = artillery.turns_to_impact(
-            math.dist(mech.pos, defaultPosition), launcher.turnsPerTile,
-        )
-        print(
-            f"Launcher target: {detail['classification']} at {defaultPosition} "
-            f"| impact in {turns} turn(s) | scatter up to {launcher.inherentInaccuracy} tile(s)"
-        )
-        prompt = "Launch: 'Enter' or 'f' default | 't' tracked target | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        print(f"Launcher target: {detail['classification']} at {defaultPosition}")
+        printLauncherProfile(mech, launcher, defaultPosition)
+        prompt = "Launch: 'Enter' or 'f' default | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
     else:
-        prompt = "Launch: 't' tracked target | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+        prompt = "Launch: 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
 
     print(prompt)
     choice = input("Launch: ").strip().lower()
@@ -151,6 +145,11 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         if position is None:
             print("No previous firing location.")
             return
+    elif choice == "o":
+        basePosition = defaultPosition or chooseLauncherTrackedTarget(matchInfo)
+        if basePosition is None:
+            return
+        position = getLauncherLeadOffset(matchInfo, basePosition)
     elif choice == "w":
         return gunMenu(matchInfo)
     elif choice in ("", "f", "x"):
@@ -160,7 +159,45 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         return
 
     if position is not None:
-        launcher.launchAt(matchInfo, position)
+        if printLauncherProfile(mech, launcher, position) is not None:
+            confirm = input("Press 'Enter' or 'f' to launch, or 'x' to cancel: ").strip().lower()
+            if confirm in ("", "f"):
+                launcher.launchAt(matchInfo, position)
+
+
+def printLauncherProfile(mech, launcher, position):
+    """Display the launcher band that will govern a shot at ``position``."""
+    distance = math.dist(mech.pos, position)
+    profile = launcher.launcher_profile(distance)
+    if profile is None:
+        print(f"Out of range: far profile reaches {launcher.launcherRanges['far'][0]} tiles.")
+        return None
+
+    damage = max(0, launcher.dmg - profile["damage_falloff"])
+    print(
+        f"{profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
+        f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} turn(s) | "
+        f"damage {damage}"
+    )
+    return profile
+
+
+def getLauncherLeadOffset(matchInfo, basePosition):
+    """Apply one signed X/Y lead offset to a remembered target position."""
+    while True:
+        rawOffset = input("Lead offset 'x,y' (positive X east, positive Y north; 'x' to cancel): ").strip().lower()
+        if rawOffset == "x":
+            return None
+        try:
+            xOffset, yOffset = (int(value.strip()) for value in rawOffset.split(","))
+        except ValueError:
+            print("Enter two signed whole numbers separated by one comma.")
+            continue
+
+        position = [basePosition[0] + xOffset, basePosition[1] + yOffset]
+        if 1 <= position[0] < matchInfo.mapWidth - 1 and 1 <= position[1] < matchInfo.mapHeight - 1:
+            return position
+        print("The offset must place the impact inside the map border.")
 
 
 def chooseLauncherTrackedTarget(matchInfo):

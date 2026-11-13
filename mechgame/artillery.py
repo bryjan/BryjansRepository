@@ -17,15 +17,6 @@ class ScheduledImpact:
     weapon_name: str
 
 
-def turns_to_impact(distance, turns_per_tile):
-    """Convert launcher travel rate into future squad-turn handoffs.
-
-    Launcher shells always resolve later, even at close range. A rate of 0.03
-    therefore produces a three-turn arrival time at 100 tiles.
-    """
-    return max(1, math.ceil(distance * turns_per_tile))
-
-
 def scatter_position(match_info, target, inherent_inaccuracy):
     """Return an in-bounds impact point scattered up to the weapon's tile error."""
     scatter = max(0, int(inherent_inaccuracy))
