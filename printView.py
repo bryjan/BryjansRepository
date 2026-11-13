@@ -189,15 +189,18 @@ def _hud_lines(matchInfo, width):
     return lines
 
 
-def _command_lines(width):
-    """Build the command-only panel kept beneath the tactical view."""
-    command_text = (
-        "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | "
-        "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
-    )
-    return [line.lstrip("| ") for line in textwrap.wrap(command_text, width=width)]
+def _command_lines(width, command_text=None):
+    """Build either the normal commands or the active menu's available keys."""
+    if command_text is None:
+        command_text = (
+            "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | "
+            "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
+        )
+    # Separators may land at a wrap boundary; trimming both edges prevents a
+    # separator from visually merging with the panel's actual border.
+    return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
-def printPOV(matchInfo, povX, povY):
+def printPOV(matchInfo, povX, povY, command_text=None):
     """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
 
@@ -267,7 +270,7 @@ def printPOV(matchInfo, povX, povY):
         print(sideLine)
     # This shared divider closes both upper panels and opens the command bar.
     print(fullDivider)
-    for line in _command_lines(fullPanelWidth):
+    for line in _command_lines(fullPanelWidth, command_text):
         print(f"|{line:<{fullPanelWidth}}|")
     print(fullDivider)
     return

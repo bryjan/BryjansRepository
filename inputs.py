@@ -144,12 +144,15 @@ def fire(matchInfo, target=None):
     # The radar menu can pass one exact shared contact here. Ordinary 'f'
     # input keeps the quick-fire behavior of choosing the nearest contact.
     defaultTarget = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
+    prompt = fireTargetPrompt(matchInfo, defaultTarget, gun)
     if defaultTarget is not None:
         printTargetingSummary(matchInfo, gun, defaultTarget, "Default target")
         detail = radar.contact_details(mech, matchInfo, defaultTarget)
-        pv.printPOV(matchInfo, *detail["position"])
+        pv.printPOV(matchInfo, *detail["position"], command_text=prompt)
+    else:
+        pv.printPOV(matchInfo, *mech.pos, command_text=prompt)
 
-    targetChoice = chooseFireTarget(matchInfo, defaultTarget, gun)
+    targetChoice = chooseFireTarget(matchInfo, defaultTarget, gun, promptDisplayed=True)
     if targetChoice == "weapon":
         return gunMenu(matchInfo, defaultTarget)
     if targetChoice is None:
@@ -175,7 +178,8 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     else:
         prompt = "Launch: 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
 
-    print(prompt)
+    view_position = defaultPosition if defaultPosition is not None else mech.pos
+    pv.printPOV(matchInfo, *view_position, command_text=prompt)
     choice = input("Launch: ").strip().lower()
     if choice in ("", "f") and defaultPosition is not None:
         return launcher.launchAt(matchInfo, defaultPosition)
@@ -215,6 +219,10 @@ def launcherFireMenu(matchInfo, launcher, target=None):
 
     if position is not None:
         if printLauncherProfile(mech, launcher, position) is not None:
+            pv.printPOV(
+                matchInfo, *position,
+                command_text="Launch: 'Enter' or 'f' confirm | 'x' cancel",
+            )
             confirm = input("Press 'Enter' or 'f' to launch, or 'x' to cancel: ").strip().lower()
             if confirm in ("", "f"):
                 launcher.launchAt(matchInfo, position)
@@ -437,16 +445,24 @@ def selectControllableSquad(matchInfo):
     matchInfo.advTurn = False
 
 
-def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
+def fireTargetPrompt(matchInfo, defaultTarget=None, weapon=None):
+    """Return the direct-fire choices that belong in the tactical command bar."""
+    if defaultTarget is None:
+        return "Fire target: 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
+    canAim = radar.can_aim_at_contact(matchInfo.pov, matchInfo, defaultTarget)
+    prompt = "Press 'Enter' or 'f' to fire."
+    if canAim:
+        prompt += f" 'a' aim limb ({aimingCostLabel(weapon)}) |"
+    return prompt + " 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
+
+
+def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None, promptDisplayed=False):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
         canAim = radar.can_aim_at_contact(mech, matchInfo, defaultTarget)
-        prompt = "Press 'Enter' or 'f' to fire."
-        if canAim:
-            prompt += f" 'a' aim limb ({aimingCostLabel(weapon)}) |"
-        prompt += " 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
-        print(prompt)
+        if not promptDisplayed:
+            print(fireTargetPrompt(matchInfo, defaultTarget, weapon))
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
             return radar.contact_position(mech, defaultTarget), None
@@ -457,7 +473,8 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
             print("Limb aiming requires direct visual contact or a fully identified radar return.")
             return None
     else:
-        print("Fire target: 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel")
+        if not promptDisplayed:
+            print(fireTargetPrompt(matchInfo, weapon=weapon))
         choice = _read_nonempty("Target: ").lower()
 
     if choice == "x":
@@ -488,7 +505,12 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
         return None
     # As with launchers, retain the selected contact and reopen the full
     # targeting menu so weapon switching and limb aiming stay available.
-    return chooseFireTarget(matchInfo, selectedTarget, weapon)
+    detail = radar.contact_details(mech, matchInfo, selectedTarget)
+    pv.printPOV(
+        matchInfo, *detail["position"],
+        command_text=fireTargetPrompt(matchInfo, selectedTarget, weapon),
+    )
+    return chooseFireTarget(matchInfo, selectedTarget, weapon, promptDisplayed=True)
 
 
 def chooseTrackedContact(matchInfo):

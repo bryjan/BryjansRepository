@@ -153,7 +153,9 @@ class InputTests(unittest.TestCase):
         ), patch("inputs.chooseFireTarget") as reopened_menu:
             original_menu(match, default_target, weapon)
 
-        reopened_menu.assert_called_once_with(match, selected_target, weapon)
+        reopened_menu.assert_called_once_with(
+            match, selected_target, weapon, promptDisplayed=True
+        )
 
     def test_weapon_selection_keeps_radar_selected_target(self):
         match = Game(map_size=20, window_size=9).create_match()
