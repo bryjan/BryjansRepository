@@ -68,3 +68,11 @@ class MapGeneratorTests(unittest.TestCase):
         beam = next(weapon for weapon in bastion.gunList if weapon.name == "Heavy Melting Beam")
 
         self.assertEqual(beam.accuracy, 27)
+
+    def test_squad_ammo_report_excludes_unlimited_weapons(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+
+        report = match.pov.squad.statusReport()
+
+        self.assertIn("ChainGun", report)
+        self.assertNotIn("Plasma Lance", report)

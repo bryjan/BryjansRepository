@@ -59,30 +59,30 @@ class Squad:
                 # report each payload rather than the launcher's empty tube.
                 if weapon.isLauncher:
                     for ammo in weapon.ammoTypes:
+                        # Unlimited ammunition never needs readiness tracking.
+                        if ammo.charges is None:
+                            continue
                         ammunition = ammoByWeapon.setdefault(
                             ammo.name,
-                            {"current": 0, "maximum": 0, "unlimited": False},
+                            {"current": 0, "maximum": 0},
                         )
-                        if ammo.charges is None:
-                            ammunition["unlimited"] = True
-                        else:
-                            ammunition["current"] += ammo.charges
-                            ammunition["maximum"] += ammo.maxCharges
+                        ammunition["current"] += ammo.charges
+                        ammunition["maximum"] += ammo.maxCharges
+                    continue
+                # Energy and melee weapons with unlimited charges do not
+                # belong in an ammunition-depletion report.
+                if weapon.charges is None:
                     continue
                 ammunition = ammoByWeapon.setdefault(
                     weapon.name,
-                    {"current": 0, "maximum": 0, "unlimited": False},
+                    {"current": 0, "maximum": 0},
                 )
-                if weapon.charges is None:
-                    ammunition["unlimited"] = True
-                    continue
                 ammunition["current"] += weapon.charges
                 ammunition["maximum"] += weapon.maxCharges
 
         ammoSummary = []
         for weaponName, ammo in ammoByWeapon.items():
-            amount = "unlimited" if ammo["unlimited"] else f"{ammo['current']}/{ammo['maximum']}"
-            ammoSummary.append(f"{weaponName} {amount}")
+            ammoSummary.append(f"{weaponName} {ammo['current']}/{ammo['maximum']}")
         ammunition = ", ".join(ammoSummary) if ammoSummary else "none"
 
         return "\n".join([
