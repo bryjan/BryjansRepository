@@ -1,7 +1,9 @@
 """Match-wide state and turn-independent board calculations."""
 
 import math
+import random
 
+from . import artillery
 from . import radar
 
 
@@ -20,6 +22,8 @@ class MatchInfo:
         self.entities = []
         self.abandonedMechs = []
         self.destroyedMechs = []
+        # Fired launcher shells resolve only after future squad-turn handoffs.
+        self.pendingImpacts = []
         self.matchRound = 0
         self.pov = ""
         self.mapParamsList = mapParams
@@ -42,6 +46,8 @@ class MatchInfo:
 
     def nextSquadTurn(self):
         """Advance the point of view to the first mech in the next squad."""
+        artillery.advance_impacts(self)
+
         # A pulse is active only for the squad turn in which it was ordered.
         # Clear every squad member so changing the point of view cannot let a
         # previous pilot's pulse survive into the next squad turn.
@@ -101,32 +107,20 @@ class MatchInfo:
         """Rebuild active radar only after a detectable source-state change."""
         radar.refresh(self)
 
-    def explosion(self, location, radius, size, damage): #spawns explosions. for rockets/artillery
-        """Apply area damage to entities within ``radius`` of a map position."""
-        pos = location #[x , y]
-        radius = radius #radius of explosion
-        size = size
-        dmg = damage
+    def explosion(self, location, radius, size, damage):
+        """Apply blast damage to several random parts of each mech in range."""
+        for entity in list(self.entities):
+            if math.dist(location, entity.pos) > radius:
+                continue
 
-        #calc effected entities
-        affectedEntities = []
-        for entity in self.entities:
-            if math.dist(pos, entity.pos) <= radius:
-                affectedEntities.append(entity)
+            # Larger explosions can strike more parts; large targets spread the
+            # blast across more armor, while small targets are more exposed.
+            parts_to_hit = max(1, min(len(entity.mechClass.limbList), 3 + size - entity.size))
+            armor_damage = max(0, 1 + size - entity.size)
+            for limb in random.sample(entity.mechClass.limbList, parts_to_hit):
+                limb.damage(self, damage, "explosion", armorDamage=armor_damage)
 
-        #calc affected limbs by size difference between explosion and mech
-        calcList = []
-        affectedLimbs = 3
-        for entity in affectedEntities:
-            sizeDif = size - entity.size
-            calcList.append(entity, affectedLimbs + sizeDif)
-
-        #calc dmg
-        for entry in calcList:
-            while entry[1] > 0:
-                entry[0].damage(self, dmg, "explosion", armorDamage = 1 + sizeDif)
-
-        #TODO chance to start fire
+        # TODO: explosions can later add fire, smoke, and terrain effects.
 
     def calcLine(self, point1, point2):
         """Return the slope and intercept for a line between two grid positions."""

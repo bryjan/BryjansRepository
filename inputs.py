@@ -2,6 +2,7 @@ import math
 
 import printView as pv
 from mechgame.coordinates import get_coordinate_input
+from mechgame import artillery
 from mechgame import radar
 
 
@@ -95,6 +96,9 @@ def fire(matchInfo, target=None):
     if defaultGuns < 1 or defaultGuns > 1:
         print("Select a default weapon.")
         return gunMenu(matchInfo)
+
+    if gun.isLauncher:
+        return launcherFireMenu(matchInfo, gun, target)
     
     # The radar menu can pass one exact shared contact here. Ordinary 'f'
     # input keeps the quick-fire behavior of choosing the nearest contact.
@@ -111,6 +115,71 @@ def fire(matchInfo, target=None):
         return
     targetPos, aimedLimb = targetChoice
     gun.shootAt(matchInfo, targetPos, aimedLimb)
+
+
+def launcherFireMenu(matchInfo, launcher, target=None):
+    """Choose a location for a delayed launcher shot without limb aiming."""
+    mech = matchInfo.pov
+    defaultTarget = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
+    defaultPosition = None
+    if defaultTarget is not None:
+        detail = radar.contact_details(mech, matchInfo, defaultTarget)
+        defaultPosition = detail["position"]
+        turns = artillery.turns_to_impact(
+            math.dist(mech.pos, defaultPosition), launcher.turnsPerTile,
+        )
+        print(
+            f"Launcher target: {detail['classification']} at {defaultPosition} "
+            f"| impact in {turns} turn(s) | scatter up to {launcher.inherentInaccuracy} tile(s)"
+        )
+        prompt = "Launch: 'Enter' or 'f' default | 't' tracked target | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+    else:
+        prompt = "Launch: 't' tracked target | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
+
+    print(prompt)
+    choice = input("Launch: ").strip().lower()
+    if choice in ("", "f") and defaultPosition is not None:
+        return launcher.launchAt(matchInfo, defaultPosition)
+    if choice == "t":
+        position = chooseLauncherTrackedTarget(matchInfo)
+    elif choice == "c":
+        position = get_coordinate_input(matchInfo, "Enter launch coordinates")
+        if position == "x":
+            return
+    elif choice == "l":
+        position = list(mech.lastFiredAt) if mech.lastFiredAt is not None else None
+        if position is None:
+            print("No previous firing location.")
+            return
+    elif choice == "w":
+        return gunMenu(matchInfo)
+    elif choice in ("", "f", "x"):
+        return
+    else:
+        print("Choose a listed launcher option.")
+        return
+
+    if position is not None:
+        launcher.launchAt(matchInfo, position)
+
+
+def chooseLauncherTrackedTarget(matchInfo):
+    """Select a remembered or visible contact as a launcher impact location."""
+    mech = matchInfo.pov
+    if not mech.trackedEnemies:
+        print("No enemy mechs are currently tracked.")
+        return None
+    if len(mech.trackedEnemies) == 1:
+        return radar.contact_position(mech, mech.trackedEnemies[0])
+
+    for index, enemy in enumerate(mech.trackedEnemies, start=1):
+        detail = radar.contact_details(mech, matchInfo, enemy)
+        print(f"'{index}' {detail['classification']} at {detail['position']}")
+    selection = _read_nonempty("Launch target: ")
+    if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
+        print("Choose a listed target number.")
+        return None
+    return radar.contact_position(mech, mech.trackedEnemies[int(selection) - 1])
 
 
 def nearestTrackedEnemy(matchInfo, mech):

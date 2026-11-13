@@ -4,6 +4,8 @@ import copy
 import math
 import random
 
+from . import artillery
+
 __all__ = ["Cockpit", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "WeaponLimb"]
 
 
@@ -307,8 +309,13 @@ class Helm(MechPart):
 
 
 class WeaponLimb(MechPart):
-    """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats."""
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = ""):
+    """Arm-mounted weapon with ammunition, costs, accuracy, and damage stats.
+
+    ``inherentInaccuracy`` is the maximum landing scatter in tiles for a
+    launcher. ``turnsPerTile`` turns a weapon into a delayed launcher; direct
+    weapons leave it as ``None`` and resolve immediately.
+    """
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", inherentInaccuracy = 0, turnsPerTile = None, blastRadius = 0, blastSize = 0):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.desc = desc
@@ -352,6 +359,11 @@ class WeaponLimb(MechPart):
         # Holosight is only one example of such a module.
         self.accuracyMultiplier = 1
         self.maxRange = maxRange
+        self.inherentInaccuracy = inherentInaccuracy
+        self.turnsPerTile = turnsPerTile
+        self.blastRadius = blastRadius
+        self.blastSize = blastSize
+        self.isLauncher = turnsPerTile is not None
 
     def updateWeaponStats(self):
         self.projectileCount = int((self.baseProjectileCount * self.multiProjectileCount) + self.bonusProjectileCount)
@@ -366,6 +378,9 @@ class WeaponLimb(MechPart):
 
     def shootAt(self, matchInfo, pos, aimedLimb=None):
         """Spend resources and resolve every projectile fired at a map position."""
+
+        if self.isLauncher:
+            return self.launchAt(matchInfo, pos)
 
         #check if enough resources
         if self.charges is not None and self.charges - 1 < 0:
@@ -427,6 +442,45 @@ class WeaponLimb(MechPart):
 
         matchInfo.advTurn = True
 
+    def launchAt(self, matchInfo, targetPosition):
+        """Fire a delayed shell that scatters and resolves on a future turn."""
+        if self.charges is not None and self.charges < 1:
+            print("Out of ammo!")
+            return
+        distance = math.dist(matchInfo.pov.pos, targetPosition)
+        if self.maxRange is not None and distance > self.maxRange:
+            print(f"Target is beyond this launcher's {self.maxRange}-tile range.")
+            return
+        if matchInfo.pov.ap < self.apCost:
+            print("Out of action points!")
+            return
+        if matchInfo.pov.energy < self.energyCost:
+            print("Not enough energy to fire!")
+            return
+
+        if self.charges is not None:
+            self.charges -= 1
+        matchInfo.pov.ap -= self.apCost
+        matchInfo.pov.energy -= self.energyCost
+        matchInfo.pov.lastFiredAt = list(targetPosition)
+        self.emitSound(matchInfo)
+
+        turns = artillery.turns_to_impact(distance, self.turnsPerTile)
+        impactPosition = artillery.scatter_position(
+            matchInfo, targetPosition, self.inherentInaccuracy,
+        )
+        artillery.schedule_impact(
+            matchInfo,
+            impactPosition,
+            turns,
+            self.blastRadius,
+            self.blastSize,
+            self.dmg,
+            self.name,
+        )
+        print(f"{self.name} fired. Impact expected in {turns} turn(s).")
+        matchInfo.advTurn = True
+
     def _hit_chance(self, shooter, target, effectiveAccuracy, accuracyRequired):
         """Return the per-projectile hit chance after terrain and size effects."""
         if effectiveAccuracy < accuracyRequired:
@@ -442,7 +496,8 @@ class WeaponLimb(MechPart):
     def printShortDesc(self):
 
         charges = "Unlimited" if self.charges is None else f"{self.charges}/{self.maxCharges}"
-        return f"[{self.name} | Charges:({charges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
+        weaponType = "Launcher" if self.isLauncher else "Weapon"
+        return f"[{weaponType}: {self.name} | Charges:({charges}) AP Cost:{self.apCost} Energy Cost:{self.energyCost}]"
 
 
 #clean up module system and make it work (not updating)
