@@ -3,7 +3,6 @@ import math
 import printView as pv
 from mechgame.coordinates import get_coordinate_input
 from mechgame import radar
-from mechgame.content import demo_roster_summary
 
 
 def _read_nonempty(prompt):
@@ -815,20 +814,5 @@ def helpCommand(matchInfo):
     print("'?' — show this command reference.")
     print("Context menus always list their own available keys; use 'x' to cancel where offered.")
 
-    # Lightweight command tests do not build a full match.  The playable demo
-    # always has teamList, so players still receive the complete briefing.
-    if hasattr(matchInfo, "teamList"):
-        for line in demo_roster_summary(matchInfo):
-            print(line)
-
-        print("")
-        print("Movement and destruction:")
-        print("Each move spends 1 AP, 1 MP, and the destination tile's energy cost.")
-        print("Roads cost 0 energy and plains cost 1. Desert costs Lancers 3 / size-3 mechs 2.")
-        print("Forest costs Lancers 2 / size-3 mechs 4; suburbs cost Lancers 1 / size-3 mechs 5.")
-        print("A move cannot enter an occupied, impassable, or off-map tile, and stops when AP, MP, or energy runs out.")
-        print("Energy returns at the start of a mech's turn, up to its reserve limit.")
-        print("A cockpit hit injures the pilot and raises a critical report; a destroyed cockpit removes that mech from its squad and the match.")
-        print("Other damaged limbs and modules reduce armor, weapons, movement, sensors, or abilities without immediately destroying the mech.")
     matchInfo.advTurn = False
 
