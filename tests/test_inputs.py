@@ -128,7 +128,10 @@ class InputTests(unittest.TestCase):
 
     def test_launcher_target_selection_reopens_the_launcher_menu(self):
         match = Game(map_size=20, window_size=9).create_match()
-        launcher_mech = match.teamList[0].squadsList[0].mechList[3]
+        launcher_mech = next(
+            mech for mech in match.teamList[0].squadsList[0].mechList
+            if mech.pilot.name == "Chiki"
+        )
         launcher = launcher_mech.mechClass.gunList[0]
         selected_target = match.teamList[1].squadsList[0].mechList[0]
         match.pov = launcher_mech
@@ -143,7 +146,10 @@ class InputTests(unittest.TestCase):
 
     def test_launcher_auto_lead_projects_visual_contact_by_flight_time(self):
         match = Game(map_size=30, window_size=9).create_match()
-        launcher_mech = match.teamList[0].squadsList[0].mechList[3]
+        launcher_mech = next(
+            mech for mech in match.teamList[0].squadsList[0].mechList
+            if mech.pilot.name == "Chiki"
+        )
         launcher = launcher_mech.mechClass.gunList[0]
         target = match.teamList[1].squadsList[0].mechList[0]
         match.pov = launcher_mech
@@ -186,7 +192,10 @@ class InputTests(unittest.TestCase):
 
     def test_non_explosive_launcher_ammo_hides_damage_in_its_profile(self):
         match = Game(map_size=20, window_size=9).create_match()
-        mortar = match.teamList[0].squadsList[0].mechList[3]
+        mortar = next(
+            mech for mech in match.teamList[0].squadsList[0].mechList
+            if mech.pilot.name == "Chiki"
+        )
         launcher = mortar.mechClass.gunList[0]
         launcher.select_ammo(1)  # Smoke is the second catalogued mortar shell.
 

@@ -27,13 +27,14 @@ class MapGeneratorTests(unittest.TestCase):
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
-        self.assertEqual(len(match.entities), 7)
+        self.assertEqual(len(match.entities), 8)
         self.assertEqual(match.pov.pilot.name, "B")
 
         self.assertEqual(
             [mech.mechClass.name for mech in match.teamList[0].squadsList[0].mechList],
             [
                 "Lancer Type.S Pathfinder",
+                "Lancer Type.A",
                 "Lancer Type.A",
                 "Lancer Type.A",
                 "Lancer Type.M Mortar",
@@ -50,6 +51,7 @@ class MapGeneratorTests(unittest.TestCase):
         roster = match.pov.squad.rosterReport()
 
         self.assertIn("B — Lancer Type.S Pathfinder", roster)
+        self.assertIn("115um6uy15 — Lancer Type.A", roster)
         self.assertIn("at [", roster)
 
     def test_standard_lancer_has_short_range_plasma_lance(self):
