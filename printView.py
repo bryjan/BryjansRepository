@@ -104,7 +104,7 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
 
 
 def _hud_lines(matchInfo, width):
-    """Build the full-width resource and command panel beneath the tactical view."""
+    """Build the stable, full-width resource HUD shown above the tactical view."""
     mech = matchInfo.pov
     condition = round(mech.mechClass.condition)
     terrain = matchInfo.map[mech.pos[1]][mech.pos[0]].terrain.name
@@ -115,7 +115,6 @@ def _hud_lines(matchInfo, width):
             f"EN {mech.energy}/{mech.mechClass.energyMax} +{mech.mechClass.energyGen} | "
             f"SPD {mech.speed} | RADAR {'ON' if mech.radarOn else 'OFF'}"
         ),
-        "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | 'n' Next | '?' Help | 'end' End Turn",
     ]
     lines = []
     for entry in entries:
@@ -123,6 +122,15 @@ def _hud_lines(matchInfo, width):
         # ``|`` and look like a second left-hand border.
         lines.extend(line.lstrip("| ") for line in textwrap.wrap(entry, width=width) or [""])
     return lines
+
+
+def _command_lines(width):
+    """Build the command-only panel kept beneath the tactical view."""
+    command_text = (
+        "Commands | 'f' Fire | 'rd' Radar | 'ab' Abilities | 'sq' Squad | "
+        "'n' Next | '?' Help | 'end' End Turn"
+    )
+    return [line.lstrip("| ") for line in textwrap.wrap(command_text, width=width)]
 
 def printPOV(matchInfo, povX, povY):
     """Render a rectangular tactical window centered on the supplied map position."""
@@ -172,6 +180,12 @@ def printPOV(matchInfo, povX, povY):
     fullPanelWidth = panelWidth + SIDE_PANEL_WIDTH + 1
     fullDivider = "+" + ("-" * fullPanelWidth) + "+"
     sideLines = _side_panel_lines(matchInfo, windowHeight)
+    # The HUD remains in one dependable place above the map, independent of
+    # how much detail the active mech panel can fit at this window height.
+    print(fullDivider)
+    for line in _hud_lines(matchInfo, fullPanelWidth):
+        print(f"|{line:<{fullPanelWidth}}|")
+    print(fullDivider)
     print(topDivider)
     for row, sideLine in zip(mapWindow, sideLines):
         print("|", end="")
@@ -185,9 +199,9 @@ def printPOV(matchInfo, povX, povY):
             else:
                  print(" ", end = " ")
         print(sideLine)
-    # This shared divider closes both upper panels and opens the HUD panel.
+    # This shared divider closes both upper panels and opens the command bar.
     print(fullDivider)
-    for line in _hud_lines(matchInfo, fullPanelWidth):
+    for line in _command_lines(fullPanelWidth):
         print(f"|{line:<{fullPanelWidth}}|")
     print(fullDivider)
     return
