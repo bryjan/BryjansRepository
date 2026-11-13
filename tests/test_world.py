@@ -27,3 +27,11 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertEqual(len(match.entities), 6)
         self.assertEqual(match.pov.pilot.name, "B")
+
+    def test_squad_roster_lists_pilots_mechs_and_positions(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+
+        roster = match.pov.squad.rosterReport()
+
+        self.assertIn("B — Lancer Type.S Pathfinder", roster)
+        self.assertIn("at [", roster)

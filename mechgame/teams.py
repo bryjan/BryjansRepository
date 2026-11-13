@@ -92,6 +92,18 @@ class Squad:
             f"Most damaged: {mostDamaged.pilot.name} — {mostDamaged.mechClass.name} ({round(mostDamaged.mechClass.condition)}%)",
         ])
 
+    def rosterReport(self):
+        """Return the current pilot, chassis, and map location for each mech."""
+        if not self.mechList:
+            return "Squad roster: no operational mechs."
+
+        entries = ["Squad roster:"]
+        for index, mech in enumerate(self.mechList, start=1):
+            entries.append(
+                f"'{index}' {mech.pilot.name} — {mech.mechClass.name} at {mech.pos}"
+            )
+        return "\n".join(entries)
+
     def squadView(self, matchInfo):
         for entity in self.mechList:
             entity.getVisuals(matchInfo)

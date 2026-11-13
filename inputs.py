@@ -259,9 +259,10 @@ def nearestTrackedEnemy(matchInfo, mech):
 
 
 def squadMenu(matchInfo):
-    """Show squad readiness, then offer player-facing squad controls."""
+    """Show squad readiness and roster before player-facing squad controls."""
     squad = matchInfo.pov.squad
     print(squad.statusReport())
+    print(squad.rosterReport())
     print("Squad options: 'm' switch mech | 's' switch controllable squad | 'x' exit")
     choice = input("Squad: ").strip().lower()
 
