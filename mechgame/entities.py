@@ -1,15 +1,13 @@
 """Live mech entities, pilots, sensing, movement, and reporting."""
 
 import copy
-import heapq
 import math
 import random
 
 from termcolor import colored
 
-from .coordinates import nesw_direction
 from .mechs import Cockpit
-from .radar import entity_detection_threshold, radar_step_loss
+from . import radar
 
 __all__ = ["Entity", "Pilot"]
 
@@ -312,136 +310,12 @@ class Entity: #a character on the map
             if entity.team != self.team
             and matchInfo.map[entity.pos[1]][entity.pos[0]] in self.visibleCells
         ]
-        self._refresh_tracked_enemies()
-
-    def _refresh_tracked_enemies(self):
-        """Combine this mech's own vision with contacts shared by its squad."""
-        radarContacts = getattr(self.squad, "radarTrackedEnemies", [])
-        self.trackedEnemies = list(dict.fromkeys([*self.directlyVisibleEnemies, *radarContacts]))
-
-    def getRadar(self, matchInfo):
-        """Refresh shared active-radar coverage when a source state changed."""
-        matchInfo.refreshRadar()
-
-    def _projectRadar(self, matchInfo):
-        """Project one source through terrain using the strongest available path."""
-        map = matchInfo.map
-        startingCell = map[self.pos[1]][self.pos[0]]
-        sourcePower = int(self.mechClass.radarPower / (1 + (self.speed * .25)))
-        if sourcePower <= 0:
-            return
-
-        # Radar below this strength cannot create a passive-radar warning or
-        # any current terrain/entity contact, so there is no reason to expand.
-        propagationCutoff = 25
-        bestPower = {tuple(startingCell.pos): sourcePower}
-        frontier = [(-sourcePower, 0, startingCell)]
-        sequence = 1
-        self.radarPower = sourcePower
-        self.radarIDlist = [startingCell]
-
-        while frontier:
-            negativePower, _, cell = heapq.heappop(frontier)
-            power = -negativePower
-            if power != bestPower.get(tuple(cell.pos)):
-                continue
-
-            cell.radarPower = max(cell.radarPower, power)
-            cell.radarReturn = True
-
-            for neighbor in cell.nList:
-                nextPower = power - radar_step_loss(neighbor.terrain.radarAbsorb)
-                neighborPos = tuple(neighbor.pos)
-                if nextPower < propagationCutoff or nextPower <= bestPower.get(neighborPos, -1):
-                    continue
-                bestPower[neighborPos] = nextPower
-                heapq.heappush(frontier, (-nextPower, sequence, neighbor))
-                sequence += 1
-
-        radarContacts = []
-        for obj in matchInfo.entities: #passive radar and radar ID reports
-            contactPower = bestPower.get(tuple(obj.pos), 0)
-            if obj.mechClass.passiveRadar == True and contactPower >= propagationCutoff:
-                if obj.team != self.team:
-                    obj.passiveRadarDetect(matchInfo, self)
-            if contactPower >= entity_detection_threshold(obj.radarSig):
-                if obj.team != self.team:
-                    radarContacts.append(obj)
-                    self.radarReport(matchInfo, contactPower, obj)
-
-        # Radar contacts belong to the squad, not only the mech that emitted
-        # the scan. Preserve contacts from other active friendly radars too.
-        for contact in radarContacts:
-            if contact not in self.squad.radarTrackedEnemies:
-                self.squad.radarTrackedEnemies.append(contact)
-
-    def passiveRadarDetect(self, matchInfo, emittor):
-        """Try to detect an emitting entity using this mech's passive radar."""
-        map = matchInfo.map
-        repCritical = False
-        emittorCell = map[emittor.pos[1]][emittor.pos[0]]
-        direction = nesw_direction(self.pos, emittorCell.pos)
-
-        if self.team.name == emittor.team.name:
-            return
-        if map[self.pos[1]][self.pos[0]].radarPower < 50:
-            return
-        if self.mechClass.passiveRadar == False:
-            return
-        # ``self`` is the detecting mech.  Referring to ``self.entity`` here
-        # crashed as soon as active radar reached a passive detector.
-        if self.speed > 1:
-            return
-
-        strength = map[self.pos[1]][self.pos[0]].radarPower
-
-        threshold = entity_detection_threshold(self.radarSig)
-        if strength >= threshold * 2:
-            status = "identified"
-            repCritical = True
-        elif strength >= threshold:
-            status = "noticable"
-            repCritical = True
-        else:
-            status = "undetected"
-
-        return self.report(matchInfo,"Getting pinged from the " + direction + ". At " + str(strength) + " strength, I'm " + status + ".", critical = repCritical)
-
-    def radarReport(self, matchInfo, radarPower, target):
-        """Record an imprecise radar contact for the target's squad."""
-
-        threshold = entity_detection_threshold(target.radarSig)
-        if radarPower < threshold:
-            return
-
-        targetName = f""
-        speed = f""
-        moveDirection = f""
-        size = "Unkown"
-
-        if target.speed == 0:
-            moveDirection = f", not moving"
-        else:
-            moveDir = nesw_direction(target.turnStartPos, target.pos)
-            moveDirection = f", moving {moveDir}"
-
-        if radarPower >= threshold * 2:
-            targetName = f" Identified as {target.mechClass.name},"
-            speed = f" Moving at {target.speed} units a turn."
-
-        if radarPower >= threshold * 1.5:
-            size = target.sizeStr.capitalize()
-            if target.speed == 0:
-                moveDirection = f", not moving"
-
-        message = f"{size} sized object detected on radar!{targetName} At {target.pos}{moveDirection}.{speed}" #constructing message
-
-        self.report(matchInfo, message, critical = True)
+        radar.refresh_tracked_enemies(self)
 
     def getVisuals(self, matchInfo):
         """Update both visual and radar information for the current entity."""
         self.getVis(matchInfo)
-        self.getRadar(matchInfo)
+        radar.refresh(matchInfo)
 
 
     def report(self, matchInfo, message, teamReport = False, critical = False): #TODO add messages to a report log

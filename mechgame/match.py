@@ -2,6 +2,8 @@
 
 import math
 
+from . import radar
+
 
 class MatchInfo:
     """Mutable state shared by one running match."""
@@ -89,43 +91,11 @@ class MatchInfo:
 
     def clearRadar(self, invalidate=True):
         """Clear radar returns without disturbing ordinary line of sight."""
-        for y in self.map:
-            for x in y:
-                x.radarReturn = False
-                x.radarPower = 0
-        if invalidate:
-            self._radarSourceState = None
+        radar.clear_returns(self, invalidate)
 
     def refreshRadar(self):
         """Rebuild active radar only after a detectable source-state change."""
-        sources = [
-            entity
-            for entity in self.entities
-            if entity.radarOn and entity.mechClass.radarPower > 0
-        ]
-        sourceState = tuple(
-            (
-                id(entity),
-                tuple(entity.pos),
-                entity.speed,
-                entity.mechClass.radarPower,
-            )
-            for entity in sources
-        )
-        if sourceState == self._radarSourceState:
-            return
-
-        # Rebuilding combines all active sources, retaining the strongest
-        # return at each cell instead of leaving stale coverage behind.
-        self.clearRadar(invalidate=False)
-        for team in self.teamList:
-            for squad in team.squadsList:
-                squad.radarTrackedEnemies = []
-        for source in sources:
-            source._projectRadar(self)
-        for entity in self.entities:
-            entity._refresh_tracked_enemies()
-        self._radarSourceState = sourceState
+        radar.refresh(self)
 
     def explosion(self, location, radius, size, damage): #spawns explosions. for rockets/artillery
         """Apply area damage to entities within ``radius`` of a map position."""
