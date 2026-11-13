@@ -1,1 +1,0 @@
-#TODO make a primitive save and load system. save stats, resources and mechs owned

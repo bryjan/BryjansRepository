@@ -5,26 +5,6 @@ from .entities import Entity, Pilot
 from .teams import Squad, Team
 
 
-def create_lancer_class():
-    """Compatibility alias for the standard Lancer catalog entry."""
-    return create_mech("lancer.type_a")
-
-
-def create_sensor_lancer_class():
-    """Compatibility alias for the Pathfinder catalog entry."""
-    return create_mech("lancer.pathfinder")
-
-
-def create_kestrel_class():
-    """Compatibility alias for the Kestrel catalog entry."""
-    return create_mech("kestrel")
-
-
-def create_bastion_class():
-    """Compatibility alias for the Bastion catalog entry."""
-    return create_mech("bastion")
-
-
 def create_demo_teams():
     """Create a playable sensor-Lancer test match."""
     player_mechs = [

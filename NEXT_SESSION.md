@@ -18,8 +18,7 @@
   The scenario itself belongs in `mechgame/content.py`.
 - Combat implementation is split into `mechgame/entities.py` (live mechs and
   sensing), `mechgame/mechs.py` (blueprints, parts, weapons, and modules), and
-  `mechgame/teams.py` (squads and teams). `mechgame/combat.py` is now a
-  compatibility import surface for older scripts.
+  `mechgame/teams.py` (squads and teams).
 
 ## Suggested next work
 

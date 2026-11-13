@@ -28,13 +28,9 @@ round and returns it to the player squad.
   labels. Positions are written `[x, y]`; map storage is indexed `[y][x]`.
 - `mechgame/match.py` owns match-wide state and turn calculations.
 - `mechgame/terrain.py` defines terrain and map cells.
-- `mechgame/entities.py`, `mechgame/mechs.py`, and `mechgame/teams.py` are the
-  focused import points for units, parts, and group coordination.
-- `mechgame/combat.py` contains the shared combat implementation behind the
-  focused entity, mech, and team modules.
-- `gameClasses.py` preserves the original top-level import path.
-- `functions.py` preserves older helper imports while forwarding to the
-  package module.
+- `mechgame/entities.py` defines live mech behavior, movement, and sensing.
+- `mechgame/mechs.py` defines mech blueprints, parts, weapons, and modules.
+- `mechgame/teams.py` defines squad coordination, reports, and spawning.
 - `tests/` contains automated checks for the world-generation boundary.
 
 ## Test
