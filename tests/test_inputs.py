@@ -25,6 +25,20 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.pov.radarOn)
 
+    def test_help_includes_the_demo_briefing_and_core_rules(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.print") as print_mock:
+            inputs.helpCommand(match)
+
+        output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("Demo roster and tactical briefing:", output)
+        self.assertIn("B — Lancer Type.S Pathfinder: Scout Rifle", output)
+        self.assertIn("Chiki — Lancer Type.M Mortar: Lancer Mortar", output)
+        self.assertIn("Blastra — Bastion: Heavy Melting Beam", output)
+        self.assertIn("Movement and destruction:", output)
+        self.assertIn("a destroyed cockpit removes that mech", output)
+
     def test_look_can_cancel_without_rendering_a_view(self):
         match = Game(map_size=20, window_size=9).create_match()
 
