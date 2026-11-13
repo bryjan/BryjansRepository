@@ -26,8 +26,22 @@ class MapGeneratorTests(unittest.TestCase):
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
-        self.assertEqual(len(match.entities), 6)
+        self.assertEqual(len(match.entities), 7)
         self.assertEqual(match.pov.pilot.name, "B")
+
+        self.assertEqual(
+            [mech.mechClass.name for mech in match.teamList[0].squadsList[0].mechList],
+            [
+                "Lancer Type.S Pathfinder",
+                "Lancer Type.A",
+                "Lancer Type.A",
+                "Lancer Type.M Mortar",
+            ],
+        )
+        self.assertEqual(
+            [mech.mechClass.name for mech in match.teamList[1].squadsList[0].mechList],
+            ["Bastion", "Kestrel", "Bastion"],
+        )
 
     def test_squad_roster_lists_pilots_mechs_and_positions(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
@@ -43,8 +57,14 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertTrue(lance.isMelee)
         self.assertEqual(lance.maxRange, 1.5)
-        self.assertEqual(lance.accuracy, 24)
+        self.assertEqual(lance.accuracy, 13)
         self.assertEqual(lance.dmg, 18)
         self.assertTrue(lance.piercing)
         self.assertEqual(lance.energyCost, 0)
         self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)
+
+    def test_bastion_heavy_beam_accuracy_is_reduced(self):
+        bastion = create_mech("bastion")
+        beam = next(weapon for weapon in bastion.gunList if weapon.name == "Heavy Melting Beam")
+
+        self.assertEqual(beam.accuracy, 27)
