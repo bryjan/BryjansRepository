@@ -130,6 +130,9 @@ class Team:
         self.resources = 0
         self.reportLog = []
         self.playerControlled = playerControlled
+        # Team memory persists across each squad's turn in this match round.
+        # Keys are enemy entities; values hold the strongest radar reading.
+        self.radarContacts = {}
 
         for squads in self.squadsList:
             # Keep the object reference: turn sequencing needs its squad list.

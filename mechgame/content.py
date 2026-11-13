@@ -17,4 +17,6 @@ def create_demo_teams():
     ]
     player = Team("Player Team", [Squad("Player Squad", player_mechs, "Combat", playerControlled=True)])
     enemies = Team("Enemy Team", [Squad("Enemy Squad", enemy_mechs, "Combat")])
-    return [enemies, player]
+    # The match begins with the player squad, so keep it first in turn order.
+    # A complete round is then player turn, enemy turn, and back to player.
+    return [player, enemies]

@@ -28,6 +28,18 @@ def entity_detection_threshold(radar_signature):
     return max(1, RADAR_DETECTION_BASE - radar_signature)
 
 
+def detection_level(radar_power, target):
+    """Convert a radar return into contact, classification, or ID detail."""
+    threshold = entity_detection_threshold(target.radarSig)
+    if radar_power >= threshold * 2:
+        return 3
+    if radar_power >= threshold * 1.5:
+        return 2
+    if radar_power >= threshold:
+        return 1
+    return 0
+
+
 def radar_step_loss(terrain_absorption):
     """Return the power lost while radar crosses one terrain cell."""
     return RADAR_DISTANCE_LOSS + int(terrain_absorption)
@@ -126,6 +138,7 @@ def project_scan(source, match_info):
         if contact_power >= entity_detection_threshold(target.radarSig):
             if target.team != source.team:
                 radar_contacts.append(target)
+                remember_contact(source.team, target, contact_power)
                 record_contact_report(source, match_info, contact_power, target)
 
     # Contacts belong to the whole squad, not solely to the emitting mech.
@@ -137,8 +150,9 @@ def project_scan(source, match_info):
 def refresh_tracked_enemies(entity):
     """Combine a mech's line-of-sight targets with squad radar contacts."""
     radar_contacts = getattr(entity.squad, "radarTrackedEnemies", [])
+    team_contacts = list(getattr(entity.team, "radarContacts", {}))
     entity.trackedEnemies = list(
-        dict.fromkeys([*entity.directlyVisibleEnemies, *radar_contacts])
+        dict.fromkeys([*entity.directlyVisibleEnemies, *radar_contacts, *team_contacts])
     )
 
 
@@ -201,22 +215,40 @@ def team_contacts(observer):
     play. The radar menu combines those lists at display time so it can show
     the player's whole team's picture without duplicating contact state.
     """
-    contacts = {
+    contacts = [
         contact
-        for squad in observer.team.squadsList
-        for contact in squad.radarTrackedEnemies
+        for contact in getattr(observer.team, "radarContacts", {})
         if contact.team != observer.team and not contact.destroyed
-    }
+    ]
     return sorted(contacts, key=lambda contact: math.dist(observer.pos, contact.pos))
+
+
+def remember_contact(team, target, radar_power):
+    """Keep the strongest detection level for one target this match round."""
+    level = detection_level(radar_power, target)
+    previous = team.radarContacts.get(target)
+    if previous is None or level > previous["level"] or (
+        level == previous["level"] and radar_power > previous["radar_power"]
+    ):
+        team.radarContacts[target] = {
+            "level": level,
+            "radar_power": radar_power,
+            "position": list(target.pos),
+        }
 
 
 def contact_details(observer, match_info, target):
     """Return player-facing detail for one radar contact without omniscience."""
-    radar_power = match_info.map[target.pos[1]][target.pos[0]].radarPower
+    memory = getattr(observer.team, "radarContacts", {}).get(target)
+    radar_power = memory["radar_power"] if memory else (
+        match_info.map[target.pos[1]][target.pos[0]].radarPower
+    )
     threshold = entity_detection_threshold(target.radarSig)
     directly_visible = target in observer.directlyVisibleEnemies
-    identified = directly_visible or radar_power >= threshold * 2
-    size_known = identified or radar_power >= threshold * 1.5
+    level = memory["level"] if memory else detection_level(radar_power, target)
+    identified = directly_visible or level >= 3
+    size_known = identified or level >= 2
+    position = memory["position"] if memory else list(target.pos)
 
     if identified:
         classification = target.mechClass.name
@@ -235,8 +267,8 @@ def contact_details(observer, match_info, target):
 
     return {
         "classification": classification,
-        "position": list(target.pos),
-        "distance": math.dist(observer.pos, target.pos),
+        "position": position,
+        "distance": math.dist(observer.pos, position),
         "return_power": radar_power,
         "threshold": threshold,
         "movement": movement,
@@ -253,5 +285,8 @@ def can_aim_at_contact(observer, match_info, target):
     """
     if target in observer.directlyVisibleEnemies:
         return True
+    memory = getattr(observer.team, "radarContacts", {}).get(target)
+    if memory:
+        return memory["level"] >= 3
     radar_power = match_info.map[target.pos[1]][target.pos[0]].radarPower
-    return radar_power >= entity_detection_threshold(target.radarSig) * 2
+    return detection_level(radar_power, target) >= 3

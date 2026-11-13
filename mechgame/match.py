@@ -61,7 +61,11 @@ class MatchInfo:
 
         if nextTeamIndex >= len(self.teamList): #start of new round
             self.matchRound += 1
-            #TODO refresh round stats
+            # Radar contacts are tactical memory for one full match round.
+            # They survive friendly squad changes, then expire together when a
+            # fresh round begins.
+            for team in self.teamList:
+                team.radarContacts.clear()
             nextTeamIndex = 0
 
         # Sensor information is rebuilt for the squad that is about to act.
