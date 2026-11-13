@@ -46,3 +46,5 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lance.accuracy, 24)
         self.assertEqual(lance.dmg, 18)
         self.assertTrue(lance.piercing)
+        self.assertEqual(lance.energyCost, 0)
+        self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)

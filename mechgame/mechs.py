@@ -414,7 +414,7 @@ class WeaponLimb(MechPart):
         if self.maxRange is not None and math.dist(matchInfo.pov.pos, pos) > self.maxRange:
             print(f"Target is beyond this weapon's {self.maxRange}-tile range.")
             return
-        aimApCost = 1 if aimedLimb is not None else 0
+        aimApCost = self.aim_ap_cost(aimedLimb)
         if matchInfo.pov.ap - (self.apCost + aimApCost) < 0:
             print("Out of action points!")
             return
@@ -558,6 +558,12 @@ class WeaponLimb(MechPart):
         ignored_cells = [*startingCell.nList, startingCell]
         path = [cell for cell in path if cell not in ignored_cells]
         return sum(cell.visualAbsorption for cell in path)
+
+    def aim_ap_cost(self, aimedLimb):
+        """Return the extra AP for limb aiming; melee precision is free."""
+        if aimedLimb is None or self.isMelee:
+            return 0
+        return 1
 
     def hit_chance_range(self, matchInfo, shooter, target, position):
         """Return the displayed low/high hit chance for a resolved target.

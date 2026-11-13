@@ -269,7 +269,7 @@ def _plasma_lance():
     """A short-reach anti-armor weapon that lets a Lancer threaten larger mechs."""
     return WeaponLimb(
         "Plasma Lance", 7, 26, [], damage=18, accuracy=24, soundRep=8,
-        charges=None, apCost=2, energyCost=4, armorPiercing=True,
+        charges=None, apCost=2, energyCost=0, armorPiercing=True,
         maxRange=1.5, melee=True,
     )
 

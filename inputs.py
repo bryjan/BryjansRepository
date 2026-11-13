@@ -381,7 +381,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
         canAim = radar.can_aim_at_contact(mech, matchInfo, defaultTarget)
         prompt = "Press 'Enter' or 'f' to fire."
         if canAim:
-            prompt += " 'a' aim limb (+1 AP) |"
+            prompt += f" 'a' aim limb ({aimingCostLabel(weapon)}) |"
         prompt += " 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
         print(prompt)
         choice = input("Target: ").strip().lower()
@@ -443,12 +443,11 @@ def chooseTargetAction(matchInfo, target, weapon=None):
     """Confirm a tracked target and optionally select a specific mech part."""
     observer = matchInfo.pov
     printTargetingSummary(matchInfo, weapon, target)
-    detail = radar.contact_details(observer, matchInfo, target)
     position = radar.contact_position(observer, target)
     canAim = radar.can_aim_at_contact(observer, matchInfo, target)
     prompt = "Press 'Enter' or 'f' to fire"
     if canAim:
-        prompt += ", or 'a' to aim at a limb (+1 AP)"
+        prompt += f", or 'a' to aim at a limb ({aimingCostLabel(weapon)})"
     choice = input(f"{prompt}: ").strip().lower()
     if choice in ("", "f"):
         return position, None
@@ -484,8 +483,13 @@ def printTargetingSummary(matchInfo, weapon, target, label="Target"):
     print(f"Hit chance: {chance}")
 
 
+def aimingCostLabel(weapon):
+    """Describe the selected weapon's additional AP cost for limb targeting."""
+    return "free" if weapon is not None and weapon.isMelee else "+1 AP"
+
+
 def chooseAimedLimb(target):
-    """Let the player select a live target part for the one-AP aiming cost."""
+    """Let the player select a live target part for the current weapon."""
     for index, limb in enumerate(target.mechClass.limbList, start=1):
         print(f"{index}. {limb.name} — armor {limb.armor}/{limb.startingArmor}, HP {limb.hp}/{limb.startingHP}")
     selection = _read_nonempty("Aim at limb ('x' to cancel): ").lower()
