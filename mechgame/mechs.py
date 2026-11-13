@@ -380,11 +380,13 @@ class MechPart: # super class to mech limbs
             self.mechClass.limbsConditionList.append(limb.limbCon)
         self.mechClass.condition = round(sum(self.mechClass.limbsConditionList) / len(self.mechClass.limbList) * 100)
 
-        #reporting damage
-        self.mech.report(
-            matchInfo, "I was hit by a " + dmgSource + "!",
-            teamReport=False, critical=(damageSource == "fire"),
-        )
+        # Explosions emit one aggregate report from MatchInfo rather than one
+        # duplicate message for every limb struck by the same blast.
+        if damageSource != "explosion":
+            self.mech.report(
+                matchInfo, "I was hit by a " + dmgSource + "!",
+                teamReport=False, critical=(damageSource == "fire"),
+            )
         return True
 
     def critical (self, matchInfo):

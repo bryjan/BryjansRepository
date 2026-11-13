@@ -115,10 +115,13 @@ class MatchInfo:
 
     def explosion(self, location, radius, size, damage, soundRange=0):
         """Apply blast damage to several random parts of each mech in range."""
-        self._report_explosion(location, soundRange)
-        for entity in list(self.entities):
-            if math.dist(location, entity.pos) > radius:
-                continue
+        affected_entities = [
+            entity
+            for entity in self.entities
+            if math.dist(location, entity.pos) <= radius
+        ]
+        self._report_explosion(location, soundRange, affected_entities)
+        for entity in affected_entities:
 
             # Larger explosions can strike more parts; large targets spread the
             # blast across more armor, while small targets are more exposed.
@@ -131,15 +134,23 @@ class MatchInfo:
 
         # TODO: explosions can later add fire, smoke, and terrain effects.
 
-    def _report_explosion(self, location, soundRange):
+    def _report_explosion(self, location, soundRange, affected_entities):
         """Let nearby mechs report an impact they saw or heard.
 
-        Visual confirmation is urgent information, so it produces a critical
-        report.  Hearing alone still gives a useful, ordinary warning without
-        revealing the exact impact location to a squad that could not see it.
+        Mechs inside the blast report being struck rather than merely seeing
+        it. Visual confirmation is urgent information, while hearing alone
+        gives a useful ordinary warning without exposing the impact location.
         """
+        affected_entities = set(affected_entities)
         for entity in self.entities:
-            sees_impact = entity.pos == location or any(
+            if entity in affected_entities:
+                entity.report(
+                    self, "I was caught in an explosion!",
+                    teamReport=False, critical=True,
+                )
+                continue
+
+            sees_impact = any(
                 cell.pos == location for cell in entity.visibleCells
             )
             if sees_impact:

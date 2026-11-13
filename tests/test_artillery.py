@@ -106,6 +106,23 @@ class ArtilleryTests(unittest.TestCase):
             for report, critical, _ in listener.squad.reportLog
         ))
 
+    def test_mech_in_explosion_reports_being_hit_not_seeing_it(self):
+        impact_cell = self.match.map[10][10]
+        victim = self.match.teamList[1].squadsList[0].mechList[0]
+        victim.pos = [10, 10]
+        victim.visibleCells = [impact_cell]
+
+        self.match.explosion([10, 10], radius=0, size=0, damage=0)
+
+        self.assertTrue(any(
+            critical and "caught in an explosion" in report
+            for report, critical, _ in victim.squad.reportLog
+        ))
+        self.assertFalse(any(
+            "see an explosion" in report
+            for report, _, _ in victim.squad.reportLog
+        ))
+
     def test_fireproof_terrain_extinguishes_after_one_round_update(self):
         border_cell = self.match.map[0][0]
         effects.add_fire(border_cell)
