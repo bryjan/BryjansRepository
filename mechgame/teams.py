@@ -53,8 +53,9 @@ class Squad:
         mostDamaged = min(self.mechList, key=lambda mech: mech.mechClass.condition)
 
         # The squad panel needs a readiness signal, not a long inventory.
-        # Average every finite ammunition pool carried by each mech; unlimited
-        # energy and melee weapons deliberately do not affect this percentage.
+        # Average every weapon's readiness for each mech. Direct weapons with
+        # unlimited charges are always fully ready; launchers instead use the
+        # readiness of their selectable shell pools.
         ammoSummary = []
         for mech in self.mechList:
             ammoPercentages = []
@@ -64,7 +65,9 @@ class Squad:
                         if ammo.charges is not None and ammo.maxCharges:
                             ammoPercentages.append(ammo.charges / ammo.maxCharges)
                     continue
-                if weapon.charges is not None and weapon.maxCharges:
+                if weapon.charges is None:
+                    ammoPercentages.append(1)
+                elif weapon.maxCharges:
                     ammoPercentages.append(weapon.charges / weapon.maxCharges)
             averageAmmo = round((sum(ammoPercentages) / len(ammoPercentages)) * 100) if ammoPercentages else 100
             ammoSummary.append(f"{mech.pilot.name} {averageAmmo}%")

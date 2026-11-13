@@ -153,3 +153,9 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertIn("Chiki 100%", report)
         self.assertNotIn("ChainGun", report)
         self.assertNotIn("Plasma Lance", report)
+
+        lancer = next(mech for mech in match.pov.squad.mechList if mech.pilot.name == "MagikP")
+        chain_gun = next(weapon for weapon in lancer.mechClass.gunList if weapon.name == "ChainGun")
+        chain_gun.charges = 0
+
+        self.assertIn("MagikP 50%", match.pov.squad.statusReport())
