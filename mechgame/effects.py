@@ -28,7 +28,7 @@ class SmokeEffect(TerrainEffect):
     """Dense smoke that disrupts sight strongly and radar slightly."""
 
     name = "smoke"
-    symbol = "S"
+    symbol = "~"
     color = "light_grey"
     visual_absorption = 12
     radar_absorption = 2
@@ -68,6 +68,12 @@ class FireEffect(TerrainEffect):
     def on_turn_start(self, match_info, entity):
         self._damage_entity(match_info, entity)
 
+    def _drift_smoke(self, cell):
+        """Let a healthy fire send one visible smoke plume downwind each round."""
+        candidates = [neighbor for neighbor in cell.nList if neighbor.terrain.passable]
+        if candidates and random.random() < 0.60:
+            add_smoke(random.choice(candidates))
+
     def tick(self, match_info, cell):
         terrain = cell.terrain
         if terrain.fireproof:
@@ -84,6 +90,10 @@ class FireEffect(TerrainEffect):
         else:
             spread_chance, extinguish_chance = 0.10, 0.25
 
+        # A working fire continuously makes smoke, including a frequent plume
+        # on an adjacent tile.  The burning tile itself is kept smoky by
+        # ``advance_effects`` after smoke dissipation is resolved.
+        self._drift_smoke(cell)
         for neighbor in cell.nList:
             if not neighbor.terrain.fireproof and random.random() < spread_chance:
                 add_fire(neighbor)
@@ -126,7 +136,9 @@ def add_smoke(cell, turns=2):
 
 
 def add_fire(cell, turns=3):
+    """Ignite a cell and immediately place the smoke its fire produces."""
     add_effect(cell, FireEffect(turns))
+    add_smoke(cell, turns=min(2, max(1, turns)))
 
 
 def add_scout_flare(cell, owner_team, vision_power, turns=1):
@@ -203,3 +215,7 @@ def advance_effects(match_info):
         newly_added = [effect for effect in cell.effects if effect not in starting_effects]
         cell.effects[:] = [*retained, *newly_added]
         cell.refresh_effect_flags()
+        # Smoke can dissipate randomly, but a tile that remains on fire should
+        # never look clear. Re-add a fresh plume only when it has dissipated.
+        if any(isinstance(effect, FireEffect) for effect in cell.effects):
+            add_smoke(cell)

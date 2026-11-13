@@ -132,3 +132,15 @@ class ArtilleryTests(unittest.TestCase):
         with patch("mechgame.effects.random.choice", return_value=limb):
             fire.on_enter(self.match, mech)
         self.assertFalse(any("hit by a fire" in report for report, _, _ in mech.squad.reportLog))
+
+    def test_fire_keeps_smoke_and_draws_above_it(self):
+        cell = self.match.map[1][1]
+        effects.add_fire(cell)
+
+        self.assertEqual(effects.SmokeEffect.symbol, "~")
+        self.assertTrue(any(isinstance(effect, effects.FireEffect) for effect in cell.effects))
+        self.assertTrue(any(isinstance(effect, effects.SmokeEffect) for effect in cell.effects))
+
+        with patch("mechgame.terrain.colored", side_effect=lambda symbol, *_: symbol), patch("builtins.print") as print_mock:
+            cell.displayCell(self.match)
+        self.assertEqual(print_mock.call_args.args[0], "*")

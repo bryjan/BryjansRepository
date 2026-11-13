@@ -135,7 +135,12 @@ class Cell:
                 entity.displayObject(active=entity is matchInfo.pov)
                 return
         if self.effects:
-            effect = self.effects[-1]
+            # Fire is drawn above its companion smoke so an active blaze is
+            # immediately legible while retaining smoke's sensor penalties.
+            effect = next(
+                (effect for effect in self.effects if effect.name == "fire"),
+                self.effects[-1],
+            )
             print(colored(effect.symbol, effect.color), end=" ")
             return
         else:
