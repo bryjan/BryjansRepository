@@ -112,8 +112,9 @@ class MatchInfo:
         """Rebuild active radar only after a detectable source-state change."""
         radar.refresh(self)
 
-    def explosion(self, location, radius, size, damage):
+    def explosion(self, location, radius, size, damage, soundRange=0):
         """Apply blast damage to several random parts of each mech in range."""
+        self._report_explosion(location, soundRange)
         for entity in list(self.entities):
             if math.dist(location, entity.pos) > radius:
                 continue
@@ -128,6 +129,28 @@ class MatchInfo:
                 limb.damage(self, damage, "explosion", armorDamage=armor_damage)
 
         # TODO: explosions can later add fire, smoke, and terrain effects.
+
+    def _report_explosion(self, location, soundRange):
+        """Let nearby mechs report an impact they saw or heard.
+
+        Visual confirmation is urgent information, so it produces a critical
+        report.  Hearing alone still gives a useful, ordinary warning without
+        revealing the exact impact location to a squad that could not see it.
+        """
+        for entity in self.entities:
+            sees_impact = entity.pos == location or any(
+                cell.pos == location for cell in entity.visibleCells
+            )
+            if sees_impact:
+                entity.report(
+                    self, f"I see an explosion at {location}.",
+                    teamReport=False, critical=True,
+                )
+            elif soundRange > 0 and math.dist(entity.pos, location) <= soundRange:
+                entity.report(
+                    self, "I hear an explosion.",
+                    teamReport=False, critical=False,
+                )
 
     def calcLine(self, point1, point2):
         """Return the slope and intercept for a line between two grid positions."""

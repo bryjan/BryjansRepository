@@ -60,6 +60,51 @@ class ArtilleryTests(unittest.TestCase):
         self.match.nextSquadTurn()
         self.assertEqual(impact_cell.onSmoke, 1)
 
+    def test_zero_turn_shell_impacts_immediately_and_reports_its_launch(self):
+        zero_turn_bands = {
+            "close": [30, 0, 0],
+            "medium": [50, 0, 0],
+            "far": [80, 0, 0],
+        }
+        smoke = artillery.LauncherAmmo(
+            "Test Smoke", zero_turn_bands, payload="smoke", charges=1,
+            effectRadius=0, effectTurns=2,
+        )
+        launcher = WeaponLimb(
+            "Test Launcher", 1, 1, [], 0, 0, 15, None,
+            ammoTypes=[smoke],
+        )
+        listener = self.match.teamList[1].squadsList[0].mechList[0]
+        listener.pos = [10, 10]
+
+        launcher.launchAt(self.match, [8, 10])
+
+        self.assertEqual(self.match.map[10][8].onSmoke, 1)
+        self.assertEqual(self.match.pendingImpacts, [])
+        self.assertTrue(any(
+            "hear fire from a Test Launcher" in report[0]
+            for report in listener.squad.reportLog
+        ))
+
+    def test_explosion_reports_are_critical_when_visually_confirmed(self):
+        impact_cell = self.match.map[10][10]
+        observer = self.match.pov
+        listener = self.match.teamList[1].squadsList[0].mechList[0]
+        observer.visibleCells = [impact_cell]
+        listener.visibleCells = []
+        listener.pos = [11, 10]
+
+        self.match.explosion([10, 10], radius=0, size=0, damage=0, soundRange=15)
+
+        self.assertTrue(any(
+            critical and "see an explosion at [10, 10]" in report
+            for report, critical, _ in observer.squad.reportLog
+        ))
+        self.assertTrue(any(
+            not critical and "hear an explosion" in report
+            for report, critical, _ in listener.squad.reportLog
+        ))
+
     def test_fireproof_terrain_extinguishes_after_one_round_update(self):
         border_cell = self.match.map[0][0]
         effects.add_fire(border_cell)

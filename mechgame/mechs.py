@@ -382,10 +382,16 @@ class WeaponLimb(MechPart):
         """Reserve a dedicated update hook for future launcher-only modules."""
 
     def emitSound(self, matchInfo):
-        """Send a sound report to enemy entities within audible range."""
+        """Send a launch or gunfire report to enemies within audible range."""
+        shooter = matchInfo.pov
         for entity in matchInfo.entities:
-            if math.dist(matchInfo.pov.pos, entity.pos) <= self.soundReport and entity not in matchInfo.pov.squad.mechList:
-                entity.report(matchInfo, "I hear shots. Sounds like a " + self.name + "." , teamReport = False, critical = False)
+            if entity.team is shooter.team:
+                continue
+            if math.dist(shooter.pos, entity.pos) <= self.soundReport:
+                entity.report(
+                    matchInfo, f"I hear fire from a {self.name}.",
+                    teamReport=False, critical=False,
+                )
 
     def shootAt(self, matchInfo, pos, aimedLimb=None):
         """Spend resources and resolve every projectile fired at a map position."""
@@ -482,7 +488,7 @@ class WeaponLimb(MechPart):
         impactPosition = artillery.scatter_position(
             matchInfo, targetPosition, profile["inaccuracy"],
         )
-        artillery.schedule_impact(
+        impact = artillery.schedule_impact(
             matchInfo,
             impactPosition,
             # The firing squad's turn is still in progress.  Add one pending
@@ -499,11 +505,20 @@ class WeaponLimb(MechPart):
             ammo.scoutVision,
             matchInfo.pov.team,
             ammo.igniteChance,
+            self.soundReport,
         )
-        print(
-            f"{self.name} fired on its {profile['name']} profile. "
-            f"Impact expected after {profile['turns']} completed turn(s)."
-        )
+        if profile["turns"] == 0:
+            print(f"{self.name} fired on its {profile['name']} profile. Impact is immediate.")
+            # A zero-turn profile resolves this shell alone.  Calling the
+            # normal advancement routine here would incorrectly age every
+            # other projectile already in the air.
+            matchInfo.pendingImpacts.remove(impact)
+            artillery.resolve_impact(matchInfo, impact)
+        else:
+            print(
+                f"{self.name} fired on its {profile['name']} profile. "
+                f"Impact expected after {profile['turns']} completed turn(s)."
+            )
         matchInfo.advTurn = True
 
     def launcher_profile(self, distance):

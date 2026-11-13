@@ -12,7 +12,8 @@ Use catalog IDs (lowercase, with dots or underscores) for references. The
 display name, map symbol, and color are the player-facing values.
 
 Launcher ammunition authoring uses three named arrays. Each is
-``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``:
+``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``.  A
+``turns_to_land`` value of ``0`` is valid and resolves at once:
 
     rangeBands={
         "close": [30, 1, 1],
@@ -267,7 +268,9 @@ def _scout_rifle():
 def _lancer_mortar():
     """A single-shell 2-AP launcher for indirect fire and support payloads."""
     return WeaponLimb(
-        "Lancer Mortar", 6, 24, [], damage=20, accuracy=0, soundRep=30,
+        # Standard Lancers see 14 tiles.  The mortar is deliberately quiet:
+        # enemies hear its launch only a tile beyond that usual sight range.
+        "Lancer Mortar", 6, 24, [], damage=20, accuracy=0, soundRep=15,
         charges=None, apCost=2, energyCost=0,
         ammoTypes=[
             create_ammo("he_mortar_round"),
