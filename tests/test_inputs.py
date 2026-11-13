@@ -88,3 +88,29 @@ class InputTests(unittest.TestCase):
             original_menu(match, launcher)
 
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
+
+    def test_direct_fire_target_selection_reopens_the_full_target_menu(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        default_target = match.teamList[1].squadsList[0].mechList[0]
+        selected_target = match.teamList[1].squadsList[0].mechList[1]
+        weapon = match.pov.mechClass.gunList[0]
+        original_menu = inputs.chooseFireTarget
+
+        with patch("builtins.input", return_value="t"), patch(
+            "inputs.chooseTrackedContact", return_value=selected_target
+        ), patch("inputs.chooseFireTarget") as reopened_menu:
+            original_menu(match, default_target, weapon)
+
+        reopened_menu.assert_called_once_with(match, selected_target, weapon)
+
+    def test_weapon_selection_keeps_radar_selected_target(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        bastion = match.teamList[1].squadsList[0].mechList[0]
+        selected_target = match.pov
+        match.pov = bastion
+        original_menu = inputs.gunMenu
+
+        with patch("builtins.input", return_value="1"), patch("inputs.fire") as fire_mock:
+            original_menu(match, selected_target)
+
+        fire_mock.assert_called_once_with(match, selected_target)

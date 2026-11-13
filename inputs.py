@@ -148,7 +148,7 @@ def fire(matchInfo, target=None):
 
     targetChoice = chooseFireTarget(matchInfo, defaultTarget, gun)
     if targetChoice == "weapon":
-        return gunMenu(matchInfo)
+        return gunMenu(matchInfo, defaultTarget)
     if targetChoice is None:
         return
     targetPos, aimedLimb = targetChoice
@@ -203,7 +203,7 @@ def launcherFireMenu(matchInfo, launcher, target=None):
             return launcherFireMenu(matchInfo, launcher, target)
         return
     elif choice == "w":
-        return gunMenu(matchInfo)
+        return gunMenu(matchInfo, target)
     elif choice in ("", "f", "x"):
         return
     else:
@@ -460,15 +460,26 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
             ),
             None,
         )
-        return chooseTargetAction(matchInfo, target, weapon) if target is not None else (list(mech.lastFiredAt), None)
+        return chooseFireTarget(matchInfo, target, weapon) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
         print("Choose 't', 'l', 'c', or 'x'.")
         return None
+    selectedTarget = chooseTrackedContact(matchInfo)
+    if selectedTarget is None:
+        return None
+    # As with launchers, retain the selected contact and reopen the full
+    # targeting menu so weapon switching and limb aiming stay available.
+    return chooseFireTarget(matchInfo, selectedTarget, weapon)
+
+
+def chooseTrackedContact(matchInfo):
+    """Select a tracked enemy while retaining it as an entity reference."""
+    mech = matchInfo.pov
     if not mech.trackedEnemies:
         print("No enemy mechs are currently tracked.")
         return None
     if len(mech.trackedEnemies) == 1:
-        return chooseTargetAction(matchInfo, mech.trackedEnemies[0], weapon)
+        return mech.trackedEnemies[0]
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         detail = radar.contact_details(mech, matchInfo, enemy)
@@ -480,29 +491,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return chooseTargetAction(matchInfo, mech.trackedEnemies[int(selection) - 1], weapon)
-
-
-def chooseTargetAction(matchInfo, target, weapon=None):
-    """Confirm a tracked target and optionally select a specific mech part."""
-    observer = matchInfo.pov
-    printTargetingSummary(matchInfo, weapon, target)
-    position = radar.contact_position(observer, target)
-    canAim = radar.can_aim_at_contact(observer, matchInfo, target)
-    prompt = "Press 'Enter' or 'f' to fire"
-    if canAim:
-        prompt += f", or 'a' to aim at a limb ({aimingCostLabel(weapon)})"
-    choice = input(f"{prompt}: ").strip().lower()
-    if choice in ("", "f"):
-        return position, None
-    if choice != "a" or not canAim:
-        print("Choose 'Enter' or 'f'." if not canAim else "Choose 'Enter', 'f', or 'a'.")
-        return None
-
-    aimedLimb = chooseAimedLimb(target)
-    if aimedLimb is None:
-        return None
-    return position, aimedLimb
+    return mech.trackedEnemies[int(selection) - 1]
 
 
 def printTargetingSummary(matchInfo, weapon, target, label="Target"):
@@ -544,8 +533,8 @@ def chooseAimedLimb(target):
         return None
     return target.mechClass.limbList[int(selection) - 1]
 
-def gunMenu(matchInfo): #TODO add ability to exit
-    """Display weapons and make one available as the default firing choice."""
+def gunMenu(matchInfo, target=None): #TODO add ability to exit
+    """Select a default weapon, preserving a radar-selected target if present."""
 
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
@@ -554,7 +543,7 @@ def gunMenu(matchInfo): #TODO add ability to exit
         gunList[0].defaultGun = True
         print(gunList[0].printShortDesc())
         print("You only have one weapon. It is set as the default for 'f'.")
-        return
+        return fire(matchInfo, target) if target is not None else None
     elif len(gunList) == 0:
         print("You have no weapons.")
         return
@@ -587,14 +576,14 @@ def gunMenu(matchInfo): #TODO add ability to exit
         playerInput = int(playerInput)
         if not 1 <= playerInput <= len(gunList):
             print("Please enter an integer listed in the menu.")
-            gunMenu(matchInfo)
+            gunMenu(matchInfo, target)
         else:
             gunList[playerInput - 1].defaultGun = True
             print(f"{gunList[playerInput - 1].name} is now the default for 'f'.")
-            return
+            return fire(matchInfo, target) if target is not None else None
     except ValueError:
         print("Please enter an integer.")
-        gunMenu(matchInfo)
+        gunMenu(matchInfo, target)
 
 
 def nextMech(matchInfo):
