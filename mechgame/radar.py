@@ -220,7 +220,10 @@ def team_contacts(observer):
         for contact in getattr(observer.team, "radarContacts", {})
         if contact.team != observer.team and not contact.destroyed
     ]
-    return sorted(contacts, key=lambda contact: math.dist(observer.pos, contact.pos))
+    return sorted(
+        contacts,
+        key=lambda contact: math.dist(observer.pos, contact_position(observer, contact)),
+    )
 
 
 def remember_contact(team, target, radar_power):
@@ -234,7 +237,19 @@ def remember_contact(team, target, radar_power):
             "level": level,
             "radar_power": radar_power,
             "position": list(target.pos),
+            # Save movement data with the contact. Reading it from the live
+            # entity later would reveal movement after radar lost the target.
+            "speed": target.speed,
+            "turn_start_pos": list(target.turnStartPos),
         }
+
+
+def contact_position(observer, target):
+    """Return a visible target's live position or a radar contact's last fix."""
+    if target in observer.directlyVisibleEnemies:
+        return list(target.pos)
+    memory = getattr(observer.team, "radarContacts", {}).get(target)
+    return list(memory["position"]) if memory else list(target.pos)
 
 
 def contact_details(observer, match_info, target):
@@ -248,7 +263,7 @@ def contact_details(observer, match_info, target):
     level = memory["level"] if memory else detection_level(radar_power, target)
     identified = directly_visible or level >= 3
     size_known = identified or level >= 2
-    position = memory["position"] if memory else list(target.pos)
+    position = contact_position(observer, target)
 
     if identified:
         classification = target.mechClass.name
@@ -257,10 +272,16 @@ def contact_details(observer, match_info, target):
     else:
         classification = "Unclassified contact"
 
-    if identified:
+    if identified and directly_visible:
         movement = "stationary" if target.speed == 0 else (
             f"moving {nesw_direction(target.turnStartPos, target.pos)} "
             f"at {target.speed} tiles/turn"
+        )
+    elif identified and memory:
+        speed = memory["speed"]
+        movement = "stationary" if speed == 0 else (
+            f"moving {nesw_direction(memory['turn_start_pos'], position)} "
+            f"at {speed} tiles/turn (last scan)"
         )
     else:
         movement = "unresolved"

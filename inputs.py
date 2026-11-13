@@ -98,10 +98,11 @@ def fire(matchInfo, target=None):
     
     # The radar menu can pass one exact shared contact here. Ordinary 'f'
     # input keeps the quick-fire behavior of choosing the nearest contact.
-    defaultTarget = target if target is not None else nearestTrackedEnemy(mech)
+    defaultTarget = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
     if defaultTarget is not None:
-        print(f"Default target: {defaultTarget.pilot.name} — {defaultTarget.mechClass.name} at {defaultTarget.pos}")
-        pv.printPOV(matchInfo, *defaultTarget.pos)
+        detail = radar.contact_details(mech, matchInfo, defaultTarget)
+        print(f"Default target: {detail['classification']} at {detail['position']}")
+        pv.printPOV(matchInfo, *detail["position"])
 
     targetChoice = chooseFireTarget(matchInfo, defaultTarget)
     if targetChoice == "weapon":
@@ -112,11 +113,14 @@ def fire(matchInfo, target=None):
     gun.shootAt(matchInfo, targetPos, aimedLimb)
 
 
-def nearestTrackedEnemy(mech):
+def nearestTrackedEnemy(matchInfo, mech):
     """Return the closest tracked enemy, or ``None`` when no contact exists."""
     if not mech.trackedEnemies:
         return None
-    return min(mech.trackedEnemies, key=lambda enemy: math.dist(mech.pos, enemy.pos))
+    return min(
+        mech.trackedEnemies,
+        key=lambda enemy: math.dist(mech.pos, radar.contact_position(mech, enemy)),
+    )
 
 
 def squadMenu(matchInfo):
@@ -239,10 +243,10 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         print(prompt)
         choice = input("Target: ").strip().lower()
         if choice in ("", "f"):
-            return list(defaultTarget.pos), None
+            return radar.contact_position(mech, defaultTarget), None
         if choice == "a" and canAim:
             aimedLimb = chooseAimedLimb(defaultTarget)
-            return None if aimedLimb is None else (list(defaultTarget.pos), aimedLimb)
+            return None if aimedLimb is None else (radar.contact_position(mech, defaultTarget), aimedLimb)
         if choice == "a":
             print("Limb aiming requires direct visual contact or a fully identified radar return.")
             return None
@@ -261,7 +265,14 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         if mech.lastFiredAt is None:
             print("No previous firing location.")
             return None
-        target = next((enemy for enemy in mech.trackedEnemies if enemy.pos == mech.lastFiredAt), None)
+        target = next(
+            (
+                enemy
+                for enemy in mech.trackedEnemies
+                if radar.contact_position(mech, enemy) == mech.lastFiredAt
+            ),
+            None,
+        )
         return chooseTargetAction(matchInfo, target) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
         print("Choose 't', 'l', 'c', or 'x'.")
@@ -273,7 +284,8 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         return chooseTargetAction(matchInfo, mech.trackedEnemies[0])
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
-        print(f"{index}. {enemy.pilot.name} — {enemy.mechClass.name} at {enemy.pos}")
+        detail = radar.contact_details(mech, matchInfo, enemy)
+        print(f"'{index}' {detail['classification']} at {detail['position']}")
     selection = _read_nonempty("Tracked target: ")
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
@@ -283,14 +295,17 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
 
 def chooseTargetAction(matchInfo, target):
     """Confirm a tracked target and optionally select a specific mech part."""
-    print(f"Target: {target.pilot.name} — {target.mechClass.name} at {target.pos}")
-    canAim = radar.can_aim_at_contact(matchInfo.pov, matchInfo, target)
+    observer = matchInfo.pov
+    detail = radar.contact_details(observer, matchInfo, target)
+    position = radar.contact_position(observer, target)
+    print(f"Target: {detail['classification']} at {position}")
+    canAim = radar.can_aim_at_contact(observer, matchInfo, target)
     prompt = "Press 'Enter' or 'f' to fire"
     if canAim:
         prompt += ", or 'a' to aim at a limb (+1 AP)"
     choice = input(f"{prompt}: ").strip().lower()
     if choice in ("", "f"):
-        return list(target.pos), None
+        return position, None
     if choice != "a" or not canAim:
         print("Choose 'Enter' or 'f'." if not canAim else "Choose 'Enter', 'f', or 'a'.")
         return None
@@ -298,7 +313,7 @@ def chooseTargetAction(matchInfo, target):
     aimedLimb = chooseAimedLimb(target)
     if aimedLimb is None:
         return None
-    return list(target.pos), aimedLimb
+    return position, aimedLimb
 
 
 def chooseAimedLimb(target):
