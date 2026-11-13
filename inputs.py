@@ -112,11 +112,11 @@ def fire(matchInfo, target=None):
     # input keeps the quick-fire behavior of choosing the nearest contact.
     defaultTarget = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
     if defaultTarget is not None:
+        printTargetingSummary(matchInfo, gun, defaultTarget, "Default target")
         detail = radar.contact_details(mech, matchInfo, defaultTarget)
-        print(f"Default target: {detail['classification']} at {detail['position']}")
         pv.printPOV(matchInfo, *detail["position"])
 
-    targetChoice = chooseFireTarget(matchInfo, defaultTarget)
+    targetChoice = chooseFireTarget(matchInfo, defaultTarget, gun)
     if targetChoice == "weapon":
         return gunMenu(matchInfo)
     if targetChoice is None:
@@ -133,7 +133,10 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     if defaultTarget is not None:
         detail = radar.contact_details(mech, matchInfo, defaultTarget)
         defaultPosition = detail["position"]
-        print(f"Launcher target: {detail['classification']} at {defaultPosition}")
+        print(
+            f"Launcher target: {detail['classification']} at {defaultPosition} "
+            f"| distance {detail['distance']:.1f} tiles"
+        )
         printLauncherProfile(mech, launcher, defaultPosition)
         prompt = "Launch: 'Enter' or 'f' default | 'a' ammo | 't' tracked target | 'o' lead offset | 'c' coordinates | 'l' last location | 'w' weapon | 'x' cancel"
     else:
@@ -190,7 +193,8 @@ def printLauncherProfile(mech, launcher, position):
     damage = max(0, launcher.dmg + ammo.damageModifier - profile["damage_falloff"])
     charges = "unlimited" if ammo.charges is None else f"{ammo.charges}/{ammo.maxCharges}"
     print(
-        f"{ammo.name} ({ammo.payload}) | {profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
+        f"{ammo.name} ({ammo.payload}) | distance {distance:.1f} tiles | "
+        f"{profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
         f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} turn(s) | "
         f"damage {damage} | rounds {charges}"
     )
@@ -240,7 +244,10 @@ def chooseLauncherTrackedTarget(matchInfo):
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         detail = radar.contact_details(mech, matchInfo, enemy)
-        print(f"'{index}' {detail['classification']} at {detail['position']}")
+        print(
+            f"'{index}' {detail['classification']} at {detail['position']} "
+            f"| distance {detail['distance']:.1f} tiles"
+        )
     selection = _read_nonempty("Launch target: ")
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
@@ -367,7 +374,7 @@ def selectControllableSquad(matchInfo):
     matchInfo.advTurn = False
 
 
-def chooseFireTarget(matchInfo, defaultTarget=None):
+def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
@@ -409,7 +416,7 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
             ),
             None,
         )
-        return chooseTargetAction(matchInfo, target) if target is not None else (list(mech.lastFiredAt), None)
+        return chooseTargetAction(matchInfo, target, weapon) if target is not None else (list(mech.lastFiredAt), None)
     if choice not in ("t", "v"):
         print("Choose 't', 'l', 'c', or 'x'.")
         return None
@@ -417,24 +424,27 @@ def chooseFireTarget(matchInfo, defaultTarget=None):
         print("No enemy mechs are currently tracked.")
         return None
     if len(mech.trackedEnemies) == 1:
-        return chooseTargetAction(matchInfo, mech.trackedEnemies[0])
+        return chooseTargetAction(matchInfo, mech.trackedEnemies[0], weapon)
 
     for index, enemy in enumerate(mech.trackedEnemies, start=1):
         detail = radar.contact_details(mech, matchInfo, enemy)
-        print(f"'{index}' {detail['classification']} at {detail['position']}")
+        print(
+            f"'{index}' {detail['classification']} at {detail['position']} "
+            f"| distance {detail['distance']:.1f} tiles"
+        )
     selection = _read_nonempty("Tracked target: ")
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return chooseTargetAction(matchInfo, mech.trackedEnemies[int(selection) - 1])
+    return chooseTargetAction(matchInfo, mech.trackedEnemies[int(selection) - 1], weapon)
 
 
-def chooseTargetAction(matchInfo, target):
+def chooseTargetAction(matchInfo, target, weapon=None):
     """Confirm a tracked target and optionally select a specific mech part."""
     observer = matchInfo.pov
+    printTargetingSummary(matchInfo, weapon, target)
     detail = radar.contact_details(observer, matchInfo, target)
     position = radar.contact_position(observer, target)
-    print(f"Target: {detail['classification']} at {position}")
     canAim = radar.can_aim_at_contact(observer, matchInfo, target)
     prompt = "Press 'Enter' or 'f' to fire"
     if canAim:
@@ -450,6 +460,28 @@ def chooseTargetAction(matchInfo, target):
     if aimedLimb is None:
         return None
     return position, aimedLimb
+
+
+def printTargetingSummary(matchInfo, weapon, target, label="Target"):
+    """Print range and, when sensors identify it, the direct-fire chance."""
+    observer = matchInfo.pov
+    detail = radar.contact_details(observer, matchInfo, target)
+    print(
+        f"{label}: {detail['classification']} at {detail['position']} "
+        f"| distance {detail['distance']:.1f} tiles"
+    )
+
+    # Exact target size is required for the size modifier.  Visual contact or
+    # radar level 3 supplies it; lower-grade returns deliberately do not.
+    if weapon is None or weapon.isLauncher or not radar.can_aim_at_contact(observer, matchInfo, target):
+        return
+    if weapon.maxRange is not None and detail["distance"] > weapon.maxRange:
+        print(f"Out of range: {weapon.name} reaches {weapon.maxRange} tiles.")
+        return
+
+    low, high = weapon.hit_chance_range(matchInfo, observer, target, detail["position"])
+    chance = f"{high}%" if low == high else f"{low}–{high}% (movement-dependent)"
+    print(f"Hit chance: {chance}")
 
 
 def chooseAimedLimb(target):

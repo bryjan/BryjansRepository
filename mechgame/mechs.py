@@ -425,18 +425,7 @@ class WeaponLimb(MechPart):
         #enemies will report noise
         self.emitSound(matchInfo)
 
-        #Calculates shot based on terrain between you and target, ignores the tile you're standing on and directly infront
-        path = matchInfo.ListInterceptingSquares(matchInfo.pov.pos, pos)
-        startingCell = matchInfo.map[matchInfo.pov.pos[1]][matchInfo.pov.pos[0]]
-        removeList = [*startingCell.nList, startingCell]
-
-        for cell in removeList:
-            if cell in path:
-                path.remove(cell)
-
-        accuracyRequired = 0
-        for n in path:
-            accuracyRequired += n.visualAbsorption
+        accuracyRequired = self.accuracy_required(matchInfo, matchInfo.pov, pos)
 
         target = next((entity for entity in matchInfo.entities if entity.pos == pos), None)
 
@@ -549,6 +538,35 @@ class WeaponLimb(MechPart):
         targetSize = target.size if target is not None else shooter.size
         sizeMultiplier = 1.2 ** (targetSize - shooter.size)
         return min(99, max(10, round(baseChance * sizeMultiplier)))
+
+    def accuracy_required(self, matchInfo, shooter, position):
+        """Return the terrain accuracy cost of a shot path.
+
+        The firing menu uses this same helper as the actual attack, so its
+        chance preview cannot drift away from the resolved combat rules.
+        """
+        path = matchInfo.ListInterceptingSquares(shooter.pos, position)
+        startingCell = matchInfo.map[shooter.pos[1]][shooter.pos[0]]
+        ignored_cells = [*startingCell.nList, startingCell]
+        path = [cell for cell in path if cell not in ignored_cells]
+        return sum(cell.visualAbsorption for cell in path)
+
+    def hit_chance_range(self, matchInfo, shooter, target, position):
+        """Return the displayed low/high hit chance for a resolved target.
+
+        Actual attacks roll a movement penalty for every projectile.  A still
+        shooter therefore gets one exact value, while a moving shooter gets a
+        truthful range covering its possible individual projectile chances.
+        """
+        accuracy_required = self.accuracy_required(matchInfo, shooter, position)
+        maximum_accuracy = self.accuracy * self.accuracyMultiplier
+        minimum_multiplier = max(0, 1 - ((self.speedPenalty * shooter.speed) / 100))
+        minimum_accuracy = maximum_accuracy * minimum_multiplier
+        chances = (
+            self._hit_chance(shooter, target, minimum_accuracy, accuracy_required),
+            self._hit_chance(shooter, target, maximum_accuracy, accuracy_required),
+        )
+        return min(chances), max(chances)
 
     def printShortDesc(self):
 

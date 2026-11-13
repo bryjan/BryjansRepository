@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import inputs
+from mechgame.runner import Game
 
 
 class InputTests(unittest.TestCase):
@@ -22,3 +23,40 @@ class InputTests(unittest.TestCase):
             inputs.receive_input(match)
 
         self.assertTrue(match.pov.radarOn)
+
+    def test_target_summary_shows_distance_and_visual_hit_chance(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        shooter = match.pov
+        target = match.teamList[1].squadsList[0].mechList[0]
+        shooter.pos = [2, 10]
+        target.pos = [10, 10]
+        shooter.directlyVisibleEnemies = [target]
+        weapon = shooter.mechClass.gunList[0]
+
+        with patch("builtins.print") as print_mock:
+            inputs.printTargetingSummary(match, weapon, target)
+
+        output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("distance 8.0 tiles", output)
+        self.assertIn("Hit chance:", output)
+
+    def test_target_summary_shows_hit_chance_for_highest_radar_id(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        shooter = match.pov
+        target = match.teamList[1].squadsList[0].mechList[0]
+        shooter.pos = [2, 10]
+        target.pos = [10, 10]
+        shooter.directlyVisibleEnemies = []
+        shooter.team.radarContacts[target] = {
+            "level": 3,
+            "radar_power": 1_000,
+            "position": [10, 10],
+            "speed": 0,
+            "turn_start_pos": [10, 10],
+        }
+
+        with patch("builtins.print") as print_mock:
+            inputs.printTargetingSummary(match, shooter.mechClass.gunList[0], target)
+
+        output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
+        self.assertIn("Hit chance:", output)
