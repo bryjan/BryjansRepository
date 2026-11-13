@@ -3,6 +3,7 @@ import printHUD as ph
 import textwrap
 from mechgame.coordinates import get_coordinate_input
 from mechgame.mechs import MAX_HULL_ART_HEIGHT
+from mechgame import radar
 
 SIDE_PANEL_WIDTH = 34
 # A damaged mortar Lancer is the tallest current detail set. Reserve space
@@ -39,11 +40,8 @@ def _condition_color(condition):
     return "green"
 
 
-def _centered_mech_lines(mech, width):
-    """Return this hull's centered silhouette, colored by average condition."""
-    mech_art = mech.mechClass.hull.asciiArt
-    condition = mech.mechClass.condition
-    color = _condition_color(condition)
+def _centered_art_lines(mech_art, width, color):
+    """Return one centered hull silhouette without exposing extra statistics."""
     lines = []
     for art_line in mech_art:
         left_padding = (width - len(art_line)) // 2
@@ -52,6 +50,15 @@ def _centered_mech_lines(mech, width):
             f"|{' ' * left_padding}{termcolor.colored(art_line, color)}{' ' * right_padding}|"
         )
     return lines
+
+
+def _centered_mech_lines(mech, width):
+    """Return the active mech's hull art, colored by average condition."""
+    return _centered_art_lines(
+        mech.mechClass.hull.asciiArt,
+        width,
+        _condition_color(mech.mechClass.condition),
+    )
 
 
 def _weapon_status(weapon):
@@ -75,9 +82,14 @@ def _panel_text_lines(text, width):
     return [f"|{line:<{width}}|" for line in textwrap.wrap(text, width=width) or [""]]
 
 
-def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
-    """Build a fixed-height active-mech summary for the tactical side panel."""
-    mech = matchInfo.pov
+def _finish_panel_lines(lines, height, width):
+    """Clip low-priority rows and pad the panel to match the map height."""
+    lines = lines[:height]
+    return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+
+
+def _own_mech_panel_lines(mech, height, width):
+    """Build the status/weapon fallback when the team tracks no enemies."""
     abilities = ", ".join(
         f"{ability.name} {'Unlimited' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
         for ability in mech.mechClass.hull.abilities
@@ -109,8 +121,51 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     ]
     for entry in entries:
         lines.extend(_panel_text_lines(entry, width))
-    lines = lines[:height]
-    return lines + [f"|{'':<{width}}|" for _ in range(height - len(lines))]
+    return _finish_panel_lines(lines, height, width)
+
+
+def _focused_contact_panel_lines(matchInfo, contacts, focus, height, width):
+    """Build a sensor-limited target view plus a compact contact list."""
+    observer = matchInfo.pov
+    detail = radar.contact_details(observer, matchInfo, focus)
+    identity = f"FOCUS: {detail['classification']}"[:width]
+    lines = []
+    # Hull art is only safe to show once visual confirmation or radar level 3
+    # identifies the chassis. It is deliberately white: condition is unknown.
+    if detail["silhouette_known"]:
+        lines.extend(_centered_art_lines(focus.mechClass.hull.asciiArt, width, "white"))
+    lines.extend([
+        f"|{identity:^{width}}|",
+        "+" + ("-" * width) + "+",
+    ])
+    sensor_source = "Visual" if detail["visually_confirmed"] else f"Radar ID {detail['radar_level']}"
+    entries = [
+        f"Position: {detail['position']} | Distance: {detail['distance']:.1f}",
+        f"Movement: {detail['movement']}",
+        f"Sensors: {sensor_source}",
+        f"Return: {detail['return_power']} / {detail['threshold']}",
+        "Tracked contacts:",
+    ]
+    for contact in contacts:
+        contact_detail = radar.contact_details(observer, matchInfo, contact)
+        marker = ">" if contact is focus else "-"
+        entries.append(
+            f"{marker} {contact_detail['classification']} {contact_detail['position']} "
+            f"({contact_detail['distance']:.1f})"
+        )
+    for entry in entries:
+        lines.extend(_panel_text_lines(entry, width))
+    return _finish_panel_lines(lines, height, width)
+
+
+def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
+    """Show contact intelligence first, falling back to own weapon readiness."""
+    observer = matchInfo.pov
+    contacts = radar.tracked_contacts(observer)
+    focus = radar.panel_focus(observer)
+    if focus is not None:
+        return _focused_contact_panel_lines(matchInfo, contacts, focus, height, width)
+    return _own_mech_panel_lines(observer, height, width)
 
 
 def _hud_lines(matchInfo, width):

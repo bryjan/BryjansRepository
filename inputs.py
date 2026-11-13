@@ -119,6 +119,9 @@ def abilityMenu(matchInfo):
 def fire(matchInfo, target=None):
     """Fire the selected weapon, optionally starting from a chosen target."""
     mech = matchInfo.pov
+    if target is not None:
+        # A deliberate target selection remains visible after this shot.
+        mech.focusedEnemy = target
     gunList = mech.mechClass.gunList
 
     if len(gunList) == 0:
@@ -292,7 +295,9 @@ def chooseLauncherTrackedContact(matchInfo):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return mech.trackedEnemies[int(selection) - 1]
+    selected_target = mech.trackedEnemies[int(selection) - 1]
+    mech.focusedEnemy = selected_target
+    return selected_target
 
 
 def chooseLauncherTrackedTarget(matchInfo):
@@ -353,7 +358,9 @@ def radarMenu(matchInfo):
         print("Choose a listed contact number or 'x'.")
         return
 
-    detail = radar.contact_details(observer, matchInfo, contacts[int(selection) - 1])
+    selected_target = contacts[int(selection) - 1]
+    observer.focusedEnemy = selected_target
+    detail = radar.contact_details(observer, matchInfo, selected_target)
     confirmation = "yes" if detail["visually_confirmed"] else "no"
     print("Radar contact details")
     print(f"Classification: {detail['classification']}")
@@ -362,7 +369,7 @@ def radarMenu(matchInfo):
     print(f"Radar return: {detail['return_power']} / {detail['threshold']} required")
     action = input("Radar contact: 'f' fire at this contact | 'x' exit: ").strip().lower()
     if action == "f":
-        return fire(matchInfo, contacts[int(selection) - 1])
+        return fire(matchInfo, selected_target)
     if action not in ("", "x"):
         print("Choose 'f' or 'x'.")
 
@@ -503,7 +510,9 @@ def chooseTrackedContact(matchInfo):
     if not selection.isdigit() or not 1 <= int(selection) <= len(mech.trackedEnemies):
         print("Choose a listed target number.")
         return None
-    return mech.trackedEnemies[int(selection) - 1]
+    selected_target = mech.trackedEnemies[int(selection) - 1]
+    mech.focusedEnemy = selected_target
+    return selected_target
 
 
 def printTargetingSummary(matchInfo, weapon, target, label="Target"):

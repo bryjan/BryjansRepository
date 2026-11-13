@@ -230,6 +230,29 @@ def team_contacts(observer):
     )
 
 
+def tracked_contacts(observer):
+    """Return every valid visual or radar contact, nearest first."""
+    contacts = [
+        contact
+        for contact in getattr(observer, "trackedEnemies", [])
+        if contact.team != observer.team and not contact.destroyed
+    ]
+    return sorted(
+        dict.fromkeys(contacts),
+        key=lambda contact: math.dist(observer.pos, contact_position(observer, contact)),
+    )
+
+
+def panel_focus(observer):
+    """Use a valid chosen contact, otherwise the nearest current contact."""
+    contacts = tracked_contacts(observer)
+    if observer.focusedEnemy in contacts:
+        return observer.focusedEnemy
+    if observer.focusedEnemy is not None:
+        observer.focusedEnemy = None
+    return contacts[0] if contacts else None
+
+
 def remember_contact(team, target, radar_power):
     """Keep the strongest detection level for one target this match round."""
     level = detection_level(radar_power, target)
@@ -298,6 +321,9 @@ def contact_details(observer, match_info, target):
         "threshold": threshold,
         "movement": movement,
         "visually_confirmed": directly_visible,
+        "radar_level": level,
+        "identified": identified,
+        "silhouette_known": identified,
     }
 
 

@@ -63,6 +63,9 @@ class Entity: #a character on the map
         self.lastFiredAt = None
         self.directlyVisibleEnemies = []
         self.trackedEnemies = []
+        # The right tactical panel keeps a selected enemy here. When empty or
+        # stale, it automatically falls back to the nearest tracked contact.
+        self.focusedEnemy = None
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False

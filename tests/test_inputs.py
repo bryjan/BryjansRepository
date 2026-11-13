@@ -63,6 +63,19 @@ class InputTests(unittest.TestCase):
         self.assertIn("Weapons:", panel)
         self.assertIn("Abilities: Dash 2/2", panel)
 
+    def test_tactical_side_panel_defaults_to_nearest_tracked_contact(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        observer = match.pov
+        target = match.teamList[1].squadsList[0].mechList[0]
+        observer.trackedEnemies = [target]
+        observer.directlyVisibleEnemies = [target]
+
+        panel = "\n".join(printView._side_panel_lines(match, height=19))
+
+        self.assertIn("FOCUS: Bastion", panel)
+        self.assertIn("Sensors: Visual", panel)
+        self.assertIn("Tracked contacts:", panel)
+
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
         match = Game(map_size=20, window_size=9).create_match()
         shooter = match.pov
