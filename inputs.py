@@ -77,8 +77,8 @@ def recieveInput(matchInfo):
     """Compatibility wrapper for the original misspelled command function."""
     return receive_input(matchInfo)
 
-def fire(matchInfo):
-    """Fire the selected weapon, defaulting to the nearest tracked enemy."""
+def fire(matchInfo, target=None):
+    """Fire the selected weapon, optionally starting from a chosen target."""
     mech = matchInfo.pov
     gunList = mech.mechClass.gunList
 
@@ -96,7 +96,9 @@ def fire(matchInfo):
         print("Select a default weapon.")
         return gunMenu(matchInfo)
     
-    defaultTarget = nearestTrackedEnemy(mech)
+    # The radar menu can pass one exact shared contact here. Ordinary 'f'
+    # input keeps the quick-fire behavior of choosing the nearest contact.
+    defaultTarget = target if target is not None else nearestTrackedEnemy(mech)
     if defaultTarget is not None:
         print(f"Default target: {defaultTarget.pilot.name} — {defaultTarget.mechClass.name} at {defaultTarget.pos}")
         pv.printPOV(matchInfo, *defaultTarget.pos)
@@ -163,6 +165,11 @@ def radarMenu(matchInfo):
     print(f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles")
     print(f"Movement: {detail['movement']} | Visually confirmed: {confirmation}")
     print(f"Radar return: {detail['return_power']} / {detail['threshold']} required")
+    action = input("Radar contact: 'f' fire at this contact | 'x' exit: ").strip().lower()
+    if action == "f":
+        return fire(matchInfo, contacts[int(selection) - 1])
+    if action not in ("", "x"):
+        print("Choose 'f' or 'x'.")
 
 
 def optionsMenu(matchInfo):
