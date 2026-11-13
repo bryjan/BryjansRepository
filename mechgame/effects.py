@@ -54,9 +54,12 @@ class FireEffect(TerrainEffect):
         self.turns_remaining = turns
 
     def _damage_entity(self, match_info, entity):
+        """Apply the hazard to one random limb; blocked flames make no alert."""
         if entity.destroyed:
             return
         limb = random.choice(entity.mechClass.limbList)
+        # ``damage`` emits the critical fire report only if this hit actually
+        # penetrates the chosen limb's armor into its hit points.
         limb.damage(match_info, 8, "fire")
 
     def on_enter(self, match_info, entity):

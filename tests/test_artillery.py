@@ -2,6 +2,7 @@
 
 import random
 import unittest
+from unittest.mock import patch
 
 from mechgame import artillery, effects
 from mechgame.mechs import WeaponLimb
@@ -111,3 +112,23 @@ class ArtilleryTests(unittest.TestCase):
         effects.advance_effects(self.match)
 
         self.assertEqual(border_cell.onFire, 0)
+
+    def test_fire_damage_reports_critical_only_after_penetrating_armor(self):
+        mech = self.match.pov
+        limb = mech.mechClass.legs
+        fire = effects.FireEffect()
+
+        # The Lancer's legs have less than eight armor, so this fire hit
+        # reaches HP and must be displayed as a critical warning.
+        with patch("mechgame.effects.random.choice", return_value=limb):
+            fire.on_enter(self.match, mech)
+        self.assertTrue(any(
+            critical and "hit by a fire" in report
+            for report, critical, _ in mech.squad.reportLog
+        ))
+
+        mech.squad.reportLog.clear()
+        limb.armor = 8
+        with patch("mechgame.effects.random.choice", return_value=limb):
+            fire.on_enter(self.match, mech)
+        self.assertFalse(any("hit by a fire" in report for report, _, _ in mech.squad.reportLog))

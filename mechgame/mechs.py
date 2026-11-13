@@ -155,7 +155,7 @@ class MechPart: # super class to mech limbs
 
 
     def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
-        """Resolve damage against armor and hit points, then check critical effects."""
+        """Resolve damage and return whether it penetrated armor into hit points."""
 
         #no negative damage values
         dmg = dmgAmount
@@ -172,12 +172,12 @@ class MechPart: # super class to mech limbs
         #damage calc
         if armorPiercing == False:
             dmg = dmg - self.armor
-            if dmg < 0:
-                return
+            if dmg <= 0:
+                return False
         else:
             dmg = round(dmg - (self.armor / 4))
-            if dmg < 0:
-                return
+            if dmg <= 0:
+                return False
 
         #applying damage
         self.hp -= dmg
@@ -203,7 +203,11 @@ class MechPart: # super class to mech limbs
         self.mechClass.condition = round(sum(self.mechClass.limbsConditionList) / len(self.mechClass.limbList) * 100)
 
         #reporting damage
-        self.mech.report(matchInfo, "I was hit by a " + dmgSource + "!", teamReport = False, critical = False)
+        self.mech.report(
+            matchInfo, "I was hit by a " + dmgSource + "!",
+            teamReport=False, critical=(damageSource == "fire"),
+        )
+        return True
 
     def critical (self, matchInfo):
         #checking if there is modules to damage
