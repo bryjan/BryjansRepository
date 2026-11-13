@@ -74,56 +74,6 @@ class Entity: #a character on the map
     def __repr__(self):
         return self.pilot.name
 
-    def statusReport(self):
-        """Return a compact condition report for the player or future AI.
-
-        Parts own their armor, HP, and modules, so this report deliberately
-        reads those live values rather than relying on the mech-wide average.
-        """
-        parts = self.mechClass.limbList
-        damagedModules = sum(
-            module.status < 2
-            for part in parts
-            for module in part.modsList
-        )
-        totalModules = sum(len(part.modsList) for part in parts)
-        lines = [
-            f"{self.mechClass.name} — {self.pilot.name}",
-            f"Overall condition: {round(self.mechClass.condition)}% | "
-            f"Damaged modules: {damagedModules}/{totalModules}",
-        ]
-
-        hullAbilities = self.mechClass.hull.abilities
-        if hullAbilities:
-            lines.append(
-                "Hull abilities: " + ", ".join(
-                    f"{ability.name} "
-                    f"{'unlimited' if ability.maxCharges is None else f'{ability.charges}/{ability.maxCharges}'}"
-                    for ability in hullAbilities
-                )
-            )
-
-        for part in parts:
-            partDamagedModules = sum(module.status < 2 for module in part.modsList)
-            modules = f"modules {partDamagedModules}/{len(part.modsList)} damaged"
-            integrity = (
-                f"armor {part.armor}/{part.startingArmor} | "
-                f"HP {part.hp}/{part.startingHP}"
-            )
-            weaponInfo = ""
-            if part.isGun:
-                if part.isLauncher:
-                    charges = ", ".join(
-                        f"{ammo.name} "
-                        f"{'unlimited' if ammo.charges is None else f'{ammo.charges}/{ammo.maxCharges}'}"
-                        for ammo in part.ammoTypes
-                    )
-                else:
-                    charges = "unlimited" if part.charges is None else f"{part.charges}/{part.maxCharges}"
-                weaponInfo = f" | charges {charges}"
-            lines.append(f"- {part.name}: {integrity} | {modules}{weaponInfo}")
-        return "\n".join(lines)
-
     def roundRefresh(self, matchInfo):
         """Restore per-round state and refresh the mech's derived statistics."""
 

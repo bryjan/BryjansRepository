@@ -256,9 +256,6 @@ class MechClass: #a constructed mech not a npc or player
 
         self.desc = description
 
-    def displayStats(self): #basic stats display for bug fixing. TODO redo to look nicer and adding descriptions for gameplay
-        pass
-
     def statUpdate(self):
         """Recalculate derived mech statistics after a part or module changes."""
         #retrieve limb passed stats
@@ -269,15 +266,6 @@ class MechClass: #a constructed mech not a npc or player
             for stat in self.passedStatsList:
                 if getattr(limb, stat, "No attribute of that Name") != "No attribute of that Name":
                     setattr(self, stat, getattr(limb, stat))
-
-
-    def statReset(self): #TODO resets mech's stats to default, including its limbs and modules
-        pass
-
-    def roundRefresh(self): #TODO refreshes round based stats(AP,MP,moved)and adds round based resources ex.power from powerGen
-        """Restore action and movement resources for a new round."""
-        pass
-
 
 class MechPart: # super class to mech limbs
     """Base component with armor, hit points, modules, and derived modifiers."""
@@ -314,18 +302,15 @@ class MechPart: # super class to mech limbs
         Module stat arrays are indexed by module condition: destroyed (0),
         damaged (1), then intact (2).
         """
-        for m in self.modsList:
-            if m.modType == 1: #skips modules that make no stat change
-                i = 0
-                while i < len(m.statNames):
-                    if getattr(self, m.statNames[i], "x") == "x":
-                        #print(m.name + " is incompatable with " + self.name)
-                        #print(self.name + " has no " + m.statNames[i])
-                        return
-                    else:
-                        setattr(self, m.statNames[i], m.statsArray[i][m.status])
-                        #print("updated " + m.name + " " + m.statNames[i] + " to " + str(m.statsArray[i][m.status]))
-                    i += 1
+        for module in self.modsList:
+            if module.modType != 1:
+                continue
+            for stat_name, stat_values in zip(module.statNames, module.statsArray):
+                if not hasattr(self, stat_name):
+                    # Reusable modules may name a stat this part does not own.
+                    # Skip only that modifier, not the rest of the module list.
+                    continue
+                setattr(self, stat_name, stat_values[module.status])
         self.updateStats()
 
     def updateStats(self):

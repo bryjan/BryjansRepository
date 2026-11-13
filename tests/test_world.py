@@ -3,6 +3,7 @@ import unittest
 
 from mechgame import effects
 from mechgame.match import MatchInfo
+from mechgame.mechs import MechPart, Module
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
 from mechgame.world import MapGenerator
@@ -65,6 +66,14 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(lance.piercing)
         self.assertEqual(lance.energyCost, 0)
         self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)
+
+    def test_incompatible_module_does_not_block_later_module_updates(self):
+        incompatible = Module("Wrong Target", ["missingStat"], 1, [[0, 0, 0]])
+        compatible = Module("Armor Bonus", ["bonusArmor"], 1, [[0, 1, 2]])
+
+        part = MechPart("Test Part", 1, 1, [incompatible, compatible])
+
+        self.assertEqual(part.bonusArmor, 2)
 
     def test_lancer_hull_dash_crosses_restrictive_terrain_without_cost(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()

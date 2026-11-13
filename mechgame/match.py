@@ -46,9 +46,6 @@ class MatchInfo:
         self.blank = self.border = self.desert = self.plains = None
         self.forest = self.suburb = self.road = None
 
-    def spawnEntities(self):
-        pass #TODO
-
     def nextSquadTurn(self):
         """Advance the point of view to the first mech in the next squad."""
         # A pulse is active only for the squad turn in which it was ordered.

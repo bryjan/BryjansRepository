@@ -163,6 +163,3 @@ class Cell:
         else:
             print(" ", end = " ")
             return
-    
-    def roundRefresh(self): #TODO reset stats that refresh every round ex)radar and visual strength, radar sources then counting down cell effects
-        pass
