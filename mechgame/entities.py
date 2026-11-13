@@ -96,7 +96,14 @@ class Entity: #a character on the map
             )
             weaponInfo = ""
             if part.isGun:
-                charges = "unlimited" if part.charges is None else f"{part.charges}/{part.maxCharges}"
+                if part.isLauncher:
+                    charges = ", ".join(
+                        f"{ammo.name} "
+                        f"{'unlimited' if ammo.charges is None else f'{ammo.charges}/{ammo.maxCharges}'}"
+                        for ammo in part.ammoTypes
+                    )
+                else:
+                    charges = "unlimited" if part.charges is None else f"{part.charges}/{part.maxCharges}"
                 weaponInfo = f" | charges {charges}"
             lines.append(f"- {part.name}: {integrity} | {modules}{weaponInfo}")
         return "\n".join(lines)

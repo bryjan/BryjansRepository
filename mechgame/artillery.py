@@ -12,7 +12,7 @@ class LauncherAmmo:
 
     def __init__(self, name, rangeBands, payload="explosive", charges=None,
                  damageModifier=0, blastRadius=0, blastSize=0,
-                 effectRadius=0, effectTurns=2, scoutVision=0):
+                 effectRadius=0, effectTurns=2, scoutVision=0, igniteChance=0):
         self.name = name
         self.rangeBands = rangeBands
         self.payload = payload
@@ -24,6 +24,7 @@ class LauncherAmmo:
         self.effectRadius = effectRadius
         self.effectTurns = effectTurns
         self.scoutVision = scoutVision
+        self.igniteChance = igniteChance
 
         if payload not in {"explosive", "smoke", "incendiary", "scout"}:
             raise ValueError("Launcher ammunition payload must be explosive, smoke, incendiary, or scout.")
@@ -69,6 +70,7 @@ class ScheduledImpact:
     effect_turns: int
     scout_vision: int
     owner_team: object
+    ignite_chance: float
 
 
 def scatter_position(match_info, target, inherent_inaccuracy):
@@ -92,11 +94,11 @@ def scatter_position(match_info, target, inherent_inaccuracy):
 
 def schedule_impact(match_info, position, turns, radius, size, damage, weapon_name,
                     payload="explosive", effect_radius=0, effect_turns=2,
-                    scout_vision=0, owner_team=None):
+                    scout_vision=0, owner_team=None, ignite_chance=0):
     """Store one delayed shell on the match until turn advancement resolves it."""
     impact = ScheduledImpact(
         list(position), turns, radius, size, damage, weapon_name,
-        payload, effect_radius, effect_turns, scout_vision, owner_team,
+        payload, effect_radius, effect_turns, scout_vision, owner_team, ignite_chance,
     )
     match_info.pendingImpacts.append(impact)
     return impact
@@ -114,6 +116,9 @@ def advance_impacts(match_info):
         print(f"{impact.weapon_name} impacts at {impact.position}!")
         if impact.payload == "explosive":
             match_info.explosion(impact.position, impact.radius, impact.size, impact.damage)
+            if random.random() < impact.ignite_chance:
+                cell = match_info.map[impact.position[1]][impact.position[0]]
+                effects.add_fire(cell)
         elif impact.payload in {"smoke", "incendiary"}:
             for row in match_info.map:
                 for cell in row:

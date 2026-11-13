@@ -378,6 +378,9 @@ class WeaponLimb(MechPart):
         self.accuracy = int((self.baseAccuracy * self.multiAccuracy) + self.bonusAccuracy)
         self.soundReport = int((self.baseSoundReport * self.multiSoundReport) + self.bonusSoundReport)
 
+    def updateLauncherStats(self):
+        """Reserve a dedicated update hook for future launcher-only modules."""
+
     def emitSound(self, matchInfo):
         """Send a sound report to enemy entities within audible range."""
         for entity in matchInfo.entities:
@@ -492,6 +495,7 @@ class WeaponLimb(MechPart):
             ammo.effectTurns,
             ammo.scoutVision,
             matchInfo.pov.team,
+            ammo.igniteChance,
         )
         print(f"{self.name} fired on its {profile['name']} profile. Impact expected in {profile['turns']} turn(s).")
         matchInfo.advTurn = True

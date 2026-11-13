@@ -118,7 +118,9 @@ class MatchInfo:
             # Larger explosions can strike more parts; large targets spread the
             # blast across more armor, while small targets are more exposed.
             parts_to_hit = max(1, min(len(entity.mechClass.limbList), 3 + size - entity.size))
-            armor_damage = max(0, 1 + size - entity.size)
+            # Every fragment hit strips one armor point. Blast size changes
+            # the number of limbs exposed, not the armor removed per limb.
+            armor_damage = 1
             for limb in random.sample(entity.mechClass.limbList, parts_to_hit):
                 limb.damage(self, damage, "explosion", armorDamage=armor_damage)
 

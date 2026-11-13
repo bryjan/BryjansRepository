@@ -150,9 +150,9 @@ def _scout_flare_round():
     return LauncherAmmo(
         "Scout Flare Round",
         {
-            "close": [35, 1, 1],
-            "medium": [75, 3, 2],
-            "far": [120, 5, 3],
+            "close": [25, 1, 1],
+            "medium": [50, 3, 2],
+            "far": [80, 5, 3],
         },
         payload="scout",
         charges=4,
@@ -161,8 +161,36 @@ def _scout_flare_round():
     )
 
 
+def _he_mortar_round():
+    """Main damage shell with a small chance to ignite its impact point."""
+    return LauncherAmmo(
+        "HE Mortar Round",
+        {"close": [25, 1, 1], "medium": [50, 3, 2], "far": [80, 5, 3]},
+        payload="explosive", charges=10, blastRadius=2, blastSize=2, igniteChance=.10,
+    )
+
+
+def _smoke_mortar_round():
+    return LauncherAmmo(
+        "Smoke Mortar Round",
+        {"close": [25, 1, 1], "medium": [50, 3, 2], "far": [80, 5, 3]},
+        payload="smoke", charges=5, effectRadius=2, effectTurns=2,
+    )
+
+
+def _incendiary_mortar_round():
+    return LauncherAmmo(
+        "Incendiary Mortar Round",
+        {"close": [25, 1, 1], "medium": [50, 2, 2], "far": [80, 4, 3]},
+        payload="incendiary", charges=1, effectRadius=2, effectTurns=3,
+    )
+
+
 AMMO_FACTORIES = {
+    "he_mortar_round": _he_mortar_round,
+    "incendiary_mortar_round": _incendiary_mortar_round,
     "scout_flare_round": _scout_flare_round,
+    "smoke_mortar_round": _smoke_mortar_round,
 }
 
 
@@ -234,6 +262,20 @@ def _chaingun():
 
 def _scout_rifle():
     return WeaponLimb("Scout Rifle", 6, 24, [create_module("holosight")], damage=10, accuracy=30, soundRep=20, charges=60)
+
+
+def _lancer_mortar():
+    """A single-shell 2-AP launcher for indirect fire and support payloads."""
+    return WeaponLimb(
+        "Lancer Mortar", 6, 24, [], damage=20, accuracy=0, soundRep=30,
+        charges=None, apCost=2, energyCost=0,
+        ammoTypes=[
+            create_ammo("he_mortar_round"),
+            create_ammo("smoke_mortar_round"),
+            create_ammo("scout_flare_round"),
+            create_ammo("incendiary_mortar_round"),
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +372,7 @@ PART_FACTORIES = {
         "pathfinder.legs": _pathfinder_lancer_legs,
         "chaingun": _chaingun,
         "scout_rifle": _scout_rifle,
+        "lancer_mortar": _lancer_mortar,
     },
     3: {
         "bastion.helm": _bastion_helm,
@@ -390,6 +433,16 @@ def _lancer_pathfinder():
     )
 
 
+def _lancer_mortar_variant():
+    return MechClass(
+        "Lancer Type.M Mortar", "m", "magenta",
+        create_part(2, "lancer.standard_hull"),
+        create_part(2, "lancer.standard_helm"),
+        create_part(2, "lancer.standard_legs"),
+        [create_part(2, "lancer_mortar")],
+    )
+
+
 def _kestrel():
     return MechClass(
         "Kestrel", "K", "light_blue",
@@ -413,7 +466,11 @@ def _bastion():
 MECH_FACTORIES = {
     # Add a complete mech builder under its class size. ``create_mech`` then
     # returns a fresh, damage-safe instance whenever the ID is requested.
-    2: {"lancer.type_a": _lancer_type_a, "lancer.pathfinder": _lancer_pathfinder},
+    2: {
+        "lancer.type_a": _lancer_type_a,
+        "lancer.pathfinder": _lancer_pathfinder,
+        "lancer.mortar": _lancer_mortar_variant,
+    },
     3: {"bastion": _bastion, "kestrel": _kestrel},
 }
 

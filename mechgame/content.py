@@ -10,6 +10,7 @@ def create_demo_teams():
     player_mechs = [
         Entity(create_mech("lancer.pathfinder"), Pilot("Kiki")),
         Entity(create_mech("bastion"), Pilot("Bryan")),
+        Entity(create_mech("lancer.mortar"), Pilot("Rook")),
     ]
     enemy_mechs = [
         Entity(create_mech("kestrel"), Pilot("Wraith")),
