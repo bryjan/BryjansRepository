@@ -11,7 +11,7 @@ from . import radar
 class MatchInfo:
     """Mutable state shared by one running match."""
 
-    def __init__(self, mapSize, windowSize, teams, mapParams, mapHeight=None):
+    def __init__(self, mapSize, windowSize, teams, mapParams, mapHeight=None, rng=None):
         # ``mapSize`` remains the width for compatibility with older callers.
         # Height defaults to width so existing square-map games still work.
         self.mapSize = mapSize
@@ -32,6 +32,9 @@ class MatchInfo:
         self.matchRound = 0
         self.pov = ""
         self.mapParamsList = mapParams
+        # One source of randomness makes seeded matches reproducible in tests
+        # and eventually suitable for replay or save-file support.
+        self.rng = rng if rng is not None else random.Random()
         self.map = []
         # Radar coverage is cached until a source changes in a meaningful way.
         self._radarSourceState = None
@@ -130,7 +133,7 @@ class MatchInfo:
             # Every fragment hit strips one armor point. Blast size changes
             # the number of limbs exposed, not the armor removed per limb.
             armor_damage = 1
-            for limb in random.sample(entity.mechClass.limbList, parts_to_hit):
+            for limb in self.rng.sample(entity.mechClass.limbList, parts_to_hit):
                 limb.damage(self, damage, "explosion", armorDamage=armor_damage)
 
         # TODO: explosions can later add fire, smoke, and terrain effects.
@@ -206,4 +209,4 @@ class MatchInfo:
     def mapInit(self):
         """Build the world through the dedicated map-generation module."""
         from mechgame.world import MapGenerator
-        self.map = MapGenerator(self.mapWidth, self.mapHeight).build(self)
+        self.map = MapGenerator(self.mapWidth, self.mapHeight, self.rng).build(self)

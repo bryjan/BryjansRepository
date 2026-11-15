@@ -99,14 +99,18 @@ class Squad:
 
     def calcEffectiveness(self):
         """Recalculate aggregate squad integrity from the live mech blueprints."""
+        if not self.mechList:
+            self.effectiveness = 0
+            return
         status = 0
         for mech in self.mechList:
             status += mech.mechClass.condition
 
         self.effectiveness = (status/len(self.mechList))*100
 
-    def spawnSquad(self, map, spawnPosition):
+    def spawnSquad(self, map, spawnPosition, rng=None):
         """Place every squad member on a unique, in-bounds passable cell."""
+        rng = rng if rng is not None else random
         mapHeight = len(map)
         mapWidth = len(map[0])
         radius = 2
@@ -129,7 +133,7 @@ class Squad:
             radius += 1
 
         for mech in self.mechList:
-            position = random.choice(validSpawnLocations)
+            position = rng.choice(validSpawnLocations)
             mech.pos = position
             validSpawnLocations.remove(position)
 

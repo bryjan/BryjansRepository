@@ -2,3 +2,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+# Local PyInstaller output is distributed separately, never committed.
+build/
+dist/
+*.spec

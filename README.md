@@ -44,9 +44,11 @@ round and returns it to the player squad.
 python -m unittest discover -s tests
 ```
 
-Current playable features include map generation, spawning, movement, visual
-range, radar reports, weapon selection, and a two-team turn cycle. Combat, AI,
-campaign flow, saves, and a full test suite are still in development.
+Current playable features include procedural maps, spawning, movement, visual
+range, shared radar contacts, direct and artillery combat, limb damage,
+temporary fire/smoke effects, equipment selection, and a two-team turn cycle.
+Enemy AI, campaign flow, saves, and broader automated coverage remain in
+development.
 
 ## Content catalog
 
@@ -62,5 +64,5 @@ holosight = create_module("holosight")
 ```
 
 `list_catalog()` lists entries grouped under class sizes from flat through
-titanic. The current test match includes Kiki's Pathfinder and Bryan's Bastion
-against two enemy Kestrels.
+titanic. The current test match fields B's Pathfinder, three standard Lancers,
+and Chiki's mortar Lancer against two Bastions and a Kestrel.

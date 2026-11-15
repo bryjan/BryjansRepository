@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 import math
-import random
 
 from . import effects
 
@@ -83,8 +82,8 @@ def scatter_position(match_info, target, inherent_inaccuracy):
         return list(target)
 
     while True:
-        offset_x = random.randint(-scatter, scatter)
-        offset_y = random.randint(-scatter, scatter)
+        offset_x = match_info.rng.randint(-scatter, scatter)
+        offset_y = match_info.rng.randint(-scatter, scatter)
         if math.hypot(offset_x, offset_y) <= scatter:
             break
 
@@ -116,7 +115,7 @@ def resolve_impact(match_info, impact):
             impact.position, impact.radius, impact.size, impact.damage,
             soundRange=impact.sound_range,
         )
-        if random.random() < impact.ignite_chance:
+        if match_info.rng.random() < impact.ignite_chance:
             cell = match_info.map[impact.position[1]][impact.position[0]]
             effects.add_fire(cell)
     elif impact.payload in {"smoke", "incendiary"}:

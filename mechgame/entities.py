@@ -2,7 +2,6 @@
 
 import copy
 import math
-import random
 
 from termcolor import colored
 
@@ -39,7 +38,7 @@ class Entity: #a character on the map
         self.mp = int(self.mechClass.mpMax)
         self.energy = int(self.mechClass.energyMax)
         self.visPower = self.mechClass.visPower
-        self.radarPower = self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25 ))
+        self.radarPower = self.mechClass.radarPower / (1 + (self.speed * .25))
         # Hull abilities can temporarily amplify both visual range and the
         # radar source projected by this individual mech.
         self.sensorBoostMultiplier = 1
@@ -187,17 +186,16 @@ class Entity: #a character on the map
             print(f"You don't have enough energy to travel over {name}, you need {moveCost}.")
             return
 
-        if self.flying == True: #checks for if their is enough energy to fly
-            flyMoveCost = self.size
-            if self.energy < flyMoveCost:
-                print(f"You need {moveCost} Energy to fly.")
-                return
+        if self.flying:
+            # Flight ignores terrain movement penalties but always costs at
+            # least the mech's size in energy.
+            moveCost = max(moveCost, self.size)
 
         if targetCell.terrain.requireFloat and not self.mechClass.canFloat and not self.flying:
             print("Your mech can't travel over water.")
             return
 
-        self.energy = int(self.energy - moveCost) #applies costs
+        self.energy = int(self.energy - moveCost)
         self.ap -= 1
         self.mp = int(self.mp - 1)
         self.pos = list(targetPos)

@@ -25,6 +25,18 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.pov.radarOn)
 
+    def test_weapon_menu_cancel_keeps_the_existing_default(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        lancer = match.teamList[0].squadsList[0].mechList[1]
+        chain_gun = next(weapon for weapon in lancer.mechClass.gunList if weapon.name == "ChainGun")
+        chain_gun.defaultGun = True
+        match.pov = lancer
+
+        with patch("builtins.input", return_value="x"), patch("builtins.print"):
+            inputs.gunMenu(match)
+
+        self.assertTrue(chain_gun.defaultGun)
+
     def test_look_can_cancel_without_rendering_a_view(self):
         match = Game(map_size=20, window_size=9).create_match()
 

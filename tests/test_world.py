@@ -3,9 +3,10 @@ import unittest
 
 from mechgame import effects
 from mechgame.match import MatchInfo
-from mechgame.mechs import MechPart, Module
+from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
+from mechgame.terrain import TerrainType
 from mechgame.world import MapGenerator
 
 
@@ -24,6 +25,20 @@ class MapGeneratorTests(unittest.TestCase):
         match.mapInit()
 
         self.assertTrue(match.map[6][6].nList)
+
+    def test_generator_rejects_maps_that_cannot_draw_a_road(self):
+        with self.assertRaisesRegex(ValueError, "at least 8"):
+            MapGenerator(7).build(MatchInfo(7, 7, [], ""))
+
+    def test_terrain_defaults_are_not_shared_between_instances(self):
+        first = TerrainType("first", "1", "white")
+        second = TerrainType("second", "2", "white")
+
+        first.moveCost.append(1)
+        first.symbolAttribute.append("bold")
+
+        self.assertEqual(second.moveCost, [])
+        self.assertEqual(second.symbolAttribute, [])
 
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
@@ -46,6 +61,19 @@ class MapGeneratorTests(unittest.TestCase):
             ["Bastion", "Kestrel", "Bastion"],
         )
 
+    def test_seeded_games_reproduce_terrain_and_spawn_positions(self):
+        first = Game(map_size=20, window_size=9, rng=random.Random(7)).create_match()
+        second = Game(map_size=20, window_size=9, rng=random.Random(7)).create_match()
+
+        first_terrain = [[cell.terrain.name for cell in row] for row in first.map]
+        second_terrain = [[cell.terrain.name for cell in row] for row in second.map]
+
+        self.assertEqual(first_terrain, second_terrain)
+        self.assertEqual(
+            [mech.pos for mech in first.entities],
+            [mech.pos for mech in second.entities],
+        )
+
     def test_squad_roster_lists_pilots_mechs_and_positions(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
@@ -66,6 +94,27 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(lance.piercing)
         self.assertEqual(lance.energyCost, 0)
         self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)
+
+    def test_flying_legs_enable_flight_and_charge_flight_energy(self):
+        flying_mech = MechClass(
+            "Test Flyer", "F", "white",
+            Hull("Hull", 1, 1, [], 10, 1, 1, 2),
+            Helm("Helm", 1, 1, [], 1, 1, 0),
+            Legs("Flight Legs", 1, 1, [], 2, fly=True),
+        )
+        self.assertTrue(flying_mech.initFlying)
+
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        flyer = match.pov
+        flyer.pos = [4, 4]
+        flyer.flying = True
+        flyer.energy = 4
+        match.entities = [flyer]
+        match.map[4][5].terrain = match.road
+
+        flyer.moveMech(match, "d")
+
+        self.assertEqual(flyer.energy, 2)
 
     def test_incompatible_module_does_not_block_later_module_updates(self):
         incompatible = Module("Wrong Target", ["missingStat"], 1, [[0, 0, 0]])

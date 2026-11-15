@@ -1,7 +1,6 @@
 """Persistent terrain effects created by shells and advanced each match round."""
 
 from collections import deque
-import random
 
 
 class TerrainEffect:
@@ -40,7 +39,7 @@ class SmokeEffect(TerrainEffect):
         self.turns_remaining -= 1
         # Smoke normally lasts close to two rounds, but either round may disperse
         # it early as wind changes.
-        return self.turns_remaining > 0 and random.random() >= 0.35
+        return self.turns_remaining > 0 and match_info.rng.random() >= 0.35
 
 
 class ChaffEffect(SmokeEffect):
@@ -71,7 +70,7 @@ class FireEffect(TerrainEffect):
         """Apply the hazard to one random limb; blocked flames make no alert."""
         if entity.destroyed:
             return
-        limb = random.choice(entity.mechClass.limbList)
+        limb = match_info.rng.choice(entity.mechClass.limbList)
         # ``damage`` emits the critical fire report only if this hit actually
         # penetrates the chosen limb's armor into its hit points.
         limb.damage(match_info, 8, "fire")
@@ -85,8 +84,8 @@ class FireEffect(TerrainEffect):
     def _drift_smoke(self, cell):
         """Let a healthy fire send one visible smoke plume downwind each round."""
         candidates = [neighbor for neighbor in cell.nList if neighbor.terrain.passable]
-        if candidates and random.random() < 0.60:
-            add_smoke(random.choice(candidates))
+        if candidates and match_info.rng.random() < 0.60:
+            add_smoke(match_info.rng.choice(candidates))
 
     def tick(self, match_info, cell):
         terrain = cell.terrain
@@ -109,11 +108,11 @@ class FireEffect(TerrainEffect):
         # ``advance_effects`` after smoke dissipation is resolved.
         self._drift_smoke(cell)
         for neighbor in cell.nList:
-            if not neighbor.terrain.fireproof and random.random() < spread_chance:
+            if not neighbor.terrain.fireproof and match_info.rng.random() < spread_chance:
                 add_fire(neighbor)
 
         self.turns_remaining -= 1
-        return self.turns_remaining > 0 and random.random() >= extinguish_chance
+        return self.turns_remaining > 0 and match_info.rng.random() >= extinguish_chance
 
 
 class ScoutFlareEffect(TerrainEffect):

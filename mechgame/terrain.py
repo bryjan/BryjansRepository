@@ -9,30 +9,30 @@ from .radar import entity_detection_threshold
 #key descriptions in dictionary
 class TerrainType:
     """Immutable-style description of how a terrain category behaves and renders."""
-    def __init__(self, name, symbol, color,size= 0, moveCostBySize=[], visualAbsorbtion = 0, radarAbsorbtion = 0, radarSig = 0, requireFloat = False, fireproof = False, passable = True, symbolHighlight = "", symbolAttribute = []):
+    def __init__(self, name, symbol, color, size=0, moveCostBySize=None, visualAbsorbtion=0, radarAbsorbtion=0, radarSig=0, requireFloat=False, fireproof=False, passable=True, symbolHighlight="", symbolAttribute=None):
         self.name = name
         self.symbol = symbol
         self.color = color
         self.size = size
-        self.moveCost = moveCostBySize
+        self.moveCost = list(moveCostBySize) if moveCostBySize is not None else []
         self.visAbsorb = visualAbsorbtion
         self.radarAbsorb = radarAbsorbtion
         self.radarSig = radarSig
         self.requireFloat = requireFloat
         self.fireproof = fireproof
-        self.symbolAttribute = symbolAttribute
+        self.symbolAttribute = list(symbolAttribute) if symbolAttribute is not None else []
         self.symbolHighlight = symbolHighlight
         self.passable = passable
 
     def displayTerrain(self):
         if self.symbolAttribute != [] and self.symbolHighlight != "":
-            return cprint(self.symbol,self.color,self.symbolHighlight,attrs=[self.symbolAttribute], end = " ")
+            return cprint(self.symbol, self.color, self.symbolHighlight, attrs=self.symbolAttribute, end=" ")
         elif self.symbolHighlight != "":
-            return cprint(self.symbol,self.color,self.symbolHighlight,end = " ")
+            return cprint(self.symbol, self.color, self.symbolHighlight, end=" ")
         elif self.symbolAttribute != []:
-            return cprint(self.symbol,self.color,attrs=[self.symbolAttribute], end = " ")
+            return cprint(self.symbol, self.color, attrs=self.symbolAttribute, end=" ")
         else:
-            return print(colored(self.symbol,self.color), end = " ")
+            return print(colored(self.symbol, self.color), end=" ")
 
 
 class Cell:
@@ -102,33 +102,6 @@ class Cell:
             return
         return closestNeighbor
     
-    def refFurthestNeighborTo(self,targetPos): #returns neighbor cell's position closest to target
-        highestDistance = -9999
-        furthestNeighbor = ""
-        for n in self.nList:
-            if math.dist(n.pos,targetPos) > highestDistance:
-                furthestNeighbor = n
-                highestDistance = math.dist(n.pos,targetPos)
-        if type(furthestNeighbor) == type(""):
-            print(str(self.pos) + "furthest neighbor returned string")
-            return
-        return furthestNeighbor
-    
-    def refPerpendicularNeigbors(self,targetPos):#returns a list
-         neighbors=[]
-         dists=[]
-         for n in self.nList:
-             dists.append(math.dist(n.pos,targetPos))
-             neighbors.append(n)
-         i=0
-         while i < 3:
-             i+=1
-             neighbors.pop(dists.index(max(dists)))
-             dists.pop(dists.index(max(dists)))
-             neighbors.pop(dists.index(min(dists)))
-             dists.pop(dists.index(min(dists)))
-         return neighbors
-        
     def displayCell(self, matchInfo): #TODO what will the cell print on map. smoke and fire affects will be displayed through here too
         """Render the visible entity at this cell, or fall back to terrain."""
         for entity in matchInfo.entities:

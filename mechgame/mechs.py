@@ -2,7 +2,6 @@
 
 import copy
 import math
-import random
 
 from . import artillery
 
@@ -203,7 +202,7 @@ class FieldRepairAbility(Ability):
 
 class MechClass: #a constructed mech not a npc or player
     """Reusable mech blueprint composed from hull, helm, legs, and weapon limbs."""
-    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist = [], description = ""):
+    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=None, description=""):
 
         #basic details
         self.name = name
@@ -218,7 +217,7 @@ class MechClass: #a constructed mech not a npc or player
         #limbs roughly organized by height off ground
         self.limbList = [self.legs, self.hull]
         self.gunList = []
-        for limb in limblist:
+        for limb in limblist or []:
             self.limbList.append(copy.deepcopy(limb))
         self.limbList.append(self.helm)
 
@@ -242,7 +241,6 @@ class MechClass: #a constructed mech not a npc or player
         self.radarPower = 0
         self.radarEnergyCost = 0
         self.passiveRadar = False
-        self.canfloat = False
         self.canFly = False
         self.initFlying = False
 
@@ -367,7 +365,7 @@ class MechPart: # super class to mech limbs
             self.armor = 0
 
         #determining if a module was damaged / crit
-        if random.randint(0, self.hp) + dmgAmount > self.hp + self.armor:
+        if matchInfo.rng.randint(0, self.hp) + dmgAmount > self.hp + self.armor:
             self.critical(matchInfo)
 
         #updating limb's condition
@@ -400,9 +398,9 @@ class MechPart: # super class to mech limbs
             return
 
         #picking random module from limb
-        dmgdMod = random.choice(self.modsList)
+        dmgdMod = matchInfo.rng.choice(self.modsList)
         while dmgdMod.status == 0:
-            dmgdMod = random.choice(self.modsList)
+            dmgdMod = matchInfo.rng.choice(self.modsList)
 
         self.mech.report(matchInfo, dmgdMod.name + " was damaged!", teamReport = False, critical = False)
         dmgdMod.damage(matchInfo)
@@ -425,7 +423,7 @@ class Legs(MechPart): #subclass mechpart
 
         self.canFloat = float
         self.canFly = fly
-        self.initFly = fly
+        self.initFlying = fly
 
     def updateLegStats(self):
         self.mpMax = int((self.baseMP * self.multiMP) + self.bonusMP)
@@ -638,16 +636,16 @@ class WeaponLimb(MechPart):
             i += 1
             movementMultiplier = 1
             if matchInfo.pov.speed > 0:
-                movementMultiplier = 1 - ((random.randint(0, self.speedPenalty) * matchInfo.pov.speed) / 100)
+                movementMultiplier = 1 - ((matchInfo.rng.randint(0, self.speedPenalty) * matchInfo.pov.speed) / 100)
             effectiveAccuracy = self.accuracy * self.accuracyMultiplier * movementMultiplier
             hitChance = self._hit_chance(matchInfo.pov, target, effectiveAccuracy, accuracyRequired)
 
-            if random.randint(1, 100) > hitChance:
+            if matchInfo.rng.randint(1, 100) > hitChance:
                 print("Shot missed!")
             else:
                 print("Shot hit!")
                 if target is not None:
-                    targetLimb = aimedLimb if aimedLimb in target.mechClass.limbList else random.choice(target.mechClass.limbList)
+                    targetLimb = aimedLimb if aimedLimb in target.mechClass.limbList else matchInfo.rng.choice(target.mechClass.limbList)
                     targetLimb.damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
         matchInfo.advTurn = True

@@ -22,7 +22,9 @@ class MapGenerator:
             height = None
         self.width = width
         self.height = width if height is None else height
-        self.rng = rng or random.Random()
+        self.rng = rng if rng is not None else random.Random()
+        if self.width < 8 or self.height < 8:
+            raise ValueError("Maps must be at least 8 tiles wide and 8 tiles high.")
 
     def build(self, match):
         # Delayed import avoids a cycle while the legacy domain module is being

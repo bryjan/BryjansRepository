@@ -702,7 +702,7 @@ def chooseAimedLimb(target):
         return None
     return target.mechClass.limbList[int(selection) - 1]
 
-def gunMenu(matchInfo, target=None): #TODO add ability to exit
+def gunMenu(matchInfo, target=None):
     """Select a default weapon, preserving a radar-selected target if present."""
 
     mech = matchInfo.pov
@@ -718,18 +718,8 @@ def gunMenu(matchInfo, target=None): #TODO add ability to exit
         return
 
 
-    menuWidth = 0
-    for limb in gunList:
-        limb.defaultGun = False
-        if len(limb.printShortDesc()) > menuWidth:
-            menuWidth = len(limb.printShortDesc())
-    menuWidth += 4
-    
-    menuDivider = ""
-    i = 1
-    while i <= menuWidth:
-        i+=1
-        menuDivider = f"{menuDivider}-" 
+    menuWidth = max(len(limb.printShortDesc()) for limb in gunList) + 4
+    menuDivider = "-" * menuWidth
 
     print("Select the default weapon used by 'f'.")
     for limb in gunList:
@@ -737,22 +727,20 @@ def gunMenu(matchInfo, target=None): #TODO add ability to exit
         print(f"'{gunList.index(limb) + 1}' {limb.printShortDesc()}")
     print(menuDivider)
 
-    #get default gun choice from menu
-    #TODO add ability to pull a weapon's long description
-    playerInput = _read_nonempty("Choose weapon number: ")
+    while True:
+        playerInput = _read_nonempty("Choose weapon number or 'x' to cancel: ").lower()
+        if playerInput == "x":
+            return
+        if not playerInput.isdigit() or not 1 <= int(playerInput) <= len(gunList):
+            print("Choose a listed weapon number or 'x'.")
+            continue
 
-    try:
-        playerInput = int(playerInput)
-        if not 1 <= playerInput <= len(gunList):
-            print("Please enter an integer listed in the menu.")
-            gunMenu(matchInfo, target)
-        else:
-            gunList[playerInput - 1].defaultGun = True
-            print(f"{gunList[playerInput - 1].name} is now the default for 'f'.")
-            return fire(matchInfo, target) if target is not None else None
-    except ValueError:
-        print("Please enter an integer.")
-        gunMenu(matchInfo, target)
+        for limb in gunList:
+            limb.defaultGun = False
+        selected = gunList[int(playerInput) - 1]
+        selected.defaultGun = True
+        print(f"{selected.name} is now the default for 'f'.")
+        return fire(matchInfo, target) if target is not None else None
 
 
 def reportMenu(matchInfo):

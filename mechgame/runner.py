@@ -16,10 +16,17 @@ class Game:
         self.map_width = map_size if map_width is None else map_width
         self.map_height = map_size if map_height is None else map_height
         self.window_size = window_size
-        self.rng = rng or random.Random()
+        self.rng = rng if rng is not None else random.Random()
 
     def create_match(self):
-        match = MatchInfo(self.map_width, self.window_size, create_demo_teams(), "", self.map_height)
+        match = MatchInfo(
+            self.map_width,
+            self.window_size,
+            create_demo_teams(),
+            "",
+            self.map_height,
+            rng=self.rng,
+        )
         match.mapInit()
         # Spawn points are kept away from the impassable map border, but their
         # margin scales down safely for compact custom maps.
@@ -38,6 +45,7 @@ class Game:
                         self.rng.randint(xMargin, self.map_width - xMargin - 1),
                         self.rng.randint(yMargin, self.map_height - yMargin - 1),
                     ],
+                    rng=self.rng,
                 )
         match.pov = match.playerSquad.mechList[0]
         return match
