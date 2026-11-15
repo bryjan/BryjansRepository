@@ -31,6 +31,9 @@ class MatchInfo:
         self.pendingImpacts = []
         self.matchRound = 0
         self.pov = ""
+        self.matchOver = False
+        self.winner = None
+        self.resultMessage = ""
         self.mapParamsList = mapParams
         # One source of randomness makes seeded matches reproducible in tests
         # and eventually suitable for replay or save-file support.
@@ -49,39 +52,102 @@ class MatchInfo:
         self.blank = self.border = self.desert = self.plains = None
         self.forest = self.suburb = self.road = None
 
+    def operational_teams(self):
+        """Return teams that still have at least one mech in the match."""
+        return [
+            team for team in self.teamList
+            if any(squad.mechList for squad in team.squadsList)
+        ]
+
+    def _finish_if_decided(self):
+        """Record the result once only one operational team remains."""
+        survivors = self.operational_teams()
+        if len(survivors) > 1:
+            return False
+
+        self.matchOver = True
+        self.winner = survivors[0] if survivors else None
+        self.resultMessage = (
+            f"Match complete: {self.winner.name} wins."
+            if self.winner is not None
+            else "Match complete: no team has operational mechs remaining."
+        )
+        self.advTurn = False
+        self.turnEnded = False
+        return True
+
+    def _turn_slots(self):
+        """Return squads in deterministic team/squad order, including empty ones."""
+        return [
+            (team, squad)
+            for team in self.teamList
+            for squad in team.squadsList
+        ]
+
+    def _begin_new_round(self):
+        """Advance match-round effects and expire round-limited team memory."""
+        self.matchRound += 1
+        effects.advance_effects(self)
+        for team in self.teamList:
+            team.radarContacts.clear()
+
+    def _next_operational_slot(self, current_squad):
+        """Find the next non-empty squad and whether that crosses a round."""
+        turn_slots = self._turn_slots()
+        current_index = next(
+            index for index, (_, squad) in enumerate(turn_slots)
+            if squad is current_squad
+        )
+        for offset in range(1, len(turn_slots) + 1):
+            slot_index = (current_index + offset) % len(turn_slots)
+            team, squad = turn_slots[slot_index]
+            if squad.mechList:
+                return team, squad, current_index + offset >= len(turn_slots)
+        return None, None, False
+
     def nextSquadTurn(self):
-        """Advance the point of view to the first mech in the next squad."""
+        """Advance to the next operational squad or finish the match.
+
+        Empty squads remain in the ordered slot list so turn order remains
+        stable, but they are skipped when selecting the next active squad.
+        """
+        if self.matchOver:
+            return False
+
+        current_squad = self.pov.squad
         # A pulse is active only for the squad turn in which it was ordered.
         # Clear every squad member so changing the point of view cannot let a
         # previous pilot's pulse survive into the next squad turn.
-        for mech in self.pov.squad.mechList:
+        for mech in current_squad.mechList:
             mech.clearTurnAbilities()
             if mech.radarPulseActive:
                 mech.radarOn = False
                 mech.radarPulseActive = False
 
-        teamIndex = self.teamList.index(self.pov.team)
-        squadIndex = self.pov.team.squadsList.index(self.pov.squad)
+        if self._finish_if_decided():
+            return False
 
-        nextTeamIndex = teamIndex
-        nextSquadIndex = squadIndex + 1
-        if nextSquadIndex >= len(self.pov.team.squadsList):
-            nextSquadIndex = 0
-            nextTeamIndex += 1
+        _, next_squad, wrapped_round = self._next_operational_slot(current_squad)
 
-        if nextTeamIndex >= len(self.teamList): #start of new round
-            self.matchRound += 1
-            effects.advance_effects(self)
-            # Radar contacts are tactical memory for one full match round.
-            # They survive friendly squad changes, then expire together when a
-            # fresh round begins.
-            for team in self.teamList:
-                team.radarContacts.clear()
-            nextTeamIndex = 0
+        # The earlier survivor check ensures this only happens for malformed
+        # matches without any schedulable squad.
+        if next_squad is None:
+            self.matchOver = True
+            self.resultMessage = "Match complete: no operational squad remains."
+            return False
+
+        if wrapped_round:
+            self._begin_new_round()
+            if self._finish_if_decided():
+                return False
+            # Fire and other round effects may have destroyed the squad that
+            # was selected before effects advanced. Select again from the
+            # stable slot order after those removals.
+            _, next_squad, _ = self._next_operational_slot(current_squad)
 
         # Sensor information is rebuilt for the squad that is about to act.
         self.clearVisuals()
-        self.pov = self.teamList[nextTeamIndex].squadsList[nextSquadIndex].mechList[0]
+        self.pov = next_squad.mechList[0]
         self.pov.squad.roundRefresh(self)
 
         # Resolve shells only after the new squad has been selected.  This
@@ -90,9 +156,12 @@ class MatchInfo:
         artillery.advance_impacts(self)
         self.advTurn = False
         self.turnEnded = False
+        return True
 
     def nextMechinTeam(self):
         """Cycle the point of view through the current squad without ending its turn."""
+        if self.matchOver or not self.pov.squad.mechList:
+            return
         nextMechIndex = self.pov.squad.mechList.index(self.pov) + 1
     
         if nextMechIndex > len(self.pov.squad.mechList)-1:

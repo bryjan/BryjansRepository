@@ -2,8 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import inputs
 import printView
+from mechgame.commands import dispatch, firing, navigation, squad
 from mechgame.runner import Game
 
 
@@ -12,8 +12,8 @@ class InputTests(unittest.TestCase):
         match = SimpleNamespace(pov=SimpleNamespace(radarOn=False))
 
         with patch("builtins.print"):
-            inputs.radarToggle(match)
-            inputs.radarToggle(match)
+            navigation.radarToggle(match)
+            navigation.radarToggle(match)
 
         self.assertFalse(match.pov.radarOn)
 
@@ -21,7 +21,7 @@ class InputTests(unittest.TestCase):
         match = SimpleNamespace(pov=SimpleNamespace(radarOn=False))
 
         with patch("builtins.input", return_value="  RADAR  "), patch("builtins.print"):
-            inputs.receive_input(match)
+            dispatch.receive_input(match)
 
         self.assertTrue(match.pov.radarOn)
 
@@ -33,7 +33,7 @@ class InputTests(unittest.TestCase):
         match.pov = lancer
 
         with patch("builtins.input", return_value="x"), patch("builtins.print"):
-            inputs.gunMenu(match)
+            firing.gunMenu(match)
 
         self.assertTrue(chain_gun.defaultGun)
 
@@ -41,7 +41,7 @@ class InputTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9).create_match()
 
         with patch("builtins.input", return_value="x"), patch("printView.printPOV") as view_mock:
-            inputs.lookAt(match)
+            navigation.lookAt(match)
 
         view_mock.assert_not_called()
 
@@ -50,7 +50,7 @@ class InputTests(unittest.TestCase):
         active_mech = match.pov
 
         with patch("builtins.input", return_value="n"), patch("builtins.print"):
-            inputs.receive_input(match)
+            dispatch.receive_input(match)
 
         self.assertIsNot(match.pov, active_mech)
 
@@ -58,9 +58,9 @@ class InputTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9).create_match()
 
         with patch("builtins.input", side_effect=["w", "15"]), patch("builtins.print"):
-            inputs.optionsMenu(match)
+            squad.optionsMenu(match)
         with patch("builtins.input", side_effect=["h", "19", "21"]), patch("builtins.print"):
-            inputs.optionsMenu(match)
+            squad.optionsMenu(match)
 
         self.assertEqual(match.windowWidth, 15)
         self.assertEqual(match.windowHeight, 21)
@@ -109,11 +109,11 @@ class InputTests(unittest.TestCase):
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
 
         with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
-            inputs.statusPanel(match)
+            navigation.statusPanel(match)
         self.assertNotIn("right_panel", view_mock.call_args.kwargs)
 
         with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
-            inputs.unreadReportMenu(match)
+            squad.unreadReportMenu(match)
         title, entries = view_mock.call_args.kwargs["right_panel"]
         self.assertEqual(title, "UNREAD REPORTS")
         self.assertIn("Test report", entries[0])
@@ -128,7 +128,7 @@ class InputTests(unittest.TestCase):
         weapon = shooter.mechClass.gunList[0]
 
         with patch("builtins.print") as print_mock:
-            inputs.printTargetingSummary(match, weapon, target)
+            firing.printTargetingSummary(match, weapon, target)
 
         output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("distance 8.0 tiles", output)
@@ -150,7 +150,7 @@ class InputTests(unittest.TestCase):
         }
 
         with patch("builtins.print") as print_mock:
-            inputs.printTargetingSummary(match, shooter.mechClass.gunList[0], target)
+            firing.printTargetingSummary(match, shooter.mechClass.gunList[0], target)
 
         output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("Hit chance:", output)
@@ -163,7 +163,7 @@ class InputTests(unittest.TestCase):
                 entity.pos = [10 + index, 15]
 
         with patch("builtins.input", side_effect=["ab", "1", "d"]), patch("builtins.print"):
-            inputs.receive_input(match)
+            dispatch.receive_input(match)
 
         self.assertEqual(match.pov.pos, [7, 4])
         self.assertEqual(match.pov.mechClass.hull.abilities[0].charges, 1)
@@ -177,11 +177,11 @@ class InputTests(unittest.TestCase):
         launcher = launcher_mech.mechClass.gunList[0]
         selected_target = match.teamList[1].squadsList[0].mechList[0]
         match.pov = launcher_mech
-        original_menu = inputs.launcherFireMenu
+        original_menu = firing.launcherFireMenu
 
         with patch("builtins.input", return_value="t"), patch(
-            "inputs.chooseLauncherTrackedContact", return_value=selected_target
-        ), patch("inputs.launcherFireMenu") as reopened_menu:
+            "mechgame.commands.firing.chooseLauncherTrackedContact", return_value=selected_target
+        ), patch("mechgame.commands.firing.launcherFireMenu") as reopened_menu:
             original_menu(match, launcher)
 
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
@@ -201,19 +201,19 @@ class InputTests(unittest.TestCase):
         target.speed = 2
         launcher_mech.directlyVisibleEnemies = [target]
 
-        self.assertEqual(inputs.predictLauncherLead(match, launcher, target), [12, 10])
-        self.assertIn("'L' auto lead", inputs.launcherFirePrompt(match, launcher, target))
+        self.assertEqual(firing.predictLauncherLead(match, launcher, target), [12, 10])
+        self.assertIn("'L' auto lead", firing.launcherFirePrompt(match, launcher, target))
 
     def test_direct_fire_target_selection_reopens_the_full_target_menu(self):
         match = Game(map_size=20, window_size=9).create_match()
         default_target = match.teamList[1].squadsList[0].mechList[0]
         selected_target = match.teamList[1].squadsList[0].mechList[1]
         weapon = match.pov.mechClass.gunList[0]
-        original_menu = inputs.chooseFireTarget
+        original_menu = firing.chooseFireTarget
 
         with patch("builtins.input", return_value="t"), patch(
-            "inputs.chooseTrackedContact", return_value=selected_target
-        ), patch("inputs.chooseFireTarget") as reopened_menu:
+            "mechgame.commands.firing.chooseTrackedContact", return_value=selected_target
+        ), patch("mechgame.commands.firing.chooseFireTarget") as reopened_menu:
             original_menu(match, default_target, weapon)
 
         reopened_menu.assert_called_once_with(
@@ -225,9 +225,9 @@ class InputTests(unittest.TestCase):
         bastion = match.teamList[1].squadsList[0].mechList[0]
         selected_target = match.pov
         match.pov = bastion
-        original_menu = inputs.gunMenu
+        original_menu = firing.gunMenu
 
-        with patch("builtins.input", return_value="1"), patch("inputs.fire") as fire_mock:
+        with patch("builtins.input", return_value="1"), patch("mechgame.commands.firing.fire") as fire_mock:
             original_menu(match, selected_target)
 
         fire_mock.assert_called_once_with(match, selected_target)
@@ -242,7 +242,7 @@ class InputTests(unittest.TestCase):
         launcher.select_ammo(1)  # Smoke is the second catalogued mortar shell.
 
         with patch("builtins.print") as print_mock:
-            inputs.printLauncherProfile(mortar, launcher, [10, 10])
+            firing.printLauncherProfile(mortar, launcher, [10, 10])
 
         output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("Smoke", output)
@@ -251,7 +251,7 @@ class InputTests(unittest.TestCase):
     def test_help_lists_every_main_command_and_footer_prioritizes_abilities(self):
         match = SimpleNamespace(advTurn=True)
         with patch("builtins.print") as print_mock:
-            inputs.helpCommand(match)
+            squad.helpCommand(match)
         help_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
             self.assertIn(command, help_output)
