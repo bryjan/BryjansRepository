@@ -7,6 +7,11 @@ from .firing import fire
 from .shared import read_nonempty
 
 
+def _print_options_panel(matchInfo, command_text):
+    """Render live display options inside the tactical command bar."""
+    pv.printPOV(matchInfo, *matchInfo.pov.pos, command_text=command_text)
+
+
 def squadMenu(matchInfo):
     """Show squad readiness and roster before player-facing squad controls."""
     squad = matchInfo.pov.squad
@@ -84,7 +89,7 @@ def optionsMenu(matchInfo):
         f"Options: 'w' tactical width ({matchInfo.windowWidth}) | "
         f"'h' tactical height ({matchInfo.windowHeight}) | 'x' exit"
     )
-    pv.printPOV(matchInfo, *matchInfo.pov.pos, command_text=option_prompt)
+    _print_options_panel(matchInfo, option_prompt)
     choice = input("Options: ").strip().lower()
     if choice in ("", "x"):
         return
@@ -95,12 +100,9 @@ def optionsMenu(matchInfo):
     dimension = "width" if choice == "w" else "height"
     minimum = 5 if choice == "w" else pv.MIN_TACTICAL_HEIGHT
     while True:
-        pv.printPOV(
+        _print_options_panel(
             matchInfo,
-            *matchInfo.pov.pos,
-            command_text=(
-                f"Options: enter odd {dimension} of at least {minimum} | 'x' cancel"
-            ),
+            f"Options: enter odd {dimension} of at least {minimum} | 'x' cancel",
         )
         size = input(
             f"Tactical {dimension} (odd whole number, at least {minimum}; 'x' to cancel): "

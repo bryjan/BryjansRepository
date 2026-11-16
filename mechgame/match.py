@@ -62,6 +62,12 @@ class MatchInfo:
             if any(squad.mechList for squad in team.squadsList)
         ]
 
+    def request_quit(self):
+        """Abandon this unsaved match and prevent any further turn transition."""
+        self.quitRequested = True
+        self.advTurn = False
+        self.turnEnded = False
+
     def _finish_if_decided(self):
         """Record the result once only one operational team remains."""
         survivors = self.operational_teams()

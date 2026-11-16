@@ -63,8 +63,12 @@ class MapPreset:
     large_river_weight: float = 1
     small_river_weight: float = 1
     lake_weight: float = 1
+    # Route counts are exact per generated map. A highway is two road lanes;
+    # an offshoot is a short spur terminating beside a suburb patch.
     highway_count: int = 0
     suburb_offshoot_count: int = 0
+    # Adds local expansion passes without increasing the number of forest
+    # seeds, so patches grow larger without becoming uniformly dense.
     forest_extra_growth: int = 0
 
     def terrain_options(self):
@@ -308,23 +312,9 @@ class MapGenerator:
                 grid, terrain["desert"], self.map_preset.desert_density, protected_terrain,
             )
         if self.terrain_enabled["road"]:
-            self._roads(grid, terrain["road"], self.map_preset.road_density)
-            self._highways(
-                grid, terrain["road"], self.map_preset.highway_count,
+            protected_terrain = self._build_road_network(
+                grid, terrain, protected_terrain,
             )
-            if self.terrain_enabled["suburb"]:
-                self._road_offshoots(
-                    grid,
-                    terrain["road"],
-                    terrain["suburb"],
-                    self.map_preset.suburb_offshoot_count,
-                    protected_terrain,
-                )
-            if self.terrain_enabled["mountain"]:
-                self._tunnel_passes(
-                    grid, terrain["road"], terrain["mountain"], terrain["tunnel"],
-                )
-                protected_terrain = (*protected_terrain, terrain["tunnel"])
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
@@ -387,6 +377,7 @@ class MapGenerator:
             self.rng.choice(cells).terrain = urban
 
     def _scatter(self, grid, terrain, density, protected_terrain=(), extra_growth=0):
+        """Seed and expand terrain patches, optionally favoring larger patches."""
         multiplier = self._density_multiplier(density)
         protected_terrain = set(protected_terrain)
         if not multiplier:
@@ -772,6 +763,25 @@ class MapGenerator:
         for _ in range(multiplier):
             start, end = self._road_endpoints()
             self._draw_road(grid, start, end, terrain, protected_terrain)
+
+    def _build_road_network(self, grid, terrain, protected_terrain):
+        """Create ordinary roads, highways, and suburb spurs for one preset."""
+        road = terrain["road"]
+        self._roads(grid, road, self.map_preset.road_density)
+        self._highways(grid, road, self.map_preset.highway_count)
+        if self.terrain_enabled["suburb"]:
+            self._road_offshoots(
+                grid,
+                road,
+                terrain["suburb"],
+                self.map_preset.suburb_offshoot_count,
+                protected_terrain,
+            )
+        if not self.terrain_enabled["mountain"]:
+            return protected_terrain
+
+        self._tunnel_passes(grid, road, terrain["mountain"], terrain["tunnel"])
+        return (*protected_terrain, terrain["tunnel"])
 
     def _highways(self, grid, terrain, count):
         """Draw two-lane edge-to-edge highways alongside ordinary roads."""

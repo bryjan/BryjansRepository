@@ -27,12 +27,16 @@ class InputTests(unittest.TestCase):
 
     def test_quit_command_requests_a_return_to_the_start_menu(self):
         match = Game(map_size=20, window_size=9).create_match()
+        match.advTurn = True
+        match.turnEnded = True
 
         with patch("builtins.input", return_value="quit"):
             dispatch.receive_input(match)
 
         self.assertTrue(match.quitRequested)
         self.assertFalse(match.matchOver)
+        self.assertFalse(match.advTurn)
+        self.assertFalse(match.turnEnded)
 
     def test_weapon_menu_cancel_keeps_the_existing_default(self):
         match = Game(map_size=20, window_size=9).create_match()

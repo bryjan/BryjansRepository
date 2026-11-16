@@ -12,7 +12,7 @@ def receive_input(matchInfo):
 
     match player_input:
         case "quit":
-            matchInfo.quitRequested = True
+            return matchInfo.request_quit()
         case "?":
             return helpCommand(matchInfo)
         case "rep":

@@ -80,7 +80,8 @@ class Game:
             match.pov.getVisuals(match)
             tactical.printPOV(match, *match.pov.pos)
             receive_input(match)
-            self.advance_turn_if_requested(match)
+            if not match.quitRequested:
+                self.advance_turn_if_requested(match)
         if match.matchOver:
             print(match.resultMessage)
         return match
