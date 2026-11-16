@@ -230,10 +230,10 @@ class MapGenerator:
                     self._draw_mountain_ridge(grid, peak, ridge_end, mountain)
 
     def _still_water(self, grid, water):
-        """Generate sparse connected ponds and, at most, one larger lake.
+        """Generate sparse connected ponds.
 
-        This deliberately creates no linear water path. Rivers will receive a
-        separate source-to-mouth design rather than being inferred from lakes.
+        Rivers and their bank-side lakes are generated separately so lakes can
+        be tied to a meaningful waterway rather than appearing at random.
         """
         for row in grid[1:-1]:
             for cell in row[1:-1]:
@@ -242,20 +242,17 @@ class MapGenerator:
                 if cell.terrain is not water and self.rng.randint(1, 1600) == 1:
                     self._grow_water_patch(grid, cell, water, self.rng.randint(3, 6))
 
-        interior_area = max(1, (self.width - 2) * (self.height - 2))
-        lake_chance = min(1, interior_area / 900)
-        if self.rng.random() < lake_chance:
-            seed = grid[
-                self.rng.randrange(1, self.height - 1)
-            ][self.rng.randrange(1, self.width - 1)]
-            self._grow_water_patch(grid, seed, water, self.rng.randint(16, 28))
-
     def _rivers(self, grid, water, mountain):
         """Add winding streams and scalable edge-to-edge large rivers."""
         # There is no global cap: larger maps can naturally receive more than
         # one large river at approximately one per 1,000 interior tiles.
+        large_river_cells = []
         for _ in range(self._scaled_feature_count(1000)):
-            self._large_river(grid, water, width=3)
+            large_river_cells.extend(self._large_river(grid, water, width=3))
+        # Lakes share the same area-scaled density as broad rivers, but are
+        # only placed from a non-water neighbor of a large-river cell.
+        for _ in range(self._scaled_feature_count(1000)):
+            self._lake_beside_large_river(grid, water, large_river_cells)
         # Small tributary-like streams are deliberately less common. They may
         # begin in mountain terrain or enter from an edge, then end naturally.
         for _ in range(self._scaled_feature_count(2000)):
@@ -276,22 +273,46 @@ class MapGenerator:
         # Wider rivers get fewer lateral shifts; width 3 is the default broad
         # river and therefore noticeably straighter than a small stream.
         bend_chance = max(0.10, 0.60 / width)
+        river_cells = []
         for major in range(1, major_limit - 1):
             if horizontal:
-                self._carve_river_cross_section(grid, major, center, water, width, horizontal=True)
+                river_cells.extend(
+                    self._carve_river_cross_section(grid, major, center, water, width, horizontal=True)
+                )
             else:
-                self._carve_river_cross_section(grid, center, major, water, width, horizontal=False)
+                river_cells.extend(
+                    self._carve_river_cross_section(grid, center, major, water, width, horizontal=False)
+                )
             if self.rng.random() < bend_chance:
                 center = min(max(1, center + self.rng.choice((-1, 1))), minor_limit - 2)
+        return list(dict.fromkeys(river_cells))
 
     def _carve_river_cross_section(self, grid, x, y, water, width, horizontal):
         """Carve a clipped perpendicular strip at one point along a river."""
         lower = -(width // 2)
         upper = lower + width
+        carved = []
         for offset in range(lower, upper):
             water_x, water_y = (x, y + offset) if horizontal else (x + offset, y)
             if 1 <= water_x < self.width - 1 and 1 <= water_y < self.height - 1:
-                grid[water_y][water_x].terrain = water
+                cell = grid[water_y][water_x]
+                cell.terrain = water
+                carved.append(cell)
+        return carved
+
+    def _lake_beside_large_river(self, grid, water, river_cells):
+        """Grow one 16–28 tile lake directly from an available river bank."""
+        bank_cells = [
+            neighbor
+            for cell in river_cells
+            for neighbor in cell.nList
+            if neighbor.terrain.passable and neighbor.terrain is not water
+        ]
+        if not bank_cells:
+            return []
+        return self._grow_water_patch(
+            grid, self.rng.choice(bank_cells), water, self.rng.randint(16, 28),
+        )
 
     def _small_river(self, grid, water, mountain):
         """Draw a one-tile stream that may begin at an edge or in the mountains."""
@@ -344,10 +365,11 @@ class MapGenerator:
                 if neighbor.terrain.passable and neighbor.terrain is not water
             ]
             if not candidates:
-                return
+                return water_cells
             next_cell = self.rng.choice(candidates)
             next_cell.terrain = water
             water_cells.append(next_cell)
+        return water_cells
 
     def _tunnel_passes(self, grid, road, mountain, tunnel):
         """Turn eligible mountain road passes into tunnels with a 25% chance."""

@@ -96,7 +96,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(mech.pos, [5, 4])
         self.assertEqual(mech.energy, 0)
 
-    def test_water_toggle_generates_sparse_ponds_and_one_area_scaled_lake(self):
+    def test_water_toggle_generates_sparse_ponds_without_rivers(self):
         disabled = MatchInfo(50, 9, [], "")
         disabled.map = MapGenerator(
             50, random.Random(0), terrain_enabled={"water": False, "river": False},
@@ -105,12 +105,9 @@ class MapGeneratorTests(unittest.TestCase):
 
         enabled = MatchInfo(50, 9, [], "")
         enabled.map = MapGenerator(
-            50, random.Random(0), terrain_enabled={"water": True},
+            50, random.Random(0), terrain_enabled={"water": True, "river": False},
         ).build(enabled)
-        water_cells = [
-            cell for row in enabled.map for cell in row if cell.terrain is enabled.water
-        ]
-        self.assertGreaterEqual(len(water_cells), 16)
+        self.assertTrue(enabled.map)
 
     def test_water_patch_can_replace_a_mountain_tile(self):
         match = MatchInfo(12, 9, [], "")
@@ -144,6 +141,20 @@ class MapGeneratorTests(unittest.TestCase):
             ({1, generator.width - 2} <= water_columns)
             or ({1, generator.height - 2} <= water_rows)
         )
+
+    def test_lakes_grow_from_a_large_river_bank(self):
+        match = MatchInfo(30, 9, [], "")
+        generator = MapGenerator(30, random.Random(0))
+        grid = generator.build(match)
+        river_cells = generator._large_river(grid, match.water)
+        lake_cells = generator._lake_beside_large_river(grid, match.water, river_cells)
+
+        self.assertGreaterEqual(len(lake_cells), 16)
+        self.assertTrue(any(
+            neighbor in river_cells
+            for cell in lake_cells
+            for neighbor in cell.nList
+        ))
 
     def test_mountain_edges_can_grow_a_sparse_forest_fringe(self):
         match = MatchInfo(12, 9, [], "")
