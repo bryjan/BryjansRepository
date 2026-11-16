@@ -47,6 +47,12 @@ class MapGenerator:
             "suburb": TerrainType("suburbs", "H", "light_grey", size=3,
                                   moveCostBySize=[1, 1, 1, 5, 4, 2, 1],
                                   visualAbsorbtion=20, radarAbsorbtion=40, radarSig=80),
+            # Dense buildings create the map's strongest static sensor cover.
+            # Small and class-2 mechs can thread the streets freely, while
+            # larger frames must force their way through or avoid the district.
+            "urban": TerrainType("urban center", "#", "white", size=4,
+                                 moveCostBySize=[0, 0, 0, 1, 3, 9999, 9999],
+                                 visualAbsorbtion=30, radarAbsorbtion=60, radarSig=50),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
                                 fireproof=True),
@@ -71,6 +77,12 @@ class MapGenerator:
         self._scatter(grid, terrain["desert"], "Light")
         self._roads(grid, terrain["road"], "Normal")
         self._associate(grid, terrain["suburb"], [terrain["road"], terrain["suburb"]], "Normal")
+        # Urban centers form dense pockets around developed road corridors,
+        # rather than appearing as isolated buildings across open terrain.
+        self._associate(
+            grid, terrain["urban"],
+            [terrain["road"], terrain["suburb"], terrain["urban"]], "Thick",
+        )
         return grid
 
     def _scatter(self, grid, terrain, density):

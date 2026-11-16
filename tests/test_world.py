@@ -40,6 +40,17 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(second.moveCost, [])
         self.assertEqual(second.symbolAttribute, [])
 
+    def test_urban_centers_provide_dense_cover_and_limit_large_mechs(self):
+        match = MatchInfo(20, 9, [], "")
+        match.map = MapGenerator(20, random.Random(0)).build(match)
+
+        self.assertEqual(match.urban.name, "urban center")
+        self.assertEqual(match.urban.symbol, "#")
+        self.assertEqual(match.urban.moveCost, [0, 0, 0, 1, 3, 9999, 9999])
+        self.assertEqual(match.urban.visAbsorb, 30)
+        self.assertEqual(match.urban.radarAbsorb, 60)
+        self.assertTrue(any(cell.terrain is match.urban for row in match.map for cell in row))
+
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
 
