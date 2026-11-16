@@ -228,8 +228,11 @@ def _command_lines(width, command_text=None):
     return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
 
-OVERVIEW_ROUTE_BONUS = 24
-OVERVIEW_ROUTE_TERRAINS = {"road", "tunnel", "water"}
+# A continuous road or tunnel is the strategic representation of a route. It
+# needs to remain visible even across a broad river or lake, while water still
+# receives a smaller link bonus to preserve unbridged river crossings.
+OVERVIEW_ROUTE_BONUSES = {"road": 100, "tunnel": 100, "water": 24}
+OVERVIEW_ROUTE_TERRAINS = set(OVERVIEW_ROUTE_BONUSES)
 
 
 def _route_crosses_chunk(chunk, terrain):
@@ -278,7 +281,7 @@ def overview_terrain(chunk):
     for terrain, count in terrain_counts.items():
         score = count * terrain.overviewWeight
         if terrain.name in OVERVIEW_ROUTE_TERRAINS and _route_crosses_chunk(chunk, terrain):
-            score += OVERVIEW_ROUTE_BONUS
+            score += OVERVIEW_ROUTE_BONUSES[terrain.name]
         scored_terrain.append((score, count, terrain.overviewWeight, terrain))
     # The stable terrain name tie-break keeps seeded map rendering reproducible.
     return max(scored_terrain, key=lambda item: (item[0], item[1], item[2], item[3].name))[3]

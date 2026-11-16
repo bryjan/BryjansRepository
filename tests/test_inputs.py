@@ -78,6 +78,13 @@ class InputTests(unittest.TestCase):
             cell.terrain = match.road
         self.assertIs(tactical.overview_terrain(chunk), match.road)
 
+        for row in chunk:
+            for cell in row:
+                cell.terrain = match.water
+        for cell in chunk[1]:
+            cell.terrain = match.road
+        self.assertIs(tactical.overview_terrain(chunk), match.road)
+
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=20, window_size=9).create_match()
         active_mech = match.pov

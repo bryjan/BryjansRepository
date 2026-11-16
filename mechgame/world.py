@@ -118,10 +118,10 @@ class MapGenerator:
             "tunnel": TerrainType("tunnel", "T", "light_grey", size=5,
                                    moveCostBySize=[0, 0, 0, 0, 2, 2, 2],
                                    visualAbsorbtion=12, radarAbsorbtion=20,
-                                   radarSig=100, fireproof=True, overviewWeight=1.75),
+                                   radarSig=100, fireproof=True, overviewWeight=3),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
-                                fireproof=True, overviewWeight=1.5),
+                                fireproof=True, overviewWeight=3),
         }
         for name, value in terrain.items():
             setattr(match, name, value)
