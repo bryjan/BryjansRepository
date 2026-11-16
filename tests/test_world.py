@@ -99,7 +99,7 @@ class MapGeneratorTests(unittest.TestCase):
     def test_water_toggle_generates_sparse_ponds_and_one_area_scaled_lake(self):
         disabled = MatchInfo(50, 9, [], "")
         disabled.map = MapGenerator(
-            50, random.Random(0), terrain_enabled={"water": False},
+            50, random.Random(0), terrain_enabled={"water": False, "river": False},
         ).build(disabled)
         self.assertFalse(any(cell.terrain is disabled.water for row in disabled.map for cell in row))
 
@@ -122,6 +122,28 @@ class MapGeneratorTests(unittest.TestCase):
         generator._grow_water_patch(grid, seed, match.water, 3)
 
         self.assertIs(seed.terrain, match.water)
+
+    def test_large_river_crosses_the_map_edge_to_edge_at_default_width(self):
+        match = MatchInfo(20, 9, [], "")
+        generator = MapGenerator(20, random.Random(0))
+        grid = generator.build(match)
+
+        generator._large_river(grid, match.water)
+
+        water_columns = {
+            x
+            for row in grid for x, cell in enumerate(row)
+            if cell.terrain is match.water
+        }
+        water_rows = {
+            y
+            for y, row in enumerate(grid) for cell in row
+            if cell.terrain is match.water
+        }
+        self.assertTrue(
+            ({1, generator.width - 2} <= water_columns)
+            or ({1, generator.height - 2} <= water_rows)
+        )
 
     def test_mountain_edges_can_grow_a_sparse_forest_fringe(self):
         match = MatchInfo(12, 9, [], "")

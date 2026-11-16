@@ -10,6 +10,7 @@ import random
 # optional generated landscape types belong in this set.
 GENERATABLE_TERRAINS = (
     "forest", "desert", "road", "suburb", "urban", "mountain", "water",
+    "river",
 )
 DEFAULT_TERRAIN_ENABLED = {
     "forest": True,
@@ -21,6 +22,7 @@ DEFAULT_TERRAIN_ENABLED = {
     "urban": True,
     "mountain": True,
     "water": True,
+    "river": True,
 }
 
 
@@ -148,6 +150,10 @@ class MapGenerator:
         if self.terrain_enabled["water"]:
             self._still_water(grid, terrain["water"])
             protected_terrain = (*protected_terrain, terrain["water"])
+        if self.terrain_enabled["river"]:
+            self._rivers(grid, terrain["water"], terrain["mountain"])
+            if terrain["water"] not in protected_terrain:
+                protected_terrain = (*protected_terrain, terrain["water"])
         if self.terrain_enabled["forest"]:
             self._scatter(grid, terrain["forest"], "Normal", protected_terrain)
             if self.terrain_enabled["mountain"]:
@@ -243,6 +249,88 @@ class MapGenerator:
                 self.rng.randrange(1, self.height - 1)
             ][self.rng.randrange(1, self.width - 1)]
             self._grow_water_patch(grid, seed, water, self.rng.randint(16, 28))
+
+    def _rivers(self, grid, water, mountain):
+        """Add winding streams and scalable edge-to-edge large rivers."""
+        # There is no global cap: larger maps can naturally receive more than
+        # one large river at approximately one per 1,000 interior tiles.
+        for _ in range(self._scaled_feature_count(1000)):
+            self._large_river(grid, water, width=3)
+        # Small tributary-like streams are deliberately less common. They may
+        # begin in mountain terrain or enter from an edge, then end naturally.
+        for _ in range(self._scaled_feature_count(2000)):
+            self._small_river(grid, water, mountain)
+
+    def _scaled_feature_count(self, tiles_per_feature):
+        """Return a stochastic feature count whose expectation scales with area."""
+        interior_area = max(1, (self.width - 2) * (self.height - 2))
+        whole, remainder = divmod(interior_area, tiles_per_feature)
+        return whole + int(self.rng.random() < remainder / tiles_per_feature)
+
+    def _large_river(self, grid, water, width=3):
+        """Draw a broad, relatively straight river from one map side to another."""
+        horizontal = self.rng.choice((True, False))
+        major_limit = self.width if horizontal else self.height
+        minor_limit = self.height if horizontal else self.width
+        center = self.rng.randrange(1, minor_limit - 1)
+        # Wider rivers get fewer lateral shifts; width 3 is the default broad
+        # river and therefore noticeably straighter than a small stream.
+        bend_chance = max(0.10, 0.60 / width)
+        for major in range(1, major_limit - 1):
+            if horizontal:
+                self._carve_river_cross_section(grid, major, center, water, width, horizontal=True)
+            else:
+                self._carve_river_cross_section(grid, center, major, water, width, horizontal=False)
+            if self.rng.random() < bend_chance:
+                center = min(max(1, center + self.rng.choice((-1, 1))), minor_limit - 2)
+
+    def _carve_river_cross_section(self, grid, x, y, water, width, horizontal):
+        """Carve a clipped perpendicular strip at one point along a river."""
+        lower = -(width // 2)
+        upper = lower + width
+        for offset in range(lower, upper):
+            water_x, water_y = (x, y + offset) if horizontal else (x + offset, y)
+            if 1 <= water_x < self.width - 1 and 1 <= water_y < self.height - 1:
+                grid[water_y][water_x].terrain = water
+
+    def _small_river(self, grid, water, mountain):
+        """Draw a one-tile stream that may begin at an edge or in the mountains."""
+        mountains = [
+            cell for row in grid[1:-1] for cell in row[1:-1]
+            if cell.terrain is mountain
+        ]
+        if mountains and self.rng.random() < 0.60:
+            start = self.rng.choice(mountains)
+            x, y = start.pos
+            delta_x, delta_y = self.rng.choice(
+                ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
+            )
+        else:
+            edge = self.rng.choice(("west", "east", "south", "north"))
+            if edge == "west":
+                x, y, delta_x, delta_y = 1, self.rng.randrange(1, self.height - 1), 1, 0
+            elif edge == "east":
+                x, y, delta_x, delta_y = self.width - 2, self.rng.randrange(1, self.height - 1), -1, 0
+            elif edge == "south":
+                x, y, delta_x, delta_y = self.rng.randrange(1, self.width - 1), 1, 0, 1
+            else:
+                x, y, delta_x, delta_y = self.rng.randrange(1, self.width - 1), self.height - 2, 0, -1
+
+        maximum_length = max(3, min(self.width, self.height) // 2)
+        for step in range(maximum_length):
+            if not (1 <= x < self.width - 1 and 1 <= y < self.height - 1):
+                return
+            grid[y][x].terrain = water
+            if step and self.rng.random() < 0.25:
+                return
+            if self.rng.random() < 0.45:
+                # Small streams change heading freely, making them windier
+                # than broad rivers and able to end in local low ground.
+                delta_x, delta_y = self.rng.choice(
+                    ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
+                )
+            x += delta_x
+            y += delta_y
 
     def _grow_water_patch(self, grid, seed, water, tile_count):
         """Flood outward from a seed to make one connected pond or lake."""

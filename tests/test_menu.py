@@ -41,6 +41,16 @@ class StartMenuTests(unittest.TestCase):
         self.assertIs(selected, settings)
         self.assertFalse(settings.terrain_enabled["urban"])
 
+    def test_map_tile_menu_can_disable_river_generation(self):
+        settings = DisplaySettings()
+        self.assertTrue(settings.terrain_enabled["river"])
+
+        with patch("builtins.input", side_effect=["o", "m", "8", "x", "x", "s"]), patch("builtins.print"):
+            selected = start_menu(settings)
+
+        self.assertIs(selected, settings)
+        self.assertFalse(settings.terrain_enabled["river"])
+
     def test_all_start_menu_pages_follow_the_selected_screen_size(self):
         settings = DisplaySettings(tactical_width=25, tactical_height=21)
         main_frame = _frame_lines(["ASCII MECH GAME", "'s' Skirmish"], settings)
