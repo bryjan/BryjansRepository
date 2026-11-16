@@ -45,6 +45,17 @@ class InputTests(unittest.TestCase):
 
         view_mock.assert_not_called()
 
+    def test_m_opens_the_full_debug_map_without_ending_the_turn(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.input", side_effect=["m", ""]), patch(
+            "mechgame.ui.tactical.print_full_map"
+        ) as map_mock:
+            dispatch.receive_input(match)
+
+        map_mock.assert_called_once_with(match)
+        self.assertFalse(match.advTurn)
+
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=20, window_size=9).create_match()
         active_mech = match.pov
@@ -253,7 +264,7 @@ class InputTests(unittest.TestCase):
         with patch("builtins.print") as print_mock:
             squad.helpCommand(match)
         help_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
-        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
+        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'m'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
             self.assertIn(command, help_output)
         self.assertFalse(match.advTurn)
 

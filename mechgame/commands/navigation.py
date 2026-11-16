@@ -23,6 +23,12 @@ def lookAt(matchInfo):
     input("Press 'Enter' to return")
 
 
+def mapView(matchInfo):
+    """Open the full debug map; strategic fog of war will replace this later."""
+    pv.print_full_map(matchInfo)
+    input("Full map: press 'Enter' to return")
+
+
 def statusPanel(matchInfo):
     """Open the normal tactical view as an explicit status reference."""
     pv.printPOV(

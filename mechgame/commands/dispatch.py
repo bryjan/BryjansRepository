@@ -1,7 +1,7 @@
 """Top-level command dispatch for an active tactical match."""
 
 from .firing import fire, gunMenu
-from .navigation import abilityMenu, lookAt, radarToggle, statusPanel
+from .navigation import abilityMenu, lookAt, mapView, radarToggle, statusPanel
 from .shared import read_nonempty
 from .squad import helpCommand, optionsMenu, radarMenu, reportMenu, squadMenu, unreadReportMenu
 
@@ -40,6 +40,8 @@ def receive_input(matchInfo):
             matchInfo.turnEnded = True
         case "look" | "l":
             return lookAt(matchInfo)
+        case "m":
+            return mapView(matchInfo)
         case "fire":
             return gunMenu(matchInfo)
         case "f":

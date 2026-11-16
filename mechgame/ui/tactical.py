@@ -227,6 +227,30 @@ def _command_lines(width, command_text=None):
     # separator from visually merging with the panel's actual border.
     return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
+
+def print_full_map(matchInfo):
+    """Render every terrain tile and entity for the temporary debug overview.
+
+    This intentionally bypasses fog of war. The command boundary is kept here
+    so a future fog-aware strategic renderer can share its frame and map
+    orientation without changing gameplay commands.
+    """
+    width = matchInfo.mapWidth * 2
+    divider = "+" + ("-" * width) + "+"
+    title = f"DEBUG MAP — {matchInfo.mapWidth} x {matchInfo.mapHeight}"
+    print(divider)
+    print(f"|{title:^{width}}|")
+    print(divider)
+    # Tactical coordinates increase toward north, so the highest Y row is
+    # printed first just like the local tactical display.
+    for row in reversed(matchInfo.map):
+        print("|", end="")
+        for cell in row:
+            cell.displayCell(matchInfo)
+        print("|")
+    print(divider)
+
+
 def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):
     """Render a rectangular tactical window centered on the supplied map position."""
     from mechgame.terrain import Cell
