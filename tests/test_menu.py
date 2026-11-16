@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, _frame_lines, start_menu
-from mechgame.ui.tactical import MIN_TACTICAL_HEIGHT
+from mechgame.ui.tactical import DEFAULT_TACTICAL_SIZE, MIN_TACTICAL_HEIGHT
 from mechgame.world import CUSTOM_MAP_PRESET, get_map_preset
 
 
@@ -31,6 +31,14 @@ class StartMenuTests(unittest.TestCase):
 
     def test_default_height_meets_the_tactical_panel_minimum(self):
         self.assertGreaterEqual(DisplaySettings().tactical_height, MIN_TACTICAL_HEIGHT)
+
+    def test_default_tactical_view_is_thirty_seven_by_thirty_seven(self):
+        settings = DisplaySettings()
+        match = Game(map_size=40).create_match()
+
+        self.assertEqual(settings.tactical_width, DEFAULT_TACTICAL_SIZE)
+        self.assertEqual(settings.tactical_height, DEFAULT_TACTICAL_SIZE)
+        self.assertEqual((match.windowWidth, match.windowHeight), (37, 37))
 
     def test_map_tile_menu_can_enable_urban_generation(self):
         settings = DisplaySettings()

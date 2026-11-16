@@ -11,7 +11,7 @@ from ..world import (
     MAP_PRESETS,
     get_map_preset,
 )
-from .tactical import MIN_TACTICAL_HEIGHT
+from .tactical import DEFAULT_TACTICAL_SIZE, MIN_TACTICAL_HEIGHT
 
 MIN_TACTICAL_WIDTH = 5
 MENU_MIN_INNER_WIDTH = 40
@@ -21,8 +21,8 @@ MENU_MIN_INNER_WIDTH = 40
 class DisplaySettings:
     """Display and map-generation choices collected before a match begins."""
 
-    tactical_width: int = 19
-    tactical_height: int = MIN_TACTICAL_HEIGHT
+    tactical_width: int = DEFAULT_TACTICAL_SIZE
+    tactical_height: int = DEFAULT_TACTICAL_SIZE
     terrain_enabled: dict = field(default_factory=lambda: dict(DEFAULT_TERRAIN_ENABLED))
     map_preset: str = DEFAULT_MAP_PRESET
 

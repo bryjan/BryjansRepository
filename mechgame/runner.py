@@ -16,10 +16,10 @@ class Game:
         map_preset=None,
     ):
         if window_size is None:
-            # The renderer imports game models, so resolve its display minimum
-            # lazily instead of creating an import cycle during package setup.
-            from .ui.tactical import MIN_TACTICAL_HEIGHT
-            window_size = MIN_TACTICAL_HEIGHT
+            # Resolve the renderer's standard view lazily instead of creating
+            # an import cycle during package setup.
+            from .ui.tactical import DEFAULT_TACTICAL_SIZE
+            window_size = DEFAULT_TACTICAL_SIZE
         self.map_width = map_size if map_width is None else map_width
         self.map_height = map_size if map_height is None else map_height
         # ``window_size`` remains the legacy square-view shorthand. The menu

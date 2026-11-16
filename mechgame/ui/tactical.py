@@ -15,6 +15,9 @@ MIN_TACTICAL_HEIGHT = (
     _minimum_side_panel_rows
     if _minimum_side_panel_rows % 2 else _minimum_side_panel_rows + 1
 )
+# The normal game view is deliberately much larger than the minimum needed by
+# the information panels. Players can still choose any supported odd size.
+DEFAULT_TACTICAL_SIZE = 37
 
 
 def _print_panel_text(text, width):
