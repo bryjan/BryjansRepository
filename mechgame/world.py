@@ -244,18 +244,21 @@ class MapGenerator:
 
     def _rivers(self, grid, water, mountain):
         """Add winding streams and scalable edge-to-edge large rivers."""
-        # There is no global cap: larger maps can naturally receive more than
-        # one large river at approximately one per 1,000 interior tiles.
+        # Broad rivers cross the full map, so their density must scale with
+        # map span rather than raw area. A roughly 100×100 map gets one; much
+        # larger maps can still receive more without a fixed global cap.
+        large_river_count = self._scaled_linear_feature_count(100)
         large_river_cells = []
-        for _ in range(self._scaled_feature_count(1000)):
+        for _ in range(large_river_count):
             large_river_cells.extend(self._large_river(grid, water, width=3))
-        # Lakes share the same area-scaled density as broad rivers, but are
-        # only placed from a non-water neighbor of a large-river cell.
-        for _ in range(self._scaled_feature_count(1000)):
+        # Lake attempts retain the requested area-scaled rate, but cannot
+        # exceed the number of broad rivers available to feed them.
+        lake_count = min(large_river_count, self._scaled_feature_count(1000))
+        for _ in range(lake_count):
             self._lake_beside_large_river(grid, water, large_river_cells)
         # Small tributary-like streams are deliberately less common. They may
         # begin in mountain terrain or enter from an edge, then end naturally.
-        for _ in range(self._scaled_feature_count(2000)):
+        for _ in range(self._scaled_linear_feature_count(50)):
             self._small_river(grid, water, mountain)
 
     def _scaled_feature_count(self, tiles_per_feature):
@@ -263,6 +266,13 @@ class MapGenerator:
         interior_area = max(1, (self.width - 2) * (self.height - 2))
         whole, remainder = divmod(interior_area, tiles_per_feature)
         return whole + int(self.rng.random() < remainder / tiles_per_feature)
+
+    def _scaled_linear_feature_count(self, tiles_per_feature):
+        """Scale cross-map feature count by map span instead of area."""
+        interior_span = math.sqrt(max(1, (self.width - 2) * (self.height - 2)))
+        expected_count = interior_span / tiles_per_feature
+        whole = int(expected_count)
+        return whole + int(self.rng.random() < expected_count - whole)
 
     def _large_river(self, grid, water, width=3):
         """Draw a broad, relatively straight river from one map side to another."""

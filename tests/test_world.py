@@ -142,6 +142,13 @@ class MapGeneratorTests(unittest.TestCase):
             or ({1, generator.height - 2} <= water_rows)
         )
 
+    def test_large_river_count_scales_with_map_span_not_area(self):
+        normal = MapGenerator(100, random.Random(0))
+        huge = MapGenerator(400, random.Random(0))
+
+        self.assertEqual(normal._scaled_linear_feature_count(100), 1)
+        self.assertGreater(huge._scaled_linear_feature_count(100), 1)
+
     def test_lakes_grow_from_a_large_river_bank(self):
         match = MatchInfo(30, 9, [], "")
         generator = MapGenerator(30, random.Random(0))
