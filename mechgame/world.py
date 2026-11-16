@@ -640,21 +640,13 @@ class MapGenerator:
             cell.terrain = tunnel
 
     def _mountain_peak_location(self, core_width):
-        """Choose a peak position that keeps its large core on the map when possible."""
-        return [
-            self._peak_axis_position(self.width, core_width),
-            self._peak_axis_position(self.height, core_width),
-        ]
-
-    def _peak_axis_position(self, map_limit, core_width):
-        """Choose one peak axis, gracefully centering oversized small-map cores."""
+        """Choose a peak position with room for its full core."""
         negative_radius = core_width // 2
         positive_radius = core_width - negative_radius - 1
-        minimum = 1 + negative_radius
-        maximum = map_limit - 2 - positive_radius
-        if minimum > maximum:
-            return (map_limit - 1) // 2
-        return self.rng.randint(minimum, maximum)
+        return [
+            self.rng.randint(1 + negative_radius, self.width - 2 - positive_radius),
+            self.rng.randint(1 + negative_radius, self.height - 2 - positive_radius),
+        ]
 
     def _place_mountain_peak(self, grid, peak, mountain, width):
         """Create a six- to ten-tile-wide peak core before adding ridges."""
