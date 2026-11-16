@@ -223,12 +223,20 @@ class MapGenerator:
                 self.rng.randrange(2, self.width - 2),
                 self.rng.randrange(2, self.height - 2),
             ]
-            self._place_mountain_peak(grid, peak, mountain)
+            # Keep the peak and each ridge independently irregular.  A range
+            # can therefore have a compact core with a broad ridge, or the
+            # reverse, instead of all of its features sharing one width.
+            peak_width = 3 + self.rng.randint(0, 2)
+            self._place_mountain_peak(grid, peak, mountain, peak_width)
             for _ in range(self.rng.randint(0, 2)):
                 ridge_end = self._ridge_endpoint(peak)
                 if ridge_end is not None:
                     self._draw_mountain_ridge(
-                        grid, peak, ridge_end, mountain, self.rng.randint(2, 3),
+                        grid,
+                        peak,
+                        ridge_end,
+                        mountain,
+                        self.rng.randint(2, 3) + self.rng.randint(0, 2),
                     )
 
     def _still_water(self, grid, water):
@@ -407,14 +415,22 @@ class MapGenerator:
         for cell in conversions:
             cell.terrain = tunnel
 
-    def _place_mountain_peak(self, grid, peak, mountain):
-        """Create a broad 3×3 peak core before extending any ridges."""
-        for y in range(peak[1] - 1, peak[1] + 2):
-            for x in range(peak[0] - 1, peak[0] + 2):
+    def _place_mountain_peak(self, grid, peak, mountain, width):
+        """Create a three- to five-tile-wide peak core before adding ridges."""
+        lower = -(width // 2)
+        upper = lower + width
+        for y in range(peak[1] + lower, peak[1] + upper):
+            for x in range(peak[0] + lower, peak[0] + upper):
                 if 1 <= x < self.width - 1 and 1 <= y < self.height - 1:
                     grid[y][x].terrain = mountain
         # Sparse outer shoulders keep peaks from reading as identical squares.
-        for delta_x, delta_y in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        shoulder_distance = (width // 2) + 1
+        for delta_x, delta_y in (
+            (-shoulder_distance, 0),
+            (shoulder_distance, 0),
+            (0, -shoulder_distance),
+            (0, shoulder_distance),
+        ):
             x, y = peak[0] + delta_x, peak[1] + delta_y
             if (
                 1 <= x < self.width - 1 and 1 <= y < self.height - 1
@@ -438,10 +454,11 @@ class MapGenerator:
         return None
 
     def _draw_mountain_ridge(self, grid, start, end, mountain, width):
-        """Draw a two- or three-tile-wide ridge from a peak to its endpoint."""
+        """Draw a two- to five-tile-wide ridge from a peak to its endpoint."""
         steps = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
         horizontal = abs(end[0] - start[0]) >= abs(end[1] - start[1])
-        offsets = (-1, 0, 1) if width == 3 else (-1, 0)
+        lower = -(width // 2)
+        offsets = range(lower, lower + width)
         for step in range(1, steps + 1):
             x = round(start[0] + ((end[0] - start[0]) * step / steps))
             y = round(start[1] + ((end[1] - start[1]) * step / steps))

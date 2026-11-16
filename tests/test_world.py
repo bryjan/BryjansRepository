@@ -181,15 +181,26 @@ class MapGeneratorTests(unittest.TestCase):
         generator = MapGenerator(12, random.Random(0))
         grid = generator.build(match)
 
-        generator._place_mountain_peak(grid, [6, 6], match.mountain)
+        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=3)
         self.assertTrue(all(
             grid[y][x].terrain is match.mountain
             for y in range(5, 8) for x in range(5, 8)
         ))
 
+        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=5)
+        self.assertTrue(all(
+            grid[y][x].terrain is match.mountain
+            for y in range(4, 9) for x in range(4, 9)
+        ))
+
         generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=3)
         self.assertTrue(all(
             grid[y][5].terrain is match.mountain for y in range(5, 8)
+        ))
+
+        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=5)
+        self.assertTrue(all(
+            grid[y][5].terrain is match.mountain for y in range(4, 9)
         ))
 
     def test_roads_can_carve_a_pass_through_mountains(self):
