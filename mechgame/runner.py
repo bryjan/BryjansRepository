@@ -12,7 +12,7 @@ class Game:
 
     def __init__(
         self, map_size=100, window_size=None, rng=None, map_width=None,
-        map_height=None, window_width=None, window_height=None,
+        map_height=None, window_width=None, window_height=None, terrain_enabled=None,
     ):
         if window_size is None:
             # The renderer imports game models, so resolve its display minimum
@@ -26,6 +26,7 @@ class Game:
         self.window_size = window_size
         self.window_width = window_size if window_width is None else window_width
         self.window_height = window_size if window_height is None else window_height
+        self.terrain_enabled = terrain_enabled
         self.rng = rng if rng is not None else random.Random()
 
     def create_match(self):
@@ -39,7 +40,7 @@ class Game:
         )
         match.windowWidth = self.window_width
         match.windowHeight = self.window_height
-        match.mapInit()
+        match.mapInit(terrain_enabled=self.terrain_enabled)
         # Spawn points are kept away from the impassable map border, but their
         # margin scales down safely for compact custom maps.
         xMargin = min(40, max(2, self.map_width // 4))

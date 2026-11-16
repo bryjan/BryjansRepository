@@ -6,6 +6,20 @@ import math
 import random
 
 
+# Plains, borders, and blank cells define a usable rectangular map, so only
+# optional generated landscape types belong in this set.
+GENERATABLE_TERRAINS = ("forest", "desert", "road", "suburb", "urban")
+DEFAULT_TERRAIN_ENABLED = {
+    "forest": True,
+    "desert": True,
+    "road": True,
+    "suburb": True,
+    # Dense urban cover makes a dramatic tactical map, but it is intentionally
+    # opt-in so ordinary skirmishes retain more open maneuver space.
+    "urban": False,
+}
+
+
 class MapGenerator:
     """Builds a map and attaches its terrain catalogue to a match.
 
@@ -15,7 +29,10 @@ class MapGenerator:
 
     DENSITY_MULTIPLIERS = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}
 
-    def __init__(self, width: int, height: int | random.Random | None = None, rng: random.Random | None = None):
+    def __init__(
+        self, width: int, height: int | random.Random | None = None,
+        rng: random.Random | None = None, terrain_enabled=None,
+    ):
         # Preserve ``MapGenerator(size, rng)`` while also allowing rectangles.
         if isinstance(height, random.Random):
             rng = height
@@ -23,8 +40,22 @@ class MapGenerator:
         self.width = width
         self.height = width if height is None else height
         self.rng = rng if rng is not None else random.Random()
+        self.terrain_enabled = self._terrain_options(terrain_enabled)
         if self.width < 8 or self.height < 8:
             raise ValueError("Maps must be at least 8 tiles wide and 8 tiles high.")
+
+    @staticmethod
+    def _terrain_options(overrides):
+        """Merge optional terrain toggles while rejecting misspelled tile IDs."""
+        if overrides is None:
+            return dict(DEFAULT_TERRAIN_ENABLED)
+        unknown = set(overrides) - set(GENERATABLE_TERRAINS)
+        if unknown:
+            raise ValueError(f"Unknown terrain toggle(s): {', '.join(sorted(unknown))}")
+        return {
+            terrain: bool(overrides.get(terrain, enabled))
+            for terrain, enabled in DEFAULT_TERRAIN_ENABLED.items()
+        }
 
     def build(self, match):
         # Delayed import avoids a cycle while the legacy domain module is being
@@ -73,16 +104,29 @@ class MapGenerator:
             for cell in row:
                 cell.refNeighbors(grid)
 
-        self._scatter(grid, terrain["forest"], "Normal")
-        self._scatter(grid, terrain["desert"], "Light")
-        self._roads(grid, terrain["road"], "Normal")
-        self._associate(grid, terrain["suburb"], [terrain["road"], terrain["suburb"]], "Normal")
+        if self.terrain_enabled["forest"]:
+            self._scatter(grid, terrain["forest"], "Normal")
+        if self.terrain_enabled["desert"]:
+            self._scatter(grid, terrain["desert"], "Light")
+        if self.terrain_enabled["road"]:
+            self._roads(grid, terrain["road"], "Normal")
+        if self.terrain_enabled["suburb"]:
+            suburb_neighbors = [terrain["suburb"]]
+            if self.terrain_enabled["road"]:
+                suburb_neighbors.append(terrain["road"])
+            self._associate(grid, terrain["suburb"], suburb_neighbors, "Normal")
         # Urban centers form dense pockets around developed road corridors,
         # rather than appearing as isolated buildings across open terrain.
-        self._associate(
-            grid, terrain["urban"],
-            [terrain["road"], terrain["suburb"], terrain["urban"]], "Thick",
-        )
+        if self.terrain_enabled["urban"]:
+            urban_neighbors = [terrain["urban"]]
+            if self.terrain_enabled["road"]:
+                urban_neighbors.append(terrain["road"])
+            if self.terrain_enabled["suburb"]:
+                urban_neighbors.append(terrain["suburb"])
+            # An urban-only map still needs seed districts before it can grow.
+            if len(urban_neighbors) == 1:
+                self._scatter(grid, terrain["urban"], "Light")
+            self._associate(grid, terrain["urban"], urban_neighbors, "Thick")
         return grid
 
     def _scatter(self, grid, terrain, density):

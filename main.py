@@ -11,6 +11,7 @@ def main():
     Game(
         window_width=settings.tactical_width,
         window_height=settings.tactical_height,
+        terrain_enabled=settings.terrain_enabled,
     ).run()
 
 

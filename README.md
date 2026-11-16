@@ -12,8 +12,9 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-The start menu offers `'s'` to launch the demo skirmish and `'o'` to choose
-the tactical screen's width and height before play begins.
+The start menu offers `'s'` to launch the demo skirmish and `'o'` for display
+size or optional map-tile generation. Forest, desert, roads, suburbs, and
+urban centers can each be toggled before play; urban centers default to off.
 
 For a quick manual test, type `end` twice after the map appears. The first
 command moves the active turn to the opposing squad; the second begins a new

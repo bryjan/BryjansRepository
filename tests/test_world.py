@@ -42,7 +42,9 @@ class MapGeneratorTests(unittest.TestCase):
 
     def test_urban_centers_provide_dense_cover_and_limit_large_mechs(self):
         match = MatchInfo(20, 9, [], "")
-        match.map = MapGenerator(20, random.Random(0)).build(match)
+        match.map = MapGenerator(
+            20, random.Random(0), terrain_enabled={"urban": True},
+        ).build(match)
 
         self.assertEqual(match.urban.name, "urban center")
         self.assertEqual(match.urban.symbol, "#")
@@ -50,6 +52,19 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(match.urban.visAbsorb, 30)
         self.assertEqual(match.urban.radarAbsorb, 60)
         self.assertTrue(any(cell.terrain is match.urban for row in match.map for cell in row))
+
+    def test_optional_terrain_can_be_disabled_or_left_out_by_default(self):
+        match = MatchInfo(20, 9, [], "")
+        match.map = MapGenerator(20, random.Random(0)).build(match)
+
+        self.assertFalse(any(cell.terrain is match.urban for row in match.map for cell in row))
+
+        disabled = MatchInfo(20, 9, [], "")
+        disabled.map = MapGenerator(
+            20, random.Random(0),
+            terrain_enabled={"forest": False, "desert": False, "road": False, "suburb": False},
+        ).build(disabled)
+        self.assertTrue(all(cell.terrain in (disabled.border, disabled.plains) for row in disabled.map for cell in row))
 
     def test_game_creates_a_small_match(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()

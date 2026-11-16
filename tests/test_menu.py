@@ -9,7 +9,7 @@ from mechgame.ui.tactical import MIN_TACTICAL_HEIGHT
 class StartMenuTests(unittest.TestCase):
     def test_skirmish_uses_display_options_selected_before_starting(self):
         settings = DisplaySettings()
-        with patch("builtins.input", side_effect=["o", "w", "25", "h", "21", "x", "s"]), patch("builtins.print"):
+        with patch("builtins.input", side_effect=["o", "d", "w", "25", "h", "21", "x", "x", "s"]), patch("builtins.print"):
             selected = start_menu(settings)
 
         self.assertIs(selected, settings)
@@ -30,3 +30,13 @@ class StartMenuTests(unittest.TestCase):
 
     def test_default_height_meets_the_tactical_panel_minimum(self):
         self.assertGreaterEqual(DisplaySettings().tactical_height, MIN_TACTICAL_HEIGHT)
+
+    def test_map_tile_menu_can_enable_urban_generation(self):
+        settings = DisplaySettings()
+        self.assertFalse(settings.terrain_enabled["urban"])
+
+        with patch("builtins.input", side_effect=["o", "m", "5", "x", "x", "s"]), patch("builtins.print"):
+            selected = start_menu(settings)
+
+        self.assertIs(selected, settings)
+        self.assertTrue(settings.terrain_enabled["urban"])

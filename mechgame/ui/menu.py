@@ -1,7 +1,8 @@
 """The small pre-match menu used to start a playable skirmish."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from ..world import DEFAULT_TERRAIN_ENABLED, GENERATABLE_TERRAINS
 from .tactical import MIN_TACTICAL_HEIGHT
 
 MIN_TACTICAL_WIDTH = 5
@@ -9,10 +10,11 @@ MIN_TACTICAL_WIDTH = 5
 
 @dataclass
 class DisplaySettings:
-    """Persistent display choices collected before a new match begins."""
+    """Display and map-generation choices collected before a match begins."""
 
     tactical_width: int = 19
     tactical_height: int = MIN_TACTICAL_HEIGHT
+    terrain_enabled: dict = field(default_factory=lambda: dict(DEFAULT_TERRAIN_ENABLED))
 
 
 def _frame(lines):
@@ -39,15 +41,35 @@ def _read_odd_size(dimension, current, minimum):
 
 
 def options_menu(settings):
+    """Open display or optional-terrain settings before a match begins."""
+    while True:
+        _frame([
+            "OPTIONS",
+            "'d' Display size",
+            "'m' Map tile generation",
+            "'x' Back",
+        ])
+        choice = input("Options: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice == "d":
+            display_options_menu(settings)
+        elif choice == "m":
+            terrain_options_menu(settings)
+        else:
+            print("Choose 'd', 'm', or 'x'.")
+
+
+def display_options_menu(settings):
     """Change the same tactical width and height available during a match."""
     while True:
         _frame([
-            "DISPLAY OPTIONS",
+            "DISPLAY SIZE",
             f"'w' Tactical width:  {settings.tactical_width}",
             f"'h' Tactical height: {settings.tactical_height}",
             "'x' Back",
         ])
-        choice = input("Options: ").strip().lower()
+        choice = input("Display: ").strip().lower()
         if choice in ("", "x"):
             return
         if choice == "w":
@@ -60,6 +82,25 @@ def options_menu(settings):
             )
         else:
             print("Choose 'w', 'h', or 'x'.")
+
+
+def terrain_options_menu(settings):
+    """Toggle optional terrain generators without affecting structural tiles."""
+    while True:
+        lines = ["MAP TILE GENERATION"]
+        for index, terrain in enumerate(GENERATABLE_TERRAINS, start=1):
+            status = "ON" if settings.terrain_enabled[terrain] else "OFF"
+            lines.append(f"'{index}' {terrain.title()}: {status}")
+        lines.extend(["", "Plains and borders are always generated.", "'x' Back"])
+        _frame(lines)
+        choice = input("Map tiles: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice.isdigit() and 1 <= int(choice) <= len(GENERATABLE_TERRAINS):
+            terrain = GENERATABLE_TERRAINS[int(choice) - 1]
+            settings.terrain_enabled[terrain] = not settings.terrain_enabled[terrain]
+        else:
+            print(f"Choose a number from 1 to {len(GENERATABLE_TERRAINS)}, or 'x'.")
 
 
 def start_menu(settings=None):
