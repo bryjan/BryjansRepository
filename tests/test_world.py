@@ -21,6 +21,13 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(all(cell.terrain is match.border for cell in match.map[0]))
         self.assertTrue(all(row[0].terrain is match.border for row in match.map))
 
+    def test_desert_has_subtle_heat_haze_without_extra_radar_cover(self):
+        match = MatchInfo(12, 9, [], "")
+        MapGenerator(12, random.Random(0)).build(match)
+
+        self.assertEqual(match.desert.visAbsorb, 1.2)
+        self.assertEqual(match.desert.radarAbsorb, match.plains.radarAbsorb)
+
     def test_map_init_uses_the_world_generator(self):
         match = MatchInfo(12, 9, [], "")
         match.mapInit()

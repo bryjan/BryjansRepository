@@ -75,8 +75,10 @@ class MapGenerator:
             "border": TerrainType("border", "X", "white", moveCostBySize=[9999] * 7,
                                   visualAbsorbtion=1, radarAbsorbtion=1, radarSig=1,
                                   fireproof=True, passable=False, overviewWeight=100),
+            # Heat haze makes long visual paths slightly less reliable than
+            # open plains, without providing meaningful physical cover.
             "desert": TerrainType("desert", "~", "yellow", moveCostBySize=[1, 2, 3, 2, 1, 1, 1],
-                                  visualAbsorbtion=2, radarAbsorbtion=1, radarSig=9999,
+                                  visualAbsorbtion=1.2, radarAbsorbtion=1, radarSig=9999,
                                   fireproof=True, overviewWeight=1),
             "plains": TerrainType("plains", "_", "light_green", moveCostBySize=[1] * 7,
                                   visualAbsorbtion=1, radarAbsorbtion=1, radarSig=9999,

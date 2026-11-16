@@ -260,7 +260,9 @@ class Entity: #a character on the map
             for tile in y:
                 tile.visPower = 0
 
-        startingCell.visPower = int(self.visPower + startingCell.visualAbsorption)
+        # Keep fractional terrain losses so light effects such as desert heat
+        # haze can matter, rather than being rounded away at every step.
+        startingCell.visPower = self.visPower + startingCell.visualAbsorption
 
         calcList = [] #cells queued to be calced
         dontCalcList= [startingCell] #cells exempt from calcs
@@ -275,8 +277,8 @@ class Entity: #a character on the map
         for cell in calcList:
             dontCalcList.append(cell)
             closestNeighbor = cell.refClosestNeighborTo(startingCell.pos)
-            visualLoss = int(closestNeighbor.visualAbsorption) + round(math.dist(startingCell.pos,cell.pos),0)
-            cell.visPower = int(closestNeighbor.visPower) - visualLoss
+            visualLoss = closestNeighbor.visualAbsorption + round(math.dist(startingCell.pos, cell.pos), 0)
+            cell.visPower = closestNeighbor.visPower - visualLoss
 
             if cell.visPower < 0:
                 cell.visPower = 0
