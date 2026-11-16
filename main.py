@@ -5,15 +5,18 @@ from mechgame.ui.menu import start_menu
 
 
 def main():
-    settings = start_menu()
-    if settings is None:
-        return
-    Game(
-        window_width=settings.tactical_width,
-        window_height=settings.tactical_height,
-        terrain_enabled=settings.terrain_enabled,
-        map_preset=settings.map_preset,
-    ).run()
+    while True:
+        settings = start_menu()
+        if settings is None:
+            return
+        match = Game(
+            window_width=settings.tactical_width,
+            window_height=settings.tactical_height,
+            terrain_enabled=settings.terrain_enabled,
+            map_preset=settings.map_preset,
+        ).run()
+        if not match.quitRequested:
+            return
 
 
 if __name__ == "__main__":

@@ -25,6 +25,15 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.pov.radarOn)
 
+    def test_quit_command_requests_a_return_to_the_start_menu(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.input", return_value="quit"):
+            dispatch.receive_input(match)
+
+        self.assertTrue(match.quitRequested)
+        self.assertFalse(match.matchOver)
+
     def test_weapon_menu_cancel_keeps_the_existing_default(self):
         match = Game(map_size=20, window_size=9).create_match()
         lancer = match.teamList[0].squadsList[0].mechList[1]
@@ -104,6 +113,17 @@ class InputTests(unittest.TestCase):
 
         self.assertEqual(match.windowWidth, 15)
         self.assertEqual(match.windowHeight, 21)
+
+    def test_options_choices_render_in_the_tactical_bottom_panel(self):
+        match = Game(map_size=20, window_size=9).create_match()
+
+        with patch("builtins.input", return_value="x"), patch(
+            "mechgame.commands.squad.pv.printPOV",
+        ) as panel:
+            squad.optionsMenu(match)
+
+        self.assertIn("'w' tactical width", panel.call_args.kwargs["command_text"])
+        self.assertIn("'h' tactical height", panel.call_args.kwargs["command_text"])
 
     def test_tactical_side_panel_summarizes_the_active_mech(self):
         match = Game(map_size=20, window_size=9).create_match()

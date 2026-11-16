@@ -32,6 +32,9 @@ class MatchInfo:
         self.matchRound = 0
         self.pov = ""
         self.matchOver = False
+        # Set by the hidden in-match ``quit`` command. The application loop
+        # discards this match and returns to the fresh start menu.
+        self.quitRequested = False
         self.winner = None
         self.resultMessage = ""
         self.mapParamsList = mapParams

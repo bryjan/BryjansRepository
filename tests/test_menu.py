@@ -1,6 +1,8 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import main as application
 from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, _frame_lines, start_menu
 from mechgame.ui.tactical import DEFAULT_TACTICAL_SIZE, MIN_TACTICAL_HEIGHT
@@ -8,6 +10,20 @@ from mechgame.world import CUSTOM_MAP_PRESET, get_map_preset
 
 
 class StartMenuTests(unittest.TestCase):
+    def test_main_reopens_the_start_menu_after_a_match_returns(self):
+        settings = DisplaySettings()
+        with patch("main.start_menu", side_effect=[settings, None]), patch("main.Game") as game:
+            game.return_value.run.return_value = SimpleNamespace(quitRequested=True)
+            application.main()
+
+        game.assert_called_once_with(
+            window_width=settings.tactical_width,
+            window_height=settings.tactical_height,
+            terrain_enabled=settings.terrain_enabled,
+            map_preset=settings.map_preset,
+        )
+        game.return_value.run.assert_called_once_with()
+
     def test_skirmish_uses_display_options_selected_before_starting(self):
         settings = DisplaySettings()
         with patch("builtins.input", side_effect=["o", "d", "w", "25", "h", "21", "x", "x", "s"]), patch("builtins.print"):

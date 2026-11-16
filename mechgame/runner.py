@@ -76,12 +76,14 @@ class Game:
 
         match = self.create_match()
         match.pov.squad.roundRefresh(match)
-        while not match.matchOver:
+        while not match.matchOver and not match.quitRequested:
             match.pov.getVisuals(match)
             tactical.printPOV(match, *match.pov.pos)
             receive_input(match)
             self.advance_turn_if_requested(match)
-        print(match.resultMessage)
+        if match.matchOver:
+            print(match.resultMessage)
+        return match
 
     @staticmethod
     def advance_turn_if_requested(match):

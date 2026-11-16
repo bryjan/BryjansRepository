@@ -80,10 +80,11 @@ def radarMenu(matchInfo):
 
 def optionsMenu(matchInfo):
     """Offer display preferences that do not alter match state."""
-    print(
+    option_prompt = (
         f"Options: 'w' tactical width ({matchInfo.windowWidth}) | "
         f"'h' tactical height ({matchInfo.windowHeight}) | 'x' exit"
     )
+    pv.printPOV(matchInfo, *matchInfo.pov.pos, command_text=option_prompt)
     choice = input("Options: ").strip().lower()
     if choice in ("", "x"):
         return
@@ -94,6 +95,13 @@ def optionsMenu(matchInfo):
     dimension = "width" if choice == "w" else "height"
     minimum = 5 if choice == "w" else pv.MIN_TACTICAL_HEIGHT
     while True:
+        pv.printPOV(
+            matchInfo,
+            *matchInfo.pov.pos,
+            command_text=(
+                f"Options: enter odd {dimension} of at least {minimum} | 'x' cancel"
+            ),
+        )
         size = input(
             f"Tactical {dimension} (odd whole number, at least {minimum}; 'x' to cancel): "
         ).strip().lower()

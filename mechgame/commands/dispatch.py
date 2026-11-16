@@ -11,6 +11,8 @@ def receive_input(matchInfo):
     player_input = read_nonempty("Input: ").lower()
 
     match player_input:
+        case "quit":
+            matchInfo.quitRequested = True
         case "?":
             return helpCommand(matchInfo)
         case "rep":
