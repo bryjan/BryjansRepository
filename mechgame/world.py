@@ -112,12 +112,12 @@ class MapGenerator:
             for cell in row:
                 cell.refNeighbors(grid)
 
-        # Mountains establish protected terrain first. No current landscape
-        # pass replaces them; future rivers and lava flows are intentional
-        # exceptions and will opt in when those generators are added.
+        # Mountains establish protected terrain first. Roads intentionally
+        # carve passes through them; future rivers and lava flows may also
+        # opt in. Every other current landscape pass preserves the rock.
         protected_terrain = ()
         if self.terrain_enabled["mountain"]:
-            self._scatter(grid, terrain["mountain"], "Light")
+            self._mountain_ranges(grid, terrain["mountain"])
             protected_terrain = (terrain["mountain"],)
         if self.terrain_enabled["forest"]:
             self._scatter(grid, terrain["forest"], "Normal", protected_terrain)
@@ -126,7 +126,7 @@ class MapGenerator:
         if self.terrain_enabled["desert"]:
             self._scatter(grid, terrain["desert"], "Light", protected_terrain)
         if self.terrain_enabled["road"]:
-            self._roads(grid, terrain["road"], "Normal", protected_terrain)
+            self._roads(grid, terrain["road"], "Normal")
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
@@ -174,6 +174,60 @@ class MapGenerator:
                         changes.append(cell)
             for cell in changes:
                 cell.terrain = terrain
+
+    def _mountain_ranges(self, grid, mountain):
+        """Place peaks with zero to two short ridges for shaped ranges."""
+        range_count = max(1, round((self.width * self.height) / 2500))
+        for _ in range(range_count):
+            peak = [
+                self.rng.randrange(2, self.width - 2),
+                self.rng.randrange(2, self.height - 2),
+            ]
+            self._place_mountain_peak(grid, peak, mountain)
+            for _ in range(self.rng.randint(0, 2)):
+                ridge_end = self._ridge_endpoint(peak)
+                if ridge_end is not None:
+                    self._draw_mountain_ridge(grid, peak, ridge_end, mountain)
+
+    def _place_mountain_peak(self, grid, peak, mountain):
+        """Create a small irregular peak core before extending any ridges."""
+        center = grid[peak[1]][peak[0]]
+        center.terrain = mountain
+        for neighbor in center.nList:
+            if (
+                neighbor.terrain.passable
+                and self.rng.randint(1, 100) <= 50
+            ):
+                neighbor.terrain = mountain
+
+    def _ridge_endpoint(self, peak):
+        """Choose an in-bounds endpoint three to eight tiles from one peak."""
+        for _ in range(20):
+            delta_x = self.rng.randint(-8, 8)
+            delta_y = self.rng.randint(-8, 8)
+            distance = math.hypot(delta_x, delta_y)
+            endpoint = [peak[0] + delta_x, peak[1] + delta_y]
+            if (
+                3 <= distance <= 8
+                and 1 <= endpoint[0] < self.width - 1
+                and 1 <= endpoint[1] < self.height - 1
+            ):
+                return endpoint
+        return None
+
+    def _draw_mountain_ridge(self, grid, start, end, mountain):
+        """Draw a narrow, lightly uneven ridge from a peak to its endpoint."""
+        steps = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
+        for step in range(1, steps + 1):
+            x = round(start[0] + ((end[0] - start[0]) * step / steps))
+            y = round(start[1] + ((end[1] - start[1]) * step / steps))
+            cell = grid[y][x]
+            cell.terrain = mountain
+            # A few shoulder tiles stop every ridge from reading as a perfect
+            # one-character line while preserving its directional shape.
+            for neighbor in cell.nList:
+                if neighbor.terrain.passable and self.rng.randint(1, 100) <= 20:
+                    neighbor.terrain = mountain
 
     def _mountain_edge_forests(self, grid, mountain, forest):
         """Add a sparse tree line around mountain patches without covering rock."""

@@ -80,6 +80,16 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertIs(center.terrain, match.mountain)
         self.assertTrue(any(neighbor.terrain is match.forest for neighbor in center.nList))
 
+    def test_roads_can_carve_a_pass_through_mountains(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        grid[4][4].terrain = match.mountain
+
+        generator._draw_road(grid, [3, 4], [5, 4], match.road)
+
+        self.assertIs(grid[4][4].terrain, match.road)
+
     def test_mountains_buff_medium_shooters_and_cover_small_targets(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
         shooter = match.teamList[1].squadsList[0].mechList[1]  # Kestrel, size 3.
