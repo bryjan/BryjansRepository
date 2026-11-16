@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+from dataclasses import dataclass
 
 
 # Plains, borders, and blank cells define a usable rectangular map, so only
@@ -25,6 +26,110 @@ DEFAULT_TERRAIN_ENABLED = {
     "river": True,
 }
 
+DEFAULT_MAP_PRESET = "temperate_frontier"
+CUSTOM_MAP_PRESET = "custom"
+
+
+@dataclass(frozen=True)
+class MapPreset:
+    """Terrain-only parameters for one procedural map style.
+
+    Presets intentionally describe terrain generation only.  Teams, spawn
+    positions, objectives, and other scenario content remain the caller's
+    responsibility, so this data can serve skirmishes and future scenarios.
+    """
+
+    key: str
+    name: str
+    description: str
+    enabled_terrain: frozenset[str]
+    forest_density: str
+    desert_density: str
+    road_density: str
+    suburb_density: str
+    urban_density: str
+    mountain_weight: float = 1
+    pond_weight: float = 1
+    large_river_weight: float = 1
+    small_river_weight: float = 1
+    lake_weight: float = 1
+
+    def terrain_options(self):
+        """Return a fresh toggle dictionary for this preset's terrain."""
+        return {
+            terrain: terrain in self.enabled_terrain
+            for terrain in GENERATABLE_TERRAINS
+        }
+
+
+MAP_PRESETS = (
+    MapPreset(
+        DEFAULT_MAP_PRESET,
+        "Temperate Frontier",
+        "Balanced terrain and infrastructure.",
+        frozenset(GENERATABLE_TERRAINS),
+        forest_density="Normal", desert_density="Light", road_density="Normal",
+        suburb_density="Normal", urban_density="Thick",
+    ),
+    MapPreset(
+        "badlands",
+        "Badlands",
+        "Desert, mountains, and sparse roads.",
+        frozenset({"desert", "road", "mountain"}),
+        forest_density="None", desert_density="Thick", road_density="Light",
+        suburb_density="None", urban_density="None", mountain_weight=1.5,
+        pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
+    ),
+    MapPreset(
+        "mountain_pass",
+        "Mountain Pass",
+        "Ridges, forests, streams, and roads.",
+        frozenset({"forest", "road", "mountain", "water", "river"}),
+        forest_density="Normal", desert_density="None", road_density="Thick",
+        suburb_density="None", urban_density="None", mountain_weight=2.5,
+        pond_weight=0.5, large_river_weight=0.25, small_river_weight=1.5,
+        lake_weight=0.25,
+    ),
+    MapPreset(
+        "river_basin",
+        "River Basin",
+        "Rivers, lakes, bridges, and towns.",
+        frozenset({"forest", "road", "suburb", "urban", "water", "river"}),
+        forest_density="Light", desert_density="None", road_density="Thick",
+        suburb_density="Normal", urban_density="Normal", mountain_weight=0,
+        pond_weight=1.5, large_river_weight=1.5, small_river_weight=1,
+        lake_weight=1.5,
+    ),
+    MapPreset(
+        "urban_fringe",
+        "Urban Fringe",
+        "Dense developed cover beside roads.",
+        frozenset({"forest", "road", "suburb", "urban"}),
+        forest_density="Light", desert_density="None", road_density="Thick",
+        suburb_density="Thick", urban_density="Thick", mountain_weight=0,
+        pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
+    ),
+    MapPreset(
+        "open_steppe",
+        "Open Steppe",
+        "Open sightlines and sparse rough ground.",
+        frozenset({"forest", "desert", "road", "mountain", "water"}),
+        forest_density="Light", desert_density="Light", road_density="Normal",
+        suburb_density="None", urban_density="None", mountain_weight=0.5,
+        pond_weight=0.25, large_river_weight=0, small_river_weight=0, lake_weight=0,
+    ),
+)
+MAP_PRESETS_BY_KEY = {preset.key: preset for preset in MAP_PRESETS}
+
+
+def get_map_preset(key):
+    """Return one named terrain profile or explain the available choices."""
+    try:
+        return MAP_PRESETS_BY_KEY[key]
+    except KeyError as error:
+        valid = ", ".join(preset.key for preset in MAP_PRESETS)
+        raise ValueError(f"Unknown map preset {key!r}; choose one of: {valid}.") from error
+
 
 class MapGenerator:
     """Builds a map and attaches its terrain catalogue to a match.
@@ -38,6 +143,7 @@ class MapGenerator:
     def __init__(
         self, width: int, height: int | random.Random | None = None,
         rng: random.Random | None = None, terrain_enabled=None,
+        map_preset=DEFAULT_MAP_PRESET,
     ):
         # Preserve ``MapGenerator(size, rng)`` while also allowing rectangles.
         if isinstance(height, random.Random):
@@ -46,21 +152,30 @@ class MapGenerator:
         self.width = width
         self.height = width if height is None else height
         self.rng = rng if rng is not None else random.Random()
+        self.map_preset_id = DEFAULT_MAP_PRESET if map_preset is None else map_preset
+        # Custom maps retain the familiar Temperate Frontier frequencies while
+        # letting the player choose every individual terrain toggle.
+        preset_key = (
+            DEFAULT_MAP_PRESET
+            if map_preset in (None, CUSTOM_MAP_PRESET)
+            else map_preset
+        )
+        self.map_preset = get_map_preset(preset_key)
         self.terrain_enabled = self._terrain_options(terrain_enabled)
         if self.width < 8 or self.height < 8:
             raise ValueError("Maps must be at least 8 tiles wide and 8 tiles high.")
 
-    @staticmethod
-    def _terrain_options(overrides):
+    def _terrain_options(self, overrides):
         """Merge optional terrain toggles while rejecting misspelled tile IDs."""
+        defaults = self.map_preset.terrain_options()
         if overrides is None:
-            return dict(DEFAULT_TERRAIN_ENABLED)
+            return defaults
         unknown = set(overrides) - set(GENERATABLE_TERRAINS)
         if unknown:
             raise ValueError(f"Unknown terrain toggle(s): {', '.join(sorted(unknown))}")
         return {
             terrain: bool(overrides.get(terrain, enabled))
-            for terrain, enabled in DEFAULT_TERRAIN_ENABLED.items()
+            for terrain, enabled in defaults.items()
         }
 
     def build(self, match):
@@ -157,13 +272,17 @@ class MapGenerator:
             if terrain["water"] not in protected_terrain:
                 protected_terrain = (*protected_terrain, terrain["water"])
         if self.terrain_enabled["forest"]:
-            self._scatter(grid, terrain["forest"], "Normal", protected_terrain)
+            self._scatter(
+                grid, terrain["forest"], self.map_preset.forest_density, protected_terrain,
+            )
             if self.terrain_enabled["mountain"]:
                 self._mountain_edge_forests(grid, terrain["mountain"], terrain["forest"])
         if self.terrain_enabled["desert"]:
-            self._scatter(grid, terrain["desert"], "Light", protected_terrain)
+            self._scatter(
+                grid, terrain["desert"], self.map_preset.desert_density, protected_terrain,
+            )
         if self.terrain_enabled["road"]:
-            self._roads(grid, terrain["road"], "Normal")
+            self._roads(grid, terrain["road"], self.map_preset.road_density)
             if self.terrain_enabled["mountain"]:
                 self._tunnel_passes(
                     grid, terrain["road"], terrain["mountain"], terrain["tunnel"],
@@ -174,7 +293,11 @@ class MapGenerator:
             if self.terrain_enabled["road"]:
                 suburb_neighbors.append(terrain["road"])
             self._associate(
-                grid, terrain["suburb"], suburb_neighbors, "Normal", protected_terrain,
+                grid,
+                terrain["suburb"],
+                suburb_neighbors,
+                self.map_preset.suburb_density,
+                protected_terrain,
             )
         # Urban centers form dense pockets around developed road corridors,
         # rather than appearing as isolated buildings across open terrain.
@@ -186,9 +309,15 @@ class MapGenerator:
                 urban_neighbors.append(terrain["suburb"])
             # An urban-only map still needs seed districts before it can grow.
             if len(urban_neighbors) == 1:
-                self._scatter(grid, terrain["urban"], "Light", protected_terrain)
+                self._scatter(
+                    grid, terrain["urban"], self.map_preset.urban_density, protected_terrain,
+                )
             self._associate(
-                grid, terrain["urban"], urban_neighbors, "Thick", protected_terrain,
+                grid,
+                terrain["urban"],
+                urban_neighbors,
+                self.map_preset.urban_density,
+                protected_terrain,
             )
         return grid
 
@@ -219,7 +348,10 @@ class MapGenerator:
 
     def _mountain_ranges(self, grid, mountain):
         """Place peaks with zero to two short ridges for shaped ranges."""
-        range_count = max(1, round((self.width * self.height) / 2500))
+        range_count = max(
+            1,
+            self._scaled_feature_count(2500, self.map_preset.mountain_weight),
+        )
         for _ in range(range_count):
             peak = [
                 self.rng.randrange(2, self.width - 2),
@@ -247,42 +379,67 @@ class MapGenerator:
         Rivers and their bank-side lakes are generated separately so lakes can
         be tied to a meaningful waterway rather than appearing at random.
         """
-        for row in grid[1:-1]:
-            for cell in row[1:-1]:
-                # About one small pond seed per 1,600 interior tiles keeps
-                # ponds rare on large maps and unusual on compact ones.
-                if cell.terrain is not water and self.rng.randint(1, 1600) == 1:
-                    self._grow_water_patch(grid, cell, water, self.rng.randint(3, 6))
+        # A water-enabled profile gets at least one small pond. This keeps
+        # compact maps tactically interesting while still scaling large-map
+        # pond counts through the profile's weight.
+        pond_count = max(
+            1,
+            self._scaled_feature_count(1600, self.map_preset.pond_weight),
+        ) if self.map_preset.pond_weight > 0 else 0
+        for _ in range(pond_count):
+            candidates = [
+                cell for row in grid[1:-1] for cell in row[1:-1]
+                if cell.terrain is not water
+            ]
+            if not candidates:
+                return
+            self._grow_water_patch(
+                grid, self.rng.choice(candidates), water, self.rng.randint(3, 6),
+            )
 
     def _rivers(self, grid, water, mountain):
         """Add winding streams and scalable edge-to-edge large rivers."""
         # Broad rivers cross the full map, so their density must scale with
         # map span rather than raw area. A roughly 100×100 map gets one; much
         # larger maps can still receive more without a fixed global cap.
-        large_river_count = self._scaled_linear_feature_count(100)
+        large_river_count = self._scaled_linear_feature_count(
+            100, self.map_preset.large_river_weight,
+        )
         large_river_cells = []
         for _ in range(large_river_count):
             large_river_cells.extend(self._large_river(grid, water, width=3))
         # Lake attempts retain the requested area-scaled rate, but cannot
         # exceed the number of broad rivers available to feed them.
-        lake_count = min(large_river_count, self._scaled_feature_count(1000))
+        lake_count = min(
+            large_river_count,
+            self._scaled_feature_count(1000, self.map_preset.lake_weight),
+        )
         for _ in range(lake_count):
             self._lake_beside_large_river(grid, water, large_river_cells)
         # Small tributary-like streams are deliberately less common. They may
         # begin in mountain terrain or enter from an edge, then end naturally.
-        for _ in range(self._scaled_linear_feature_count(50)):
+        small_river_count = self._scaled_linear_feature_count(
+            50, self.map_preset.small_river_weight,
+        )
+        for _ in range(small_river_count):
             self._small_river(grid, water, mountain)
 
-    def _scaled_feature_count(self, tiles_per_feature):
-        """Return a stochastic feature count whose expectation scales with area."""
+    def _scaled_feature_count(self, tiles_per_feature, weight=1):
+        """Return an area-scaled feature count adjusted by a preset weight."""
+        if weight <= 0:
+            return 0
         interior_area = max(1, (self.width - 2) * (self.height - 2))
-        whole, remainder = divmod(interior_area, tiles_per_feature)
-        return whole + int(self.rng.random() < remainder / tiles_per_feature)
+        expected_count = (interior_area / tiles_per_feature) * weight
+        whole = int(expected_count)
+        remainder = expected_count - whole
+        return whole + int(self.rng.random() < remainder)
 
-    def _scaled_linear_feature_count(self, tiles_per_feature):
-        """Scale cross-map feature count by map span instead of area."""
+    def _scaled_linear_feature_count(self, tiles_per_feature, weight=1):
+        """Scale cross-map feature count by span and a preset feature weight."""
+        if weight <= 0:
+            return 0
         interior_span = math.sqrt(max(1, (self.width - 2) * (self.height - 2)))
-        expected_count = interior_span / tiles_per_feature
+        expected_count = (interior_span / tiles_per_feature) * weight
         whole = int(expected_count)
         return whole + int(self.rng.random() < expected_count - whole)
 
@@ -332,9 +489,35 @@ class MapGenerator:
         ]
         if not bank_cells:
             return []
+        tile_count = self.rng.randint(16, 28)
+        spacious_banks = [
+            cell for cell in bank_cells
+            if self._passable_patch_capacity(cell, water, tile_count) >= tile_count
+        ]
+        if not spacious_banks:
+            return []
         return self._grow_water_patch(
-            grid, self.rng.choice(bank_cells), water, self.rng.randint(16, 28),
+            grid, self.rng.choice(spacious_banks), water, tile_count,
         )
+
+    @staticmethod
+    def _passable_patch_capacity(seed, water, limit):
+        """Count reachable non-water cells, stopping once a patch can fit."""
+        visited = {id(seed)}
+        frontier = [seed]
+        while frontier and len(visited) < limit:
+            cell = frontier.pop()
+            for neighbor in cell.nList:
+                if (
+                    id(neighbor) not in visited
+                    and neighbor.terrain.passable
+                    and neighbor.terrain is not water
+                ):
+                    visited.add(id(neighbor))
+                    frontier.append(neighbor)
+                    if len(visited) >= limit:
+                        break
+        return len(visited)
 
     def _small_river(self, grid, water, mountain):
         """Draw a one-tile stream that may begin at an edge or in the mountains."""

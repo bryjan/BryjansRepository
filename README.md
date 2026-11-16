@@ -13,9 +13,21 @@ python main.py
 ```
 
 The start menu offers `'s'` to launch the demo skirmish and `'o'` for display
-size or optional map-tile generation. Forest, desert, roads, suburbs, urban
-centers, mountains, and water can each be toggled before play; they all
-default to on for map-generation testing.
+size and map generation. Under Options, `'p'` selects a terrain-only map
+preset and `'m'` exposes individual tile toggles. Changing an individual
+toggle marks the map as **Custom**; choosing a preset again replaces those
+custom selections. Custom maps use Temperate Frontier generation frequencies
+for every enabled tile type. Presets do not change teams, mech loadouts,
+spawns, or objectives.
+
+| Preset | Terrain emphasis |
+| --- | --- |
+| Temperate Frontier | Balanced cover, roads, settlements, mountains, and water. |
+| Badlands | Heat-hazed desert, mountains, and sparse roads. |
+| Mountain Pass | Dense ridges, forest approaches, streams, tunnels, and roads. |
+| River Basin | Rivers, lakes, bridges, suburbs, and urban corridors. |
+| Urban Fringe | Road-linked suburbs and urban centers with light natural cover. |
+| Open Steppe | Long sightlines, scattered rough terrain, roads, and small ponds. |
 
 For a quick manual test, type `end` twice after the map appears. The first
 command moves the active turn to the opposing squad; the second begins a new

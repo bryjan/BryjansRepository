@@ -1,3 +1,4 @@
+from collections import Counter
 import random
 import unittest
 from unittest.mock import patch
@@ -8,7 +9,14 @@ from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
 from mechgame.terrain import TerrainType
-from mechgame.world import DEFAULT_TERRAIN_ENABLED, MapGenerator
+from mechgame.world import (
+    CUSTOM_MAP_PRESET,
+    DEFAULT_MAP_PRESET,
+    DEFAULT_TERRAIN_ENABLED,
+    MAP_PRESETS,
+    MapGenerator,
+    get_map_preset,
+)
 
 
 class MapGeneratorTests(unittest.TestCase):
@@ -27,6 +35,66 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertEqual(match.desert.visAbsorb, 1.2)
         self.assertEqual(match.desert.radarAbsorb, match.plains.radarAbsorb)
+
+    def test_named_presets_define_complete_terrain_only_map_profiles(self):
+        self.assertEqual(get_map_preset(DEFAULT_MAP_PRESET).terrain_options(), DEFAULT_TERRAIN_ENABLED)
+        self.assertEqual(len({preset.key for preset in MAP_PRESETS}), len(MAP_PRESETS))
+
+        badlands = MapGenerator(20, random.Random(0), map_preset="badlands")
+        self.assertEqual(badlands.map_preset.desert_density, "Thick")
+        self.assertEqual(badlands.map_preset.mountain_weight, 1.5)
+        self.assertFalse(badlands.terrain_enabled["forest"])
+        self.assertFalse(badlands.terrain_enabled["water"])
+
+        river_basin = MapGenerator(20, random.Random(0), map_preset="river_basin")
+        self.assertGreater(river_basin.map_preset.large_river_weight, 1)
+        self.assertTrue(river_basin.terrain_enabled["river"])
+
+    def test_custom_terrain_toggles_retain_temperate_generation_weights(self):
+        generator = MapGenerator(
+            20,
+            random.Random(0),
+            terrain_enabled={"urban": False},
+            map_preset=CUSTOM_MAP_PRESET,
+        )
+
+        self.assertEqual(generator.map_preset.key, DEFAULT_MAP_PRESET)
+        self.assertFalse(generator.terrain_enabled["urban"])
+        self.assertEqual(generator.map_preset.road_density, "Normal")
+
+    def test_unknown_map_preset_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unknown map preset"):
+            MapGenerator(20, random.Random(0), map_preset="not-a-preset")
+
+    def test_presets_apply_distinct_terrain_generation_weights(self):
+        def terrain_counts(preset):
+            match = MatchInfo(100, 9, [], "")
+            grid = MapGenerator(
+                100, 100, random.Random(0), map_preset=preset,
+            ).build(match)
+            return Counter(cell.terrain.name for row in grid for cell in row)
+
+        temperate = terrain_counts(DEFAULT_MAP_PRESET)
+        badlands = terrain_counts("badlands")
+        river_basin = terrain_counts("river_basin")
+        urban_fringe = terrain_counts("urban_fringe")
+
+        self.assertGreater(badlands["desert"], temperate["desert"] * 5)
+        self.assertGreater(river_basin["water"], urban_fringe["water"])
+
+    def test_game_forwards_its_map_preset_to_world_generation(self):
+        match = Game(
+            map_size=20,
+            window_size=9,
+            rng=random.Random(0),
+            map_preset="urban_fringe",
+        ).create_match()
+
+        disabled_terrain = {"desert", "mountain", "water"}
+        self.assertFalse(any(
+            cell.terrain.name in disabled_terrain
+            for row in match.map for cell in row
+        ))
 
     def test_map_init_uses_the_world_generator(self):
         match = MatchInfo(12, 9, [], "")

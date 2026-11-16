@@ -275,9 +275,13 @@ class MatchInfo:
             interceptingCells.append(self.map[i][x])
         return interceptingCells
 
-    def mapInit(self, terrain_enabled=None):
+    def mapInit(self, terrain_enabled=None, map_preset=None):
         """Build the world through the dedicated map-generation module."""
         from mechgame.world import MapGenerator
         self.map = MapGenerator(
-            self.mapWidth, self.mapHeight, self.rng, terrain_enabled,
+            self.mapWidth,
+            height=self.mapHeight,
+            rng=self.rng,
+            terrain_enabled=terrain_enabled,
+            map_preset=map_preset,
         ).build(self)

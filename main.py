@@ -12,6 +12,7 @@ def main():
         window_width=settings.tactical_width,
         window_height=settings.tactical_height,
         terrain_enabled=settings.terrain_enabled,
+        map_preset=settings.map_preset,
     ).run()
 
 

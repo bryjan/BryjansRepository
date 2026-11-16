@@ -4,6 +4,7 @@ from unittest.mock import patch
 from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, _frame_lines, start_menu
 from mechgame.ui.tactical import MIN_TACTICAL_HEIGHT
+from mechgame.world import CUSTOM_MAP_PRESET, get_map_preset
 
 
 class StartMenuTests(unittest.TestCase):
@@ -40,6 +41,7 @@ class StartMenuTests(unittest.TestCase):
 
         self.assertIs(selected, settings)
         self.assertFalse(settings.terrain_enabled["urban"])
+        self.assertEqual(settings.map_preset, CUSTOM_MAP_PRESET)
 
     def test_map_tile_menu_can_disable_river_generation(self):
         settings = DisplaySettings()
@@ -50,6 +52,16 @@ class StartMenuTests(unittest.TestCase):
 
         self.assertIs(selected, settings)
         self.assertFalse(settings.terrain_enabled["river"])
+        self.assertEqual(settings.map_preset, CUSTOM_MAP_PRESET)
+
+    def test_map_preset_replaces_tile_choices_with_its_own_configuration(self):
+        settings = DisplaySettings()
+        with patch("builtins.input", side_effect=["o", "p", "2", "x", "s"]), patch("builtins.print"):
+            selected = start_menu(settings)
+
+        self.assertIs(selected, settings)
+        self.assertEqual(settings.map_preset, "badlands")
+        self.assertEqual(settings.terrain_enabled, get_map_preset("badlands").terrain_options())
 
     def test_all_start_menu_pages_follow_the_selected_screen_size(self):
         settings = DisplaySettings(tactical_width=25, tactical_height=21)
