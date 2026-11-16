@@ -78,7 +78,7 @@ MAP_PRESETS = (
         "Temperate Frontier",
         "Balanced terrain and infrastructure.",
         frozenset(GENERATABLE_TERRAINS),
-        forest_density="Normal", desert_density="Light", road_density="Normal",
+        forest_density="Thick", desert_density="Light", road_density="Normal",
         suburb_density="Normal", urban_density="Thick",
     ),
     MapPreset(
@@ -86,7 +86,7 @@ MAP_PRESETS = (
         "Badlands",
         "Desert, mountains, and sparse roads.",
         frozenset({"desert", "road", "mountain"}),
-        forest_density="None", desert_density="Thick", road_density="Light",
+        forest_density="None", desert_density="Dominant", road_density="Light",
         suburb_density="None", urban_density="None", mountain_weight=1.5,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
     ),
@@ -148,7 +148,15 @@ class MapGenerator:
     independent from match flow and combat rules.
     """
 
-    DENSITY_MULTIPLIERS = {"None": 0, "Light": 1, "Normal": 2, "Thick": 3}
+    DENSITY_MULTIPLIERS = {
+        "None": 0,
+        "Light": 1,
+        "Normal": 2,
+        "Thick": 3,
+        # Used for terrain that defines a map's identity rather than merely
+        # decorating it. The Badlands desert must dominate open plains.
+        "Dominant": 12,
+    }
 
     def __init__(
         self, width: int, height: int | random.Random | None = None,

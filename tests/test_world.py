@@ -42,7 +42,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(len({preset.key for preset in MAP_PRESETS}), len(MAP_PRESETS))
 
         badlands = MapGenerator(20, random.Random(0), map_preset="badlands")
-        self.assertEqual(badlands.map_preset.desert_density, "Thick")
+        self.assertEqual(badlands.map_preset.desert_density, "Dominant")
         self.assertEqual(badlands.map_preset.mountain_weight, 1.5)
         self.assertFalse(badlands.terrain_enabled["forest"])
         self.assertFalse(badlands.terrain_enabled["water"])
@@ -81,6 +81,8 @@ class MapGeneratorTests(unittest.TestCase):
         urban_fringe = terrain_counts("urban_fringe")
 
         self.assertGreater(badlands["desert"], temperate["desert"] * 5)
+        self.assertGreater(badlands["desert"], badlands["plains"] * 3)
+        self.assertGreater(temperate["forest"], 500)
         self.assertGreater(river_basin["water"], urban_fringe["water"])
 
     def test_game_forwards_its_map_preset_to_world_generation(self):
