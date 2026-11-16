@@ -256,40 +256,41 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(any(neighbor.terrain is match.forest for neighbor in center.nList))
 
     def test_mountain_peaks_and_ridges_have_doubled_variable_shapes(self):
-        match = MatchInfo(12, 9, [], "")
-        generator = MapGenerator(12, random.Random(0))
+        match = MatchInfo(30, 9, [], "")
+        generator = MapGenerator(30, random.Random(0))
         grid = generator.build(match)
+        peak = [15, 15]
 
-        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=6)
+        generator._place_mountain_peak(grid, peak, match.mountain, width=6)
         self.assertTrue(all(
             grid[y][x].terrain is match.mountain
-            for y in range(3, 9) for x in range(3, 9)
+            for y in range(12, 18) for x in range(12, 18)
         ))
 
-        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=10)
+        generator._place_mountain_peak(grid, peak, match.mountain, width=10)
         self.assertTrue(all(
             grid[y][x].terrain is match.mountain
-            for y in range(1, 11) for x in range(1, 11)
+            for y in range(10, 20) for x in range(10, 20)
         ))
 
-        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=4)
+        generator._draw_mountain_ridge(grid, [6, 15], [24, 15], match.mountain, width=4)
         self.assertTrue(all(
-            grid[y][5].terrain is match.mountain for y in range(4, 8)
+            grid[y][15].terrain is match.mountain for y in range(13, 17)
         ))
 
-        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=10)
+        generator._draw_mountain_ridge(grid, [6, 15], [24, 15], match.mountain, width=20)
         self.assertTrue(all(
-            grid[y][5].terrain is match.mountain for y in range(1, 11)
+            grid[y][15].terrain is match.mountain for y in range(5, 25)
         ))
 
-    def test_large_mountain_ridges_extend_six_to_sixteen_tiles_when_space_allows(self):
-        generator = MapGenerator(50, random.Random(0))
-        peak = [25, 25]
+    def test_large_mountain_ridges_extend_six_to_thirty_two_tiles_when_space_allows(self):
+        generator = MapGenerator(100, random.Random(0))
+        peak = [50, 50]
         endpoint = generator._ridge_endpoint(peak)
 
         self.assertIsNotNone(endpoint)
         self.assertGreaterEqual(math.dist(peak, endpoint), 6)
-        self.assertLessEqual(math.dist(peak, endpoint), 16)
+        self.assertLessEqual(math.dist(peak, endpoint), 32)
 
     def test_roads_can_carve_a_pass_through_mountains(self):
         match = MatchInfo(12, 9, [], "")

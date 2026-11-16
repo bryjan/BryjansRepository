@@ -35,9 +35,9 @@ CUSTOM_MAP_PRESET = "custom"
 MOUNTAIN_CORE_WIDTH = 6
 MOUNTAIN_CORE_VARIANCE = 4
 MOUNTAIN_RIDGE_WIDTH = 4
-MOUNTAIN_RIDGE_VARIANCE = 6
+MOUNTAIN_RIDGE_VARIANCE = 16
 MOUNTAIN_RIDGE_MIN_LENGTH = 6
-MOUNTAIN_RIDGE_MAX_LENGTH = 16
+MOUNTAIN_RIDGE_MAX_LENGTH = 32
 
 
 @dataclass(frozen=True)
@@ -672,7 +672,7 @@ class MapGenerator:
                 grid[y][x].terrain = mountain
 
     def _ridge_endpoint(self, peak):
-        """Choose an in-bounds endpoint six to sixteen tiles from one peak."""
+        """Choose an in-bounds endpoint six to thirty-two tiles from one peak."""
         for _ in range(20):
             delta_x = self.rng.randint(
                 -MOUNTAIN_RIDGE_MAX_LENGTH, MOUNTAIN_RIDGE_MAX_LENGTH,
@@ -691,7 +691,7 @@ class MapGenerator:
         return None
 
     def _draw_mountain_ridge(self, grid, start, end, mountain, width):
-        """Draw a four- to ten-tile-wide ridge from a peak to its endpoint."""
+        """Draw a four- to twenty-tile-wide ridge from a peak to its endpoint."""
         steps = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
         horizontal = abs(end[0] - start[0]) >= abs(end[1] - start[1])
         lower = -(width // 2)
