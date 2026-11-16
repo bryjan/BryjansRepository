@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from mechgame.runner import Game
-from mechgame.ui.menu import DisplaySettings, start_menu
+from mechgame.ui.menu import DisplaySettings, _frame_lines, start_menu
 from mechgame.ui.tactical import MIN_TACTICAL_HEIGHT
 
 
@@ -40,3 +40,13 @@ class StartMenuTests(unittest.TestCase):
 
         self.assertIs(selected, settings)
         self.assertTrue(settings.terrain_enabled["urban"])
+
+    def test_all_start_menu_pages_follow_the_selected_screen_size(self):
+        settings = DisplaySettings(tactical_width=25, tactical_height=21)
+        main_frame = _frame_lines(["ASCII MECH GAME", "'s' Skirmish"], settings)
+        options_frame = _frame_lines(["OPTIONS", "'d' Display size"], settings)
+
+        self.assertEqual(len(main_frame), 23)
+        self.assertEqual(len(options_frame), 23)
+        self.assertTrue(all(len(line) == 54 for line in main_frame))
+        self.assertTrue(all(len(line) == 54 for line in options_frame))

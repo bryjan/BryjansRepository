@@ -1,11 +1,13 @@
 """The small pre-match menu used to start a playable skirmish."""
 
 from dataclasses import dataclass, field
+import textwrap
 
 from ..world import DEFAULT_TERRAIN_ENABLED, GENERATABLE_TERRAINS
 from .tactical import MIN_TACTICAL_HEIGHT
 
 MIN_TACTICAL_WIDTH = 5
+MENU_MIN_INNER_WIDTH = 40
 
 
 @dataclass
@@ -17,14 +19,28 @@ class DisplaySettings:
     terrain_enabled: dict = field(default_factory=lambda: dict(DEFAULT_TERRAIN_ENABLED))
 
 
-def _frame(lines):
-    """Print a consistently bordered menu sized to its longest row."""
-    width = max(len(line) for line in lines)
-    divider = "+" + ("-" * (width + 2)) + "+"
-    print(divider)
+def _frame_lines(lines, settings):
+    """Build a fixed-size menu frame from the selected display dimensions."""
+    # Tactical cells consume two terminal columns. Reusing that scale makes a
+    # menu resized in Options visibly remain the same size on every page.
+    width = max(MENU_MIN_INNER_WIDTH, settings.tactical_width * 2)
+    content = []
     for line in lines:
-        print(f"| {line:<{width}} |")
-    print(divider)
+        content.extend(textwrap.wrap(line, width=width) or [""])
+    height = max(settings.tactical_height, len(content))
+    divider = "+" + ("-" * (width + 2)) + "+"
+    return [
+        divider,
+        *(f"| {line:<{width}} |" for line in content),
+        *(f"| {'':<{width}} |" for _ in range(height - len(content))),
+        divider,
+    ]
+
+
+def _frame(lines, settings):
+    """Print a consistently sized pre-match menu frame."""
+    for line in _frame_lines(lines, settings):
+        print(line)
 
 
 def _read_odd_size(dimension, current, minimum):
@@ -48,7 +64,7 @@ def options_menu(settings):
             "'d' Display size",
             "'m' Map tile generation",
             "'x' Back",
-        ])
+        ], settings)
         choice = input("Options: ").strip().lower()
         if choice in ("", "x"):
             return
@@ -68,7 +84,7 @@ def display_options_menu(settings):
             f"'w' Tactical width:  {settings.tactical_width}",
             f"'h' Tactical height: {settings.tactical_height}",
             "'x' Back",
-        ])
+        ], settings)
         choice = input("Display: ").strip().lower()
         if choice in ("", "x"):
             return
@@ -92,7 +108,7 @@ def terrain_options_menu(settings):
             status = "ON" if settings.terrain_enabled[terrain] else "OFF"
             lines.append(f"'{index}' {terrain.title()}: {status}")
         lines.extend(["", "Plains and borders are always generated.", "'x' Back"])
-        _frame(lines)
+        _frame(lines, settings)
         choice = input("Map tiles: ").strip().lower()
         if choice in ("", "x"):
             return
@@ -113,7 +129,7 @@ def start_menu(settings=None):
             "'s' Skirmish",
             "'o' Options",
             "'q' Quit",
-        ])
+        ], settings)
         choice = input("Select: ").strip().lower()
         if choice == "s":
             return settings
