@@ -14,8 +14,8 @@ python main.py
 
 The start menu offers `'s'` to launch the demo skirmish and `'o'` for display
 size or optional map-tile generation. Forest, desert, roads, suburbs, urban
-centers, and mountains can each be toggled before play; urban centers and
-mountains default to off.
+centers, mountains, and water can each be toggled before play; they all
+default to on for map-generation testing.
 
 For a quick manual test, type `end` twice after the map appears. The first
 command moves the active turn to the opposing squad; the second begins a new

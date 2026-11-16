@@ -31,7 +31,10 @@ def mountain_launcher_range_bonus(match_info, position):
 #key descriptions in dictionary
 class TerrainType:
     """Immutable-style description of how a terrain category behaves and renders."""
-    def __init__(self, name, symbol, color, size=0, moveCostBySize=None, visualAbsorbtion=0, radarAbsorbtion=0, radarSig=0, requireFloat=False, fireproof=False, passable=True, symbolHighlight="", symbolAttribute=None):
+    def __init__(self, name, symbol, color, size=0, moveCostBySize=None,
+                 visualAbsorbtion=0, radarAbsorbtion=0, radarSig=0,
+                 requireFloat=False, fireproof=False, passable=True,
+                 symbolHighlight="", symbolAttribute=None, overviewWeight=1):
         self.name = name
         self.symbol = symbol
         self.color = color
@@ -45,6 +48,9 @@ class TerrainType:
         self.symbolAttribute = list(symbolAttribute) if symbolAttribute is not None else []
         self.symbolHighlight = symbolHighlight
         self.passable = passable
+        # Strategic-map chunks use weighted terrain votes instead of letting
+        # a single rare tile replace an otherwise dominant landscape.
+        self.overviewWeight = overviewWeight
 
     def displayTerrain(self):
         if self.symbolAttribute != [] and self.symbolHighlight != "":

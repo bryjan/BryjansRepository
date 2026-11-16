@@ -16,11 +16,11 @@ DEFAULT_TERRAIN_ENABLED = {
     "desert": True,
     "road": True,
     "suburb": True,
-    # Dense urban cover makes a dramatic tactical map, but it is intentionally
-    # opt-in so ordinary skirmishes retain more open maneuver space.
-    "urban": False,
-    "mountain": False,
-    "water": False,
+    # Everything starts enabled for map-generation testing. Individual maps
+    # can still disable any optional terrain in the pre-match menu.
+    "urban": True,
+    "mountain": True,
+    "water": True,
 }
 
 
@@ -68,33 +68,39 @@ class MapGenerator:
 
         terrain = {
             "blank": TerrainType("blank", " ", "black", visualAbsorbtion=9999,
-                                 radarAbsorbtion=9999, fireproof=True, passable=False),
+                                 radarAbsorbtion=9999, fireproof=True, passable=False,
+                                 overviewWeight=0),
             "border": TerrainType("border", "X", "white", moveCostBySize=[9999] * 7,
                                   visualAbsorbtion=1, radarAbsorbtion=1, radarSig=1,
-                                  fireproof=True, passable=False),
+                                  fireproof=True, passable=False, overviewWeight=100),
             "desert": TerrainType("desert", "~", "yellow", moveCostBySize=[1, 2, 3, 2, 1, 1, 1],
-                                  visualAbsorbtion=2, radarAbsorbtion=1, radarSig=9999, fireproof=True),
+                                  visualAbsorbtion=2, radarAbsorbtion=1, radarSig=9999,
+                                  fireproof=True, overviewWeight=1),
             "plains": TerrainType("plains", "_", "light_green", moveCostBySize=[1] * 7,
-                                  visualAbsorbtion=1, radarAbsorbtion=1, radarSig=9999),
+                                  visualAbsorbtion=1, radarAbsorbtion=1, radarSig=9999,
+                                  overviewWeight=1),
             "forest": TerrainType("forest", "t", "green", size=3,
                                   moveCostBySize=[1, 1, 2, 4, 3, 1, 1],
-                                  visualAbsorbtion=6, radarAbsorbtion=15, radarSig=100),
+                                  visualAbsorbtion=6, radarAbsorbtion=15, radarSig=100,
+                                  overviewWeight=1.25),
             "suburb": TerrainType("suburbs", "H", "light_grey", size=3,
                                   moveCostBySize=[1, 1, 1, 5, 4, 2, 1],
-                                  visualAbsorbtion=20, radarAbsorbtion=40, radarSig=80),
+                                  visualAbsorbtion=20, radarAbsorbtion=40, radarSig=80,
+                                  overviewWeight=1.5),
             # Dense buildings create the map's strongest static sensor cover.
             # Small and class-2 mechs can thread the streets freely, while
             # larger frames must force their way through or avoid the district.
             "urban": TerrainType("urban center", "#", "white", size=4,
                                  moveCostBySize=[0, 0, 0, 1, 3, 9999, 9999],
-                                 visualAbsorbtion=30, radarAbsorbtion=60, radarSig=50),
+                                 visualAbsorbtion=30, radarAbsorbtion=60, radarSig=50,
+                                 overviewWeight=2.5),
             # Mountain patches are arduous for small frames, while larger
             # mechs can stride over the vegetation and rough ground. They
             # remain costly terrain even for the largest walking chassis.
             "mountain": TerrainType("mountain", "^", "white", size=5,
                                     moveCostBySize=[6, 5, 4, 3, 2, 2, 2],
                                     visualAbsorbtion=12, radarAbsorbtion=20,
-                                    radarSig=100),
+                                    radarSig=100, overviewWeight=2.5),
             # Water is deliberately defined before river and pond generation.
             # It is sensor-clear, but only floating, flying, or titanic mechs
             # can enter it. The energy scale starts at one for sizes 0–2,
@@ -102,17 +108,18 @@ class MapGenerator:
             "water": TerrainType("water", "~", "cyan",
                                   moveCostBySize=[1, 1, 1, 2, 3, 4, 5],
                                   visualAbsorbtion=0, radarAbsorbtion=0,
-                                  radarSig=9999, requireFloat=True, fireproof=True),
+                                  radarSig=9999, requireFloat=True, fireproof=True,
+                                  overviewWeight=3),
             # Tunnels preserve mountain cover but give light and medium mechs
             # a road-like route through the pass. Larger frames still have to
             # force their way through as if crossing mountain terrain.
             "tunnel": TerrainType("tunnel", "T", "light_grey", size=5,
                                    moveCostBySize=[0, 0, 0, 0, 2, 2, 2],
                                    visualAbsorbtion=12, radarAbsorbtion=20,
-                                   radarSig=100, fireproof=True),
+                                   radarSig=100, fireproof=True, overviewWeight=1.75),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
-                                fireproof=True),
+                                fireproof=True, overviewWeight=1.5),
         }
         for name, value in terrain.items():
             setattr(match, name, value)

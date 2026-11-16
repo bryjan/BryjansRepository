@@ -33,13 +33,13 @@ class StartMenuTests(unittest.TestCase):
 
     def test_map_tile_menu_can_enable_urban_generation(self):
         settings = DisplaySettings()
-        self.assertFalse(settings.terrain_enabled["urban"])
+        self.assertTrue(settings.terrain_enabled["urban"])
 
         with patch("builtins.input", side_effect=["o", "m", "5", "x", "x", "s"]), patch("builtins.print"):
             selected = start_menu(settings)
 
         self.assertIs(selected, settings)
-        self.assertTrue(settings.terrain_enabled["urban"])
+        self.assertFalse(settings.terrain_enabled["urban"])
 
     def test_all_start_menu_pages_follow_the_selected_screen_size(self):
         settings = DisplaySettings(tactical_width=25, tactical_height=21)

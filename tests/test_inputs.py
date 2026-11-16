@@ -49,12 +49,34 @@ class InputTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9).create_match()
 
         with patch("builtins.input", side_effect=["m", ""]), patch(
-            "mechgame.ui.tactical.print_full_map"
+            "mechgame.ui.tactical.print_overview"
         ) as map_mock:
             dispatch.receive_input(match)
 
         map_mock.assert_called_once_with(match)
         self.assertFalse(match.advTurn)
+
+    def test_overview_uses_weighted_votes_and_connected_route_bonus(self):
+        match = Game(map_size=20, window_size=9).create_match()
+        chunk = [row[2:6] for row in match.map[2:6]]
+        for row in chunk:
+            for cell in row:
+                cell.terrain = match.plains
+
+        chunk[0][0].terrain = match.urban
+        self.assertIs(tactical.overview_terrain(chunk), match.plains)
+
+        for cell in chunk[0]:
+            cell.terrain = match.urban
+        chunk[1][0].terrain = match.urban
+        self.assertIs(tactical.overview_terrain(chunk), match.urban)
+
+        for row in chunk:
+            for cell in row:
+                cell.terrain = match.plains
+        for cell in chunk[1]:
+            cell.terrain = match.road
+        self.assertIs(tactical.overview_terrain(chunk), match.road)
 
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=20, window_size=9).create_match()

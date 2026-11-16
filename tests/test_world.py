@@ -8,7 +8,7 @@ from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
 from mechgame.terrain import TerrainType
-from mechgame.world import MapGenerator
+from mechgame.world import DEFAULT_TERRAIN_ENABLED, MapGenerator
 
 
 class MapGeneratorTests(unittest.TestCase):
@@ -98,7 +98,9 @@ class MapGeneratorTests(unittest.TestCase):
 
     def test_water_toggle_generates_sparse_ponds_and_one_area_scaled_lake(self):
         disabled = MatchInfo(50, 9, [], "")
-        disabled.map = MapGenerator(50, random.Random(0)).build(disabled)
+        disabled.map = MapGenerator(
+            50, random.Random(0), terrain_enabled={"water": False},
+        ).build(disabled)
         self.assertFalse(any(cell.terrain is disabled.water for row in disabled.map for cell in row))
 
         enabled = MatchInfo(50, 9, [], "")
@@ -198,17 +200,17 @@ class MapGeneratorTests(unittest.TestCase):
             weapon.effective_accuracy(match, shooter, target), baseline * 0.85,
         )
 
-    def test_optional_terrain_can_be_disabled_or_left_out_by_default(self):
+    def test_optional_terrain_defaults_on_and_can_be_disabled(self):
+        self.assertTrue(all(DEFAULT_TERRAIN_ENABLED.values()))
+
         match = MatchInfo(20, 9, [], "")
         match.map = MapGenerator(20, random.Random(0)).build(match)
-
-        self.assertFalse(any(cell.terrain is match.urban for row in match.map for cell in row))
-        self.assertFalse(any(cell.terrain is match.mountain for row in match.map for cell in row))
+        self.assertTrue(any(cell.terrain is match.water for row in match.map for cell in row))
 
         disabled = MatchInfo(20, 9, [], "")
         disabled.map = MapGenerator(
             20, random.Random(0),
-            terrain_enabled={"forest": False, "desert": False, "road": False, "suburb": False},
+            terrain_enabled={terrain: False for terrain in DEFAULT_TERRAIN_ENABLED},
         ).build(disabled)
         self.assertTrue(all(cell.terrain in (disabled.border, disabled.plains) for row in disabled.map for cell in row))
 

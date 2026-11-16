@@ -228,27 +228,133 @@ def _command_lines(width, command_text=None):
     return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
 
-def print_full_map(matchInfo):
-    """Render every terrain tile and entity for the temporary debug overview.
+OVERVIEW_ROUTE_BONUS = 24
+OVERVIEW_ROUTE_TERRAINS = {"road", "tunnel", "water"}
 
-    This intentionally bypasses fog of war. The command boundary is kept here
-    so a future fog-aware strategic renderer can share its frame and map
-    orientation without changing gameplay commands.
-    """
-    width = matchInfo.mapWidth * 2
-    divider = "+" + ("-" * width) + "+"
-    title = f"DEBUG MAP — {matchInfo.mapWidth} x {matchInfo.mapHeight}"
-    print(divider)
-    print(f"|{title:^{width}}|")
-    print(divider)
-    # Tactical coordinates increase toward north, so the highest Y row is
-    # printed first just like the local tactical display.
-    for row in reversed(matchInfo.map):
-        print("|", end="")
+
+def _route_crosses_chunk(chunk, terrain):
+    """Return whether connected route tiles reach at least two chunk edges."""
+    height, width = len(chunk), len(chunk[0])
+    positions = {
+        (row_index, column_index)
+        for row_index, row in enumerate(chunk)
+        for column_index, cell in enumerate(row)
+        if cell.terrain is terrain
+    }
+    while positions:
+        frontier = [positions.pop()]
+        edges = set()
+        while frontier:
+            row, column = frontier.pop()
+            if row == 0:
+                edges.add("south")
+            if row == height - 1:
+                edges.add("north")
+            if column == 0:
+                edges.add("west")
+            if column == width - 1:
+                edges.add("east")
+            for delta_row, delta_column in (
+                (-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1),
+                (1, -1), (1, 0), (1, 1),
+            ):
+                neighbor = (row + delta_row, column + delta_column)
+                if neighbor in positions:
+                    positions.remove(neighbor)
+                    frontier.append(neighbor)
+        if len(edges) >= 2:
+            return True
+    return False
+
+
+def overview_terrain(chunk):
+    """Choose a chunk symbol through weighted terrain voting and route links."""
+    terrain_counts = {}
+    for row in chunk:
         for cell in row:
-            cell.displayCell(matchInfo)
-        print("|")
-    print(divider)
+            terrain_counts[cell.terrain] = terrain_counts.get(cell.terrain, 0) + 1
+
+    scored_terrain = []
+    for terrain, count in terrain_counts.items():
+        score = count * terrain.overviewWeight
+        if terrain.name in OVERVIEW_ROUTE_TERRAINS and _route_crosses_chunk(chunk, terrain):
+            score += OVERVIEW_ROUTE_BONUS
+        scored_terrain.append((score, count, terrain.overviewWeight, terrain))
+    # The stable terrain name tie-break keeps seeded map rendering reproducible.
+    return max(scored_terrain, key=lambda item: (item[0], item[1], item[2], item[3].name))[3]
+
+
+def _overview_chunks(matchInfo, width, height):
+    """Partition the full map into complete rectangular overview chunks."""
+    rows = []
+    for display_y in range(height):
+        start_y = (display_y * matchInfo.mapHeight) // height
+        end_y = ((display_y + 1) * matchInfo.mapHeight) // height
+        row = []
+        for display_x in range(width):
+            start_x = (display_x * matchInfo.mapWidth) // width
+            end_x = ((display_x + 1) * matchInfo.mapWidth) // width
+            row.append([
+                map_row[start_x:end_x]
+                for map_row in matchInfo.map[start_y:end_y]
+            ])
+        rows.append(row)
+    return rows
+
+
+def _display_overview_chunk(matchInfo, chunk):
+    """Render the selected terrain, or a debug-visible entity/effect on top."""
+    entities = [
+        entity
+        for entity in matchInfo.entities
+        if any(entity.pos == cell.pos for row in chunk for cell in row)
+    ]
+    active = next((entity for entity in entities if entity is matchInfo.pov), None)
+    if active is not None:
+        active.displayObject(active=True)
+        return
+    if len(entities) == 1:
+        entities[0].displayObject()
+        return
+    if len(entities) > 1:
+        print(termcolor.colored("+", "yellow"), end=" ")
+        return
+    effects = [effect for row in chunk for cell in row for effect in cell.effects]
+    if effects:
+        effect = next((effect for effect in effects if effect.name == "fire"), effects[0])
+        print(termcolor.colored(effect.symbol, effect.color), end=" ")
+        return
+    overview_terrain(chunk).displayTerrain()
+
+
+def print_overview(matchInfo):
+    """Render a full-map debug overview inside the normal tactical frame.
+
+    Fog of war will later limit each chunk to terrain and contacts the team has
+    actually discovered. For now all terrain, effects, and entities are shown.
+    """
+    window_width = min(matchInfo.windowWidth, matchInfo.mapWidth)
+    window_height = min(matchInfo.windowHeight, matchInfo.mapHeight)
+    chunks = _overview_chunks(matchInfo, window_width, window_height)
+    panel_width = window_width * 2
+    top_divider = "+" + ("-" * panel_width) + "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
+    full_panel_width = panel_width + SIDE_PANEL_WIDTH + 1
+    full_divider = "+" + ("-" * full_panel_width) + "+"
+    side_lines = _side_panel_lines(matchInfo, window_height)
+
+    print(full_divider)
+    for line in _hud_lines(matchInfo, full_panel_width):
+        print(f"|{line:<{full_panel_width}}|")
+    print(top_divider)
+    for row, side_line in zip(reversed(chunks), side_lines):
+        print("|", end="")
+        for chunk in row:
+            _display_overview_chunk(matchInfo, chunk)
+        print(side_line)
+    print(full_divider)
+    for line in _command_lines(full_panel_width, "Map overview: 'Enter' or 'x' return"):
+        print(f"|{line:<{full_panel_width}}|")
+    print(full_divider)
 
 
 def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):

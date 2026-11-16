@@ -24,9 +24,9 @@ def lookAt(matchInfo):
 
 
 def mapView(matchInfo):
-    """Open the full debug map; strategic fog of war will replace this later."""
-    pv.print_full_map(matchInfo)
-    input("Full map: press 'Enter' to return")
+    """Open the scaled debug overview; strategic fog of war will follow."""
+    pv.print_overview(matchInfo)
+    input("Map overview: press 'Enter' to return")
 
 
 def statusPanel(matchInfo):
