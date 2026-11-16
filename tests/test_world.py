@@ -1,5 +1,6 @@
 import random
 import unittest
+from unittest.mock import patch
 
 from mechgame import effects
 from mechgame.match import MatchInfo
@@ -63,8 +64,21 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(match.mountain.moveCost, [6, 5, 4, 3, 2, 2, 2])
         self.assertEqual(match.mountain.visAbsorb, 12)
         self.assertEqual(match.mountain.radarAbsorb, 20)
-        self.assertTrue(match.mountain.fireproof)
+        self.assertFalse(match.mountain.fireproof)
         self.assertTrue(any(cell.terrain is match.mountain for row in match.map for cell in row))
+
+    def test_mountain_edges_can_grow_a_sparse_forest_fringe(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        center = grid[6][6]
+        center.terrain = match.mountain
+
+        with patch.object(generator.rng, "randint", return_value=1):
+            generator._mountain_edge_forests(grid, match.mountain, match.forest)
+
+        self.assertIs(center.terrain, match.mountain)
+        self.assertTrue(any(neighbor.terrain is match.forest for neighbor in center.nList))
 
     def test_mountains_buff_medium_shooters_and_cover_small_targets(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()

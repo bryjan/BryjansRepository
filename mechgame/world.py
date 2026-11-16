@@ -91,7 +91,7 @@ class MapGenerator:
             "mountain": TerrainType("mountain", "^", "white", size=5,
                                     moveCostBySize=[6, 5, 4, 3, 2, 2, 2],
                                     visualAbsorbtion=12, radarAbsorbtion=20,
-                                    radarSig=100, fireproof=True),
+                                    radarSig=100),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
                                 fireproof=True),
@@ -112,21 +112,28 @@ class MapGenerator:
             for cell in row:
                 cell.refNeighbors(grid)
 
-        if self.terrain_enabled["forest"]:
-            self._scatter(grid, terrain["forest"], "Normal")
-        if self.terrain_enabled["desert"]:
-            self._scatter(grid, terrain["desert"], "Light")
+        # Mountains establish protected terrain first. No current landscape
+        # pass replaces them; future rivers and lava flows are intentional
+        # exceptions and will opt in when those generators are added.
+        protected_terrain = ()
         if self.terrain_enabled["mountain"]:
-            # Mountains use the same clustered growth method as forests, but
-            # start less densely so they read as distinct ridges or patches.
             self._scatter(grid, terrain["mountain"], "Light")
+            protected_terrain = (terrain["mountain"],)
+        if self.terrain_enabled["forest"]:
+            self._scatter(grid, terrain["forest"], "Normal", protected_terrain)
+            if self.terrain_enabled["mountain"]:
+                self._mountain_edge_forests(grid, terrain["mountain"], terrain["forest"])
+        if self.terrain_enabled["desert"]:
+            self._scatter(grid, terrain["desert"], "Light", protected_terrain)
         if self.terrain_enabled["road"]:
-            self._roads(grid, terrain["road"], "Normal")
+            self._roads(grid, terrain["road"], "Normal", protected_terrain)
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
                 suburb_neighbors.append(terrain["road"])
-            self._associate(grid, terrain["suburb"], suburb_neighbors, "Normal")
+            self._associate(
+                grid, terrain["suburb"], suburb_neighbors, "Normal", protected_terrain,
+            )
         # Urban centers form dense pockets around developed road corridors,
         # rather than appearing as isolated buildings across open terrain.
         if self.terrain_enabled["urban"]:
@@ -137,45 +144,74 @@ class MapGenerator:
                 urban_neighbors.append(terrain["suburb"])
             # An urban-only map still needs seed districts before it can grow.
             if len(urban_neighbors) == 1:
-                self._scatter(grid, terrain["urban"], "Light")
-            self._associate(grid, terrain["urban"], urban_neighbors, "Thick")
+                self._scatter(grid, terrain["urban"], "Light", protected_terrain)
+            self._associate(
+                grid, terrain["urban"], urban_neighbors, "Thick", protected_terrain,
+            )
         return grid
 
-    def _scatter(self, grid, terrain, density):
+    def _scatter(self, grid, terrain, density, protected_terrain=()):
         multiplier = self._density_multiplier(density)
+        protected_terrain = set(protected_terrain)
         if not multiplier:
             return
         for row in grid[1:-1]:
             for cell in row[1:-1]:
-                if self.rng.randint(1, 1000) <= 3 * multiplier:
+                if (
+                    cell.terrain not in protected_terrain
+                    and self.rng.randint(1, 1000) <= 3 * multiplier
+                ):
                     cell.terrain = terrain
         for _ in range(multiplier):
             changes = []
             for row in grid[2:-2]:
                 for cell in row[2:-2]:
                     neighbors = sum(neighbor.terrain is terrain for neighbor in cell.nList)
-                    if neighbors and self.rng.randint(1, 100) + neighbors < 25:
+                    if (
+                        cell.terrain not in protected_terrain
+                        and neighbors and self.rng.randint(1, 100) + neighbors < 25
+                    ):
                         changes.append(cell)
             for cell in changes:
                 cell.terrain = terrain
 
-    def _associate(self, grid, terrain, associated, density):
+    def _mountain_edge_forests(self, grid, mountain, forest):
+        """Add a sparse tree line around mountain patches without covering rock."""
+        changes = []
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                if cell.terrain is not mountain:
+                    continue
+                for neighbor in cell.nList:
+                    if (
+                        neighbor.terrain.name == "plains"
+                        and self.rng.randint(1, 100) <= 8
+                    ):
+                        changes.append(neighbor)
+        for cell in changes:
+            cell.terrain = forest
+
+    def _associate(self, grid, terrain, associated, density, protected_terrain=()):
         multiplier = self._density_multiplier(density)
+        protected_terrain = set(protected_terrain)
         for _ in range(multiplier):
             changes = []
             for row in grid[2:-2]:
                 for cell in row[2:-2]:
                     neighbors = sum(neighbor.terrain in associated for neighbor in cell.nList)
-                    if cell.terrain not in associated and neighbors and self.rng.randint(1, 100) + neighbors < 5:
+                    if (
+                        cell.terrain not in protected_terrain and cell.terrain not in associated
+                        and neighbors and self.rng.randint(1, 100) + neighbors < 5
+                    ):
                         changes.append(cell)
             for cell in changes:
                 cell.terrain = terrain
 
-    def _roads(self, grid, terrain, density):
+    def _roads(self, grid, terrain, density, protected_terrain=()):
         multiplier = self._density_multiplier(density)
         for _ in range(multiplier):
             start, end = self._distant_cells(grid)
-            self._draw_road(grid, start, end, terrain)
+            self._draw_road(grid, start, end, terrain, protected_terrain)
 
     def _density_multiplier(self, density):
         """Translate a readable map-density setting into a generation count."""
@@ -192,13 +228,16 @@ class MapGenerator:
             if math.dist(start, end) >= min(self.width, self.height) / 2:
                 return start, end
 
-    def _draw_road(self, grid, start, end, terrain):
+    def _draw_road(self, grid, start, end, terrain, protected_terrain=()):
         x, y = start
         target_x, target_y = end
+        protected_terrain = set(protected_terrain)
         while (x, y) != (target_x, target_y):
-            grid[y][x].terrain = terrain
+            if grid[y][x].terrain not in protected_terrain:
+                grid[y][x].terrain = terrain
             if x != target_x and (y == target_y or self.rng.choice((True, False))):
                 x += 1 if target_x > x else -1
             elif y != target_y:
                 y += 1 if target_y > y else -1
-        grid[target_y][target_x].terrain = terrain
+        if grid[target_y][target_x].terrain not in protected_terrain:
+            grid[target_y][target_x].terrain = terrain

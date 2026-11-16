@@ -81,7 +81,7 @@ class FireEffect(TerrainEffect):
     def on_turn_start(self, match_info, entity):
         self._damage_entity(match_info, entity)
 
-    def _drift_smoke(self, cell):
+    def _drift_smoke(self, match_info, cell):
         """Let a healthy fire send one visible smoke plume downwind each round."""
         candidates = [neighbor for neighbor in cell.nList if neighbor.terrain.passable]
         if candidates and match_info.rng.random() < 0.60:
@@ -100,13 +100,17 @@ class FireEffect(TerrainEffect):
             spread_chance, extinguish_chance = 0.25, 0.10
         elif terrain.name == "suburbs":
             spread_chance, extinguish_chance = 0.20, 0.15
+        elif terrain.name == "mountain":
+            # Dry scrub and tree line make mountains a little more hazardous
+            # than plains, despite the exposed rock and sparse fuel.
+            spread_chance, extinguish_chance = 0.08, 0.40
         else:
             spread_chance, extinguish_chance = 0.10, 0.25
 
         # A working fire continuously makes smoke, including a frequent plume
         # on an adjacent tile.  The burning tile itself is kept smoky by
         # ``advance_effects`` after smoke dissipation is resolved.
-        self._drift_smoke(cell)
+        self._drift_smoke(match_info, cell)
         for neighbor in cell.nList:
             if not neighbor.terrain.fireproof and match_info.rng.random() < spread_chance:
                 add_fire(neighbor)

@@ -155,6 +155,16 @@ class ArtilleryTests(unittest.TestCase):
 
         self.assertEqual(border_cell.onFire, 0)
 
+    def test_mountain_fire_is_not_immediately_extinguished_as_fireproof_terrain(self):
+        mountain_cell = self.match.map[10][10]
+        mountain_cell.terrain = self.match.mountain
+        effects.add_fire(mountain_cell, turns=2)
+
+        with patch.object(self.match.rng, "random", return_value=1.0):
+            effects.advance_effects(self.match)
+
+        self.assertEqual(mountain_cell.onFire, 1)
+
     def test_fire_damage_reports_critical_only_after_penetrating_armor(self):
         mech = self.match.pov
         limb = mech.mechClass.legs
