@@ -53,11 +53,48 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(match.urban.radarAbsorb, 60)
         self.assertTrue(any(cell.terrain is match.urban for row in match.map for cell in row))
 
+    def test_mountains_are_optional_clustered_cover_with_size_scaled_costs(self):
+        match = MatchInfo(20, 9, [], "")
+        match.map = MapGenerator(
+            20, random.Random(0), terrain_enabled={"mountain": True},
+        ).build(match)
+
+        self.assertEqual(match.mountain.symbol, "^")
+        self.assertEqual(match.mountain.moveCost, [6, 5, 4, 3, 2, 2, 2])
+        self.assertEqual(match.mountain.visAbsorb, 12)
+        self.assertEqual(match.mountain.radarAbsorb, 20)
+        self.assertTrue(match.mountain.fireproof)
+        self.assertTrue(any(cell.terrain is match.mountain for row in match.map for cell in row))
+
+    def test_mountains_buff_medium_shooters_and_cover_small_targets(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        shooter = match.teamList[1].squadsList[0].mechList[1]  # Kestrel, size 3.
+        target = match.pov  # Pathfinder Lancer, size 2.
+        weapon = shooter.mechClass.gunList[0]
+        shooter.pos = [4, 4]
+        target.pos = [10, 4]
+        match.map[4][4].terrain = match.plains
+        match.map[4][10].terrain = match.plains
+
+        baseline = weapon.effective_accuracy(match, shooter, target)
+
+        match.map[4][4].terrain = match.mountain
+        self.assertAlmostEqual(
+            weapon.effective_accuracy(match, shooter, target), baseline * 1.15,
+        )
+
+        match.map[4][4].terrain = match.plains
+        match.map[4][10].terrain = match.forest
+        self.assertAlmostEqual(
+            weapon.effective_accuracy(match, shooter, target), baseline * 0.85,
+        )
+
     def test_optional_terrain_can_be_disabled_or_left_out_by_default(self):
         match = MatchInfo(20, 9, [], "")
         match.map = MapGenerator(20, random.Random(0)).build(match)
 
         self.assertFalse(any(cell.terrain is match.urban for row in match.map for cell in row))
+        self.assertFalse(any(cell.terrain is match.mountain for row in match.map for cell in row))
 
         disabled = MatchInfo(20, 9, [], "")
         disabled.map = MapGenerator(

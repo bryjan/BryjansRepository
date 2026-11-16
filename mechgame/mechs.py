@@ -637,7 +637,9 @@ class WeaponLimb(MechPart):
             movementMultiplier = 1
             if matchInfo.pov.speed > 0:
                 movementMultiplier = 1 - ((matchInfo.rng.randint(0, self.speedPenalty) * matchInfo.pov.speed) / 100)
-            effectiveAccuracy = self.accuracy * self.accuracyMultiplier * movementMultiplier
+            effectiveAccuracy = self.effective_accuracy(
+                matchInfo, matchInfo.pov, target, movementMultiplier,
+            )
             hitChance = self._hit_chance(matchInfo.pov, target, effectiveAccuracy, accuracyRequired)
 
             if matchInfo.rng.randint(1, 100) > hitChance:
@@ -657,9 +659,9 @@ class WeaponLimb(MechPart):
             print("Out of ammo!")
             return
         distance = math.dist(matchInfo.pov.pos, targetPosition)
-        profile = self.launcher_profile(distance)
+        profile = self.launcher_profile(distance, matchInfo, matchInfo.pov)
         if profile is None:
-            farRange = ammo.rangeBands["far"][0]
+            farRange = ammo.rangeBands["far"][0] + self.launcher_range_bonus(matchInfo, matchInfo.pov)
             print(f"Target is beyond this launcher's {farRange}-tile far range.")
             return
         if matchInfo.pov.ap < self.apCost:
@@ -712,11 +714,20 @@ class WeaponLimb(MechPart):
             )
         matchInfo.advTurn = True
 
-    def launcher_profile(self, distance):
+    def launcher_range_bonus(self, matchInfo=None, shooter=None):
+        """Return a terrain-based range bonus for a launcher firing uphill."""
+        if matchInfo is None or shooter is None:
+            return 0
+        from .terrain import mountain_launcher_range_bonus
+        return mountain_launcher_range_bonus(matchInfo, shooter.pos)
+
+    def launcher_profile(self, distance, matchInfo=None, shooter=None):
         """Return the first range band able to reach ``distance``, if any."""
         if not self.isLauncher:
             return None
-        return self.selected_ammo.profile(distance)
+        return self.selected_ammo.profile(
+            distance, self.launcher_range_bonus(matchInfo, shooter),
+        )
 
     @property
     def selected_ammo(self):
@@ -740,6 +751,25 @@ class WeaponLimb(MechPart):
         targetSize = target.size if target is not None else shooter.size
         sizeMultiplier = 1.2 ** (targetSize - shooter.size)
         return min(99, max(10, round(baseChance * sizeMultiplier)))
+
+    def terrain_accuracy_multiplier(self, matchInfo, shooter, target):
+        """Return mountain elevation and small-target cover accuracy modifiers."""
+        multiplier = 1
+        shooter_terrain = matchInfo.map[shooter.pos[1]][shooter.pos[0]].terrain.name
+        if shooter.size == 3 and shooter_terrain == "mountain":
+            multiplier *= 1.15
+        if target is not None:
+            target_terrain = matchInfo.map[target.pos[1]][target.pos[0]].terrain.name
+            if target.size <= 2 and target_terrain in {"forest", "mountain"}:
+                multiplier *= 0.85
+        return multiplier
+
+    def effective_accuracy(self, matchInfo, shooter, target, movementMultiplier=1):
+        """Combine weapon, movement, and terrain modifiers for one projectile."""
+        return (
+            self.accuracy * self.accuracyMultiplier * movementMultiplier
+            * self.terrain_accuracy_multiplier(matchInfo, shooter, target)
+        )
 
     def accuracy_required(self, matchInfo, shooter, position):
         """Return the terrain accuracy cost of a shot path.
@@ -767,9 +797,11 @@ class WeaponLimb(MechPart):
         truthful range covering its possible individual projectile chances.
         """
         accuracy_required = self.accuracy_required(matchInfo, shooter, position)
-        maximum_accuracy = self.accuracy * self.accuracyMultiplier
+        maximum_accuracy = self.effective_accuracy(matchInfo, shooter, target)
         minimum_multiplier = max(0, 1 - ((self.speedPenalty * shooter.speed) / 100))
-        minimum_accuracy = maximum_accuracy * minimum_multiplier
+        minimum_accuracy = self.effective_accuracy(
+            matchInfo, shooter, target, minimum_multiplier,
+        )
         chances = (
             self._hit_chance(shooter, target, minimum_accuracy, accuracy_required),
             self._hit_chance(shooter, target, maximum_accuracy, accuracy_required),

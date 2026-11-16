@@ -1,9 +1,31 @@
 """Terrain definitions and cells that make up a generated map."""
 
 import math
+from collections import deque
 
 from termcolor import colored, cprint
 from .radar import entity_detection_threshold
+
+
+def mountain_launcher_range_bonus(match_info, position):
+    """Return +1 at a mountain edge and +2 one or more tiles into a patch."""
+    start = match_info.map[position[1]][position[0]]
+    if start.terrain.name != "mountain":
+        return 0
+
+    # Depth counts mountain-to-mountain steps before reaching open terrain.
+    # A boundary mountain therefore has depth 0 and earns +1 range.
+    visited = {id(start)}
+    frontier = deque([(start, 0)])
+    while frontier:
+        cell, depth = frontier.popleft()
+        for neighbor in cell.nList:
+            if neighbor.terrain.name != "mountain":
+                return min(2, depth + 1)
+            if id(neighbor) not in visited:
+                visited.add(id(neighbor))
+                frontier.append((neighbor, depth + 1))
+    return 0
 
 
 #key descriptions in dictionary

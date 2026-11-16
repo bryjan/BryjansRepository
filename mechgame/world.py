@@ -8,7 +8,7 @@ import random
 
 # Plains, borders, and blank cells define a usable rectangular map, so only
 # optional generated landscape types belong in this set.
-GENERATABLE_TERRAINS = ("forest", "desert", "road", "suburb", "urban")
+GENERATABLE_TERRAINS = ("forest", "desert", "road", "suburb", "urban", "mountain")
 DEFAULT_TERRAIN_ENABLED = {
     "forest": True,
     "desert": True,
@@ -17,6 +17,7 @@ DEFAULT_TERRAIN_ENABLED = {
     # Dense urban cover makes a dramatic tactical map, but it is intentionally
     # opt-in so ordinary skirmishes retain more open maneuver space.
     "urban": False,
+    "mountain": False,
 }
 
 
@@ -84,6 +85,13 @@ class MapGenerator:
             "urban": TerrainType("urban center", "#", "white", size=4,
                                  moveCostBySize=[0, 0, 0, 1, 3, 9999, 9999],
                                  visualAbsorbtion=30, radarAbsorbtion=60, radarSig=50),
+            # Mountain patches are arduous for small frames, while larger
+            # mechs can stride over the vegetation and rough ground. They
+            # remain costly terrain even for the largest walking chassis.
+            "mountain": TerrainType("mountain", "^", "white", size=5,
+                                    moveCostBySize=[6, 5, 4, 3, 2, 2, 2],
+                                    visualAbsorbtion=12, radarAbsorbtion=20,
+                                    radarSig=100, fireproof=True),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
                                 fireproof=True),
@@ -108,6 +116,10 @@ class MapGenerator:
             self._scatter(grid, terrain["forest"], "Normal")
         if self.terrain_enabled["desert"]:
             self._scatter(grid, terrain["desert"], "Light")
+        if self.terrain_enabled["mountain"]:
+            # Mountains use the same clustered growth method as forests, but
+            # start less densely so they read as distinct ridges or patches.
+            self._scatter(grid, terrain["mountain"], "Light")
         if self.terrain_enabled["road"]:
             self._roads(grid, terrain["road"], "Normal")
         if self.terrain_enabled["suburb"]:

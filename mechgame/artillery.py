@@ -39,16 +39,18 @@ class LauncherAmmo:
             if values[0] <= 0 or values[1] < 0 or values[2] < 0:
                 raise ValueError(f"Ammo {band} needs positive range and nonnegative scatter/turns.")
 
-    def profile(self, distance):
+    def profile(self, distance, range_bonus=0):
         """Return the first band able to reach this target distance."""
+        range_bonus = max(0, int(range_bonus))
         for name in ("close", "medium", "far"):
             values = self.rangeBands[name]
             max_range, inaccuracy, turns = values[:3]
             falloff = values[3] if len(values) == 4 else 0
-            if distance <= max_range:
+            if distance <= max_range + range_bonus:
                 return {
                     "name": name,
-                    "max_range": max_range,
+                    "max_range": max_range + range_bonus,
+                    "range_bonus": range_bonus,
                     "inaccuracy": inaccuracy,
                     "turns": turns,
                     "damage_falloff": falloff,

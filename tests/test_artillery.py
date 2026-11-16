@@ -47,6 +47,23 @@ class ArtilleryTests(unittest.TestCase):
         self.assertEqual(cell.visualAbsorption, cell.terrain.visAbsorb + 3)
         self.assertEqual(cell.radarAbsorption, cell.terrain.radarAbsorb + 12)
 
+    def test_mountain_depth_extends_launcher_range_by_one_or_two_tiles(self):
+        launcher = WeaponLimb(
+            "Test Launcher", 1, 1, [], 0, 0, 1, None,
+            ammoTypes=[artillery.LauncherAmmo("Test", self.bands)],
+        )
+        self.match.pov.pos = [4, 4]
+        self.match.map[4][4].terrain = self.match.mountain
+
+        self.assertEqual(launcher.launcher_range_bonus(self.match, self.match.pov), 1)
+        self.assertIsNotNone(launcher.launcher_profile(81, self.match, self.match.pov))
+
+        for y in range(3, 6):
+            for x in range(3, 6):
+                self.match.map[y][x].terrain = self.match.mountain
+        self.assertEqual(launcher.launcher_range_bonus(self.match, self.match.pov), 2)
+        self.assertIsNotNone(launcher.launcher_profile(82, self.match, self.match.pov))
+
     def test_one_turn_shell_waits_through_a_complete_future_squad_turn(self):
         smoke = artillery.LauncherAmmo(
             "Test Smoke", self.bands, payload="smoke", charges=1,

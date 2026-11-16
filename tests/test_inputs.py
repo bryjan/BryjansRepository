@@ -242,7 +242,7 @@ class InputTests(unittest.TestCase):
         launcher.select_ammo(1)  # Smoke is the second catalogued mortar shell.
 
         with patch("builtins.print") as print_mock:
-            firing.printLauncherProfile(mortar, launcher, [10, 10])
+            firing.printLauncherProfile(match, mortar, launcher, [10, 10])
 
         output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("Smoke", output)

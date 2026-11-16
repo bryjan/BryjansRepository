@@ -62,7 +62,7 @@ def launcherFireMenu(matchInfo, launcher, target=None):
             f"Launcher target: {detail['classification']} at {default_position} "
             f"| distance {detail['distance']:.1f} tiles"
         )
-        printLauncherProfile(mech, launcher, default_position)
+        printLauncherProfile(matchInfo, mech, launcher, default_position)
         prompt = launcherFirePrompt(matchInfo, launcher, default_target, hasDefault=True)
     else:
         prompt = launcherFirePrompt(matchInfo, launcher, None)
@@ -117,7 +117,7 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         print("Choose a listed launcher option.")
         return
 
-    if position is not None and printLauncherProfile(mech, launcher, position) is not None:
+    if position is not None and printLauncherProfile(matchInfo, mech, launcher, position) is not None:
         pv.printPOV(
             matchInfo, *position,
             command_text="Launch: 'Enter' or 'f' confirm | 'x' cancel",
@@ -162,7 +162,9 @@ def predictLauncherLead(matchInfo, launcher, target):
     # A projected location can cross into a slower range band. Re-evaluate the
     # band a few times so the final lead uses the shell's actual flight time.
     for _ in range(3):
-        profile = launcher.launcher_profile(math.dist(observer.pos, projected))
+        profile = launcher.launcher_profile(
+            math.dist(observer.pos, projected), matchInfo, observer,
+        )
         if profile is None:
             return None
         updated = [
@@ -186,12 +188,13 @@ def launcherAutoLeadAvailable(matchInfo, target):
     )
 
 
-def printLauncherProfile(mech, launcher, position):
+def printLauncherProfile(matchInfo, mech, launcher, position):
     """Display the launcher band that will govern a shot at ``position``."""
     distance = math.dist(mech.pos, position)
-    profile = launcher.launcher_profile(distance)
+    range_bonus = launcher.launcher_range_bonus(matchInfo, mech)
+    profile = launcher.launcher_profile(distance, matchInfo, mech)
     if profile is None:
-        far_range = launcher.selected_ammo.rangeBands["far"][0]
+        far_range = launcher.selected_ammo.rangeBands["far"][0] + range_bonus
         print(f"Out of range: far profile reaches {far_range} tiles.")
         return None
 
@@ -205,7 +208,8 @@ def printLauncherProfile(mech, launcher, position):
     )
     if ammo.payload == "explosive":
         details += f"damage {damage} | "
-    print(details + f"rounds {charges}")
+    elevation = f" | mountain range +{range_bonus}" if range_bonus else ""
+    print(details + f"rounds {charges}{elevation}")
     return profile
 
 
