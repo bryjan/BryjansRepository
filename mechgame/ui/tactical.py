@@ -1,3 +1,5 @@
+"""Terminal rendering for tactical gameplay and contextual panels."""
+
 import termcolor
 import textwrap
 from mechgame.mechs import MAX_HULL_ART_HEIGHT

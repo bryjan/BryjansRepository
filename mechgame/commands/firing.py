@@ -2,7 +2,7 @@
 
 import math
 
-import printView as pv
+from ..ui import tactical as pv
 
 from .. import radar
 from ..coordinates import get_coordinate_input

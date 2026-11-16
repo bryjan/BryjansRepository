@@ -1,6 +1,6 @@
 """Commands for local movement support, viewing, and hull abilities."""
 
-import printView as pv
+from ..ui import tactical as pv
 
 from ..coordinates import get_coordinate_input
 

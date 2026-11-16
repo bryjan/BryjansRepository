@@ -1,6 +1,6 @@
 """Commands for squad management, radar contacts, reports, and options."""
 
-import printView as pv
+from ..ui import tactical as pv
 
 from .. import radar
 from .firing import fire

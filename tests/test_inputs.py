@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import printView
+from mechgame.ui import tactical
 from mechgame.commands import dispatch, firing, navigation, squad
 from mechgame.runner import Game
 
@@ -40,7 +40,7 @@ class InputTests(unittest.TestCase):
     def test_look_can_cancel_without_rendering_a_view(self):
         match = Game(map_size=20, window_size=9).create_match()
 
-        with patch("builtins.input", return_value="x"), patch("printView.printPOV") as view_mock:
+        with patch("builtins.input", return_value="x"), patch("mechgame.ui.tactical.printPOV") as view_mock:
             navigation.lookAt(match)
 
         view_mock.assert_not_called()
@@ -70,10 +70,10 @@ class InputTests(unittest.TestCase):
         match.pov.mechClass.legs.limbCon = 0.5
         match.pov.cockpit.status = 1
 
-        lines = printView._side_panel_lines(match, height=19)
+        lines = tactical._side_panel_lines(match, height=19)
 
         self.assertEqual(len(lines), 19)
-        self.assertTrue(all(len(line) == printView.SIDE_PANEL_WIDTH + 2 for line in lines))
+        self.assertTrue(all(len(line) == tactical.SIDE_PANEL_WIDTH + 2 for line in lines))
         panel = "\n".join(lines)
         self.assertEqual(match.pov.mechClass.hull.asciiArt, (" /\\ ", "/##\\", " /\\ "))
         self.assertIn("B - Lancer Type.S Pathfinder", panel)
@@ -90,7 +90,7 @@ class InputTests(unittest.TestCase):
         observer.trackedEnemies = [target]
         observer.directlyVisibleEnemies = [target]
 
-        panel = "\n".join(printView._side_panel_lines(match, height=19))
+        panel = "\n".join(tactical._side_panel_lines(match, height=19))
 
         self.assertIn("FOCUS: Bastion", panel)
         self.assertIn("Sensors: Visual", panel)
@@ -100,7 +100,7 @@ class InputTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9).create_match()
         match.pov.squad.reportLog.append(["CRITICAL MESSAGE! Test", True, False])
 
-        lines = printView._side_panel_lines(match, height=19)
+        lines = tactical._side_panel_lines(match, height=19)
 
         self.assertIn("Critical reports!", lines[-1])
 
@@ -108,11 +108,11 @@ class InputTests(unittest.TestCase):
         match = Game(map_size=20, window_size=9).create_match()
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
 
-        with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
+        with patch("mechgame.ui.tactical.printPOV") as view_mock, patch("builtins.input", return_value="x"):
             navigation.statusPanel(match)
         self.assertNotIn("right_panel", view_mock.call_args.kwargs)
 
-        with patch("printView.printPOV") as view_mock, patch("builtins.input", return_value="x"):
+        with patch("mechgame.ui.tactical.printPOV") as view_mock, patch("builtins.input", return_value="x"):
             squad.unreadReportMenu(match)
         title, entries = view_mock.call_args.kwargs["right_panel"]
         self.assertEqual(title, "UNREAD REPORTS")
@@ -258,7 +258,7 @@ class InputTests(unittest.TestCase):
         self.assertFalse(match.advTurn)
 
         with patch("builtins.print") as print_mock:
-            printView._print_tactical_footer(80)
+            tactical._print_tactical_footer(80)
         footer_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
         self.assertIn("'ab' Abilities", footer_output)
         self.assertIn("'o'", footer_output)

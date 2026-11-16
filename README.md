@@ -12,14 +12,19 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+The start menu offers `'s'` to launch the demo skirmish and `'o'` to choose
+the tactical screen's width and height before play begins.
+
 For a quick manual test, type `end` twice after the map appears. The first
 command moves the active turn to the opposing squad; the second begins a new
 round and returns it to the player squad.
 
 ## Project map
 
-- `main.py` starts the application.
+- `main.py` opens the start menu and launches a skirmish.
 - `mechgame/runner.py` owns match setup and the command-line loop.
+- `mechgame/ui/menu.py` owns the pre-match Skirmish and display-options menus.
+- `mechgame/ui/tactical.py` owns terminal rendering for the tactical screen and its panels.
 - `mechgame/catalog.py` is the reusable library of named mech, part, and module
   factories, grouped by size class.
 - `mechgame/content.py` assembles the playable sensor-Lancer demo scenario.
