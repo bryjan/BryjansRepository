@@ -50,7 +50,7 @@ class MatchInfo:
         # These attributes are populated by mapInit for compatibility with the
         # existing combat and rendering code.
         self.blank = self.border = self.desert = self.plains = None
-        self.forest = self.suburb = self.urban = self.mountain = self.water = self.road = None
+        self.forest = self.suburb = self.urban = self.mountain = self.water = self.tunnel = self.road = None
 
     def operational_teams(self):
         """Return teams that still have at least one mech in the match."""

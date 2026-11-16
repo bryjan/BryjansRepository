@@ -103,6 +103,13 @@ class MapGenerator:
                                   moveCostBySize=[1, 1, 1, 2, 3, 4, 5],
                                   visualAbsorbtion=0, radarAbsorbtion=0,
                                   radarSig=9999, requireFloat=True, fireproof=True),
+            # Tunnels preserve mountain cover but give light and medium mechs
+            # a road-like route through the pass. Larger frames still have to
+            # force their way through as if crossing mountain terrain.
+            "tunnel": TerrainType("tunnel", "T", "light_grey", size=5,
+                                   moveCostBySize=[0, 0, 0, 0, 2, 2, 2],
+                                   visualAbsorbtion=12, radarAbsorbtion=20,
+                                   radarSig=100, fireproof=True),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
                                 fireproof=True),
@@ -124,8 +131,9 @@ class MapGenerator:
                 cell.refNeighbors(grid)
 
         # Mountains establish protected terrain first. Still water may replace
-        # mountain cells; roads intentionally carve mountain passes but stop
-        # at water until bridges are designed. Other passes preserve both.
+        # mountain cells. Roads cross both terrain types: over water as bridges
+        # and through mountains as potential tunnels. Other passes preserve
+        # the resulting special terrain.
         protected_terrain = ()
         if self.terrain_enabled["mountain"]:
             self._mountain_ranges(grid, terrain["mountain"])
@@ -140,10 +148,12 @@ class MapGenerator:
         if self.terrain_enabled["desert"]:
             self._scatter(grid, terrain["desert"], "Light", protected_terrain)
         if self.terrain_enabled["road"]:
-            # Roads remain the sole current exception to mountain protection,
-            # but water awaits a future bridge-generation rule.
-            road_protection = (terrain["water"],) if self.terrain_enabled["water"] else ()
-            self._roads(grid, terrain["road"], "Normal", road_protection)
+            self._roads(grid, terrain["road"], "Normal")
+            if self.terrain_enabled["mountain"]:
+                self._tunnel_passes(
+                    grid, terrain["road"], terrain["mountain"], terrain["tunnel"],
+                )
+                protected_terrain = (*protected_terrain, terrain["tunnel"])
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
@@ -243,6 +253,30 @@ class MapGenerator:
             next_cell = self.rng.choice(candidates)
             next_cell.terrain = water
             water_cells.append(next_cell)
+
+    def _tunnel_passes(self, grid, road, mountain, tunnel):
+        """Turn eligible mountain road passes into tunnels with a 25% chance."""
+        conversions = set()
+        # Each axis is inspected once, so a road tile between opposite mountain
+        # walls has one 25% conversion roll rather than two competing rolls.
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                if cell.terrain is not road:
+                    continue
+                for delta_x, delta_y in ((1, 0), (0, 1)):
+                    forward = grid[cell.pos[1] + delta_y][cell.pos[0] + delta_x]
+                    backward = grid[cell.pos[1] - delta_y][cell.pos[0] - delta_x]
+                    if forward.terrain is mountain and backward.terrain is mountain:
+                        if self.rng.randint(1, 4) == 1:
+                            conversions.add(cell)
+                    elif {forward.terrain, backward.terrain} == {mountain, road}:
+                        if self.rng.randint(1, 4) == 1:
+                            # This is a two-wide highway against one mountain
+                            # wall; convert both lanes into one tunnel entrance.
+                            conversions.add(cell)
+                            conversions.add(forward if forward.terrain is road else backward)
+        for cell in conversions:
+            cell.terrain = tunnel
 
     def _place_mountain_peak(self, grid, peak, mountain):
         """Create a small irregular peak core before extending any ridges."""

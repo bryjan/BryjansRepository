@@ -144,6 +144,37 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertIs(grid[4][4].terrain, match.road)
 
+    def test_roads_cross_water_as_bridges(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        grid[4][4].terrain = match.water
+
+        generator._draw_road(grid, [3, 4], [5, 4], match.road)
+
+        self.assertIs(grid[4][4].terrain, match.road)
+
+    def test_mountain_road_passes_can_make_single_and_two_lane_tunnels(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        # A road directly between mountain walls becomes a single-lane tunnel.
+        grid[5][5].terrain = match.road
+        grid[5][4].terrain = match.mountain
+        grid[5][6].terrain = match.mountain
+        # A mountain beside a two-lane road converts both road tiles.
+        grid[7][5].terrain = match.mountain
+        grid[7][6].terrain = match.road
+        grid[7][7].terrain = match.road
+
+        with patch.object(generator.rng, "randint", return_value=1):
+            generator._tunnel_passes(grid, match.road, match.mountain, match.tunnel)
+
+        self.assertIs(grid[5][5].terrain, match.tunnel)
+        self.assertIs(grid[7][6].terrain, match.tunnel)
+        self.assertIs(grid[7][7].terrain, match.tunnel)
+        self.assertEqual(match.tunnel.moveCost, [0, 0, 0, 0, 2, 2, 2])
+
     def test_mountains_buff_medium_shooters_and_cover_small_targets(self):
         match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
         shooter = match.teamList[1].squadsList[0].mechList[1]  # Kestrel, size 3.
