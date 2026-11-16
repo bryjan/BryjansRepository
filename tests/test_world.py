@@ -51,6 +51,12 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertGreater(river_basin.map_preset.large_river_weight, 1)
         self.assertTrue(river_basin.terrain_enabled["river"])
 
+        frontier = MapGenerator(20, random.Random(0), map_preset=DEFAULT_MAP_PRESET)
+        self.assertEqual(frontier.map_preset.road_density, "Normal")
+        self.assertEqual(frontier.map_preset.highway_count, 1)
+        self.assertEqual(frontier.map_preset.suburb_offshoot_count, 1)
+        self.assertEqual(frontier.map_preset.forest_extra_growth, 1)
+
     def test_custom_terrain_toggles_retain_temperate_generation_weights(self):
         generator = MapGenerator(
             20,
@@ -82,7 +88,8 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertGreater(badlands["desert"], temperate["desert"] * 5)
         self.assertGreater(badlands["desert"], badlands["plains"] * 3)
-        self.assertGreater(temperate["forest"], 500)
+        self.assertGreater(temperate["forest"], 700)
+        self.assertGreaterEqual(temperate["suburbs"], 6)
         self.assertGreater(river_basin["water"], urban_fringe["water"])
 
     def test_game_forwards_its_map_preset_to_world_generation(self):
@@ -294,6 +301,25 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertGreaterEqual(math.dist(peak, endpoint), 6)
         self.assertLessEqual(math.dist(peak, endpoint), 32)
 
+    def test_mountain_ranges_always_draw_a_ridge_narrower_than_its_length(self):
+        match = MatchInfo(100, 9, [], "")
+        generator = MapGenerator(100, random.Random(0))
+        grid = generator.build(match)
+
+        def valid_endpoint(peak):
+            direction = -10 if peak[0] > 20 else 10
+            return [peak[0] + direction, peak[1]]
+
+        with patch.object(generator, "_ridge_endpoint", side_effect=valid_endpoint), patch.object(
+            generator, "_draw_mountain_ridge",
+        ) as draw_ridge:
+            generator._mountain_ranges(grid, match.mountain)
+
+        self.assertGreaterEqual(draw_ridge.call_count, 1)
+        for call in draw_ridge.call_args_list:
+            _, start, end, _, width = call.args
+            self.assertLess(width, math.dist(start, end))
+
     def test_roads_can_carve_a_pass_through_mountains(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))
@@ -339,6 +365,23 @@ class MapGeneratorTests(unittest.TestCase):
             )
         )
         self.assertTrue(reaches_left_and_right or reaches_top_and_bottom)
+
+    def test_highway_has_two_parallel_road_lanes(self):
+        match = MatchInfo(30, 9, [], "")
+        generator = MapGenerator(30, random.Random(0))
+        grid = generator.build(match)
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = match.plains
+
+        endpoints = ([1, 15], [28, 15])
+        with patch.object(generator, "_road_endpoints", return_value=endpoints):
+            generator._highways(grid, match.road, count=1)
+
+        self.assertTrue(all(
+            grid[y][x].terrain is match.road
+            for y in (15, 16) for x in range(1, 29)
+        ))
 
     def test_mountain_road_passes_can_make_single_and_two_lane_tunnels(self):
         match = MatchInfo(12, 9, [], "")
@@ -487,6 +530,9 @@ class MapGeneratorTests(unittest.TestCase):
         lancer = match.pov
         dash = lancer.mechClass.hull.abilities[0]
         lancer.pos = [4, 4]
+        for other in match.entities:
+            if other is not lancer:
+                other.pos = [15, 15]
         lancer.energy = 0
         lancer.mp = 0
         match.map[4][5].terrain = match.forest

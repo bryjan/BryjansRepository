@@ -22,7 +22,7 @@ spawns, or objectives.
 
 | Preset | Terrain emphasis |
 | --- | --- |
-| Temperate Frontier | Balanced cover, roads, settlements, mountains, and water. |
+| Temperate Frontier | Larger forests, two roads, a two-lane highway with a suburb spur, mountains, and water. |
 | Badlands | Heat-hazed desert, mountains, and sparse roads. |
 | Mountain Pass | Dense ridges, forest approaches, streams, tunnels, and roads. |
 | River Basin | Rivers, lakes, bridges, suburbs, and urban corridors. |

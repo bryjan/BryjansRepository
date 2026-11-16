@@ -63,6 +63,9 @@ class MapPreset:
     large_river_weight: float = 1
     small_river_weight: float = 1
     lake_weight: float = 1
+    highway_count: int = 0
+    suburb_offshoot_count: int = 0
+    forest_extra_growth: int = 0
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -79,7 +82,8 @@ MAP_PRESETS = (
         "Balanced terrain and infrastructure.",
         frozenset(GENERATABLE_TERRAINS),
         forest_density="Thick", desert_density="Light", road_density="Normal",
-        suburb_density="Normal", urban_density="Thick",
+        suburb_density="Normal", urban_density="Thick", highway_count=1,
+        suburb_offshoot_count=1, forest_extra_growth=1,
     ),
     MapPreset(
         "badlands",
@@ -291,7 +295,11 @@ class MapGenerator:
                 protected_terrain = (*protected_terrain, terrain["water"])
         if self.terrain_enabled["forest"]:
             self._scatter(
-                grid, terrain["forest"], self.map_preset.forest_density, protected_terrain,
+                grid,
+                terrain["forest"],
+                self.map_preset.forest_density,
+                protected_terrain,
+                extra_growth=self.map_preset.forest_extra_growth,
             )
             if self.terrain_enabled["mountain"]:
                 self._mountain_edge_forests(grid, terrain["mountain"], terrain["forest"])
@@ -301,6 +309,17 @@ class MapGenerator:
             )
         if self.terrain_enabled["road"]:
             self._roads(grid, terrain["road"], self.map_preset.road_density)
+            self._highways(
+                grid, terrain["road"], self.map_preset.highway_count,
+            )
+            if self.terrain_enabled["suburb"]:
+                self._road_offshoots(
+                    grid,
+                    terrain["road"],
+                    terrain["suburb"],
+                    self.map_preset.suburb_offshoot_count,
+                    protected_terrain,
+                )
             if self.terrain_enabled["mountain"]:
                 self._tunnel_passes(
                     grid, terrain["road"], terrain["mountain"], terrain["tunnel"],
@@ -367,7 +386,7 @@ class MapGenerator:
         if cells:
             self.rng.choice(cells).terrain = urban
 
-    def _scatter(self, grid, terrain, density, protected_terrain=()):
+    def _scatter(self, grid, terrain, density, protected_terrain=(), extra_growth=0):
         multiplier = self._density_multiplier(density)
         protected_terrain = set(protected_terrain)
         if not multiplier:
@@ -379,7 +398,7 @@ class MapGenerator:
                     and self.rng.randint(1, 1000) <= 3 * multiplier
                 ):
                     cell.terrain = terrain
-        for _ in range(multiplier):
+        for _ in range(multiplier + extra_growth):
             changes = []
             for row in grid[2:-2]:
                 for cell in row[2:-2]:
@@ -393,7 +412,7 @@ class MapGenerator:
                 cell.terrain = terrain
 
     def _mountain_ranges(self, grid, mountain):
-        """Place large peak cores with zero to two irregular long ridges."""
+        """Place large peak cores with one to two irregular long ridges."""
         range_count = max(
             1,
             self._scaled_feature_count(2500, self.map_preset.mountain_weight),
@@ -407,17 +426,20 @@ class MapGenerator:
             )
             peak = self._mountain_peak_location(peak_width)
             self._place_mountain_peak(grid, peak, mountain, peak_width)
-            for _ in range(self.rng.randint(0, 2)):
+            for _ in range(self.rng.randint(1, 2)):
                 ridge_end = self._ridge_endpoint(peak)
                 if ridge_end is not None:
+                    ridge_length = math.dist(peak, ridge_end)
+                    maximum_width = min(
+                        MOUNTAIN_RIDGE_WIDTH + MOUNTAIN_RIDGE_VARIANCE,
+                        math.ceil(ridge_length) - 1,
+                    )
                     self._draw_mountain_ridge(
                         grid,
                         peak,
                         ridge_end,
                         mountain,
-                        MOUNTAIN_RIDGE_WIDTH + self.rng.randint(
-                            0, MOUNTAIN_RIDGE_VARIANCE,
-                        ),
+                        self.rng.randint(MOUNTAIN_RIDGE_WIDTH, maximum_width),
                     )
 
     def _still_water(self, grid, water):
@@ -751,6 +773,94 @@ class MapGenerator:
             start, end = self._road_endpoints()
             self._draw_road(grid, start, end, terrain, protected_terrain)
 
+    def _highways(self, grid, terrain, count):
+        """Draw two-lane edge-to-edge highways alongside ordinary roads."""
+        for _ in range(count):
+            start, end = self._road_endpoints()
+            path = self._draw_road(grid, start, end, terrain)
+            horizontal = abs(end[0] - start[0]) >= abs(end[1] - start[1])
+            for cell in path:
+                if horizontal:
+                    lane_x = cell.pos[0]
+                    lane_y = cell.pos[1] + (1 if cell.pos[1] < self.height - 2 else -1)
+                else:
+                    lane_x = cell.pos[0] + (1 if cell.pos[0] < self.width - 2 else -1)
+                    lane_y = cell.pos[1]
+                grid[lane_y][lane_x].terrain = terrain
+
+    def _road_offshoots(self, grid, road, suburb, count, protected_terrain):
+        """Add short road spurs that terminate beside small suburb patches."""
+        protected = set(protected_terrain)
+        for _ in range(count):
+            road_cells = [
+                cell for row in grid[2:-2] for cell in row[2:-2]
+                if cell.terrain is road
+            ]
+            if not road_cells:
+                return
+            start = self.rng.choice(road_cells)
+            endpoint = self._offshoot_endpoint(grid, start, protected)
+            if endpoint is None:
+                continue
+            self._draw_road(grid, start.pos, endpoint.pos, road, protected)
+            self._grow_suburb_patch(grid, endpoint, suburb, protected)
+
+    def _offshoot_endpoint(self, grid, start, protected):
+        """Find a short cardinal branch that ends on clear, passable ground."""
+        directions = ((1, 0), (-1, 0), (0, 1), (0, -1))
+        for _ in range(12):
+            delta_x, delta_y = self.rng.choice(directions)
+            distance = self.rng.randint(4, 8)
+            end_x = start.pos[0] + (delta_x * distance)
+            end_y = start.pos[1] + (delta_y * distance)
+            if not (2 <= end_x < self.width - 2 and 2 <= end_y < self.height - 2):
+                continue
+            path_is_clear = all(
+                grid[start.pos[1] + (delta_y * step)][start.pos[0] + (delta_x * step)].terrain
+                not in protected
+                for step in range(1, distance + 1)
+            )
+            if not path_is_clear:
+                continue
+            endpoint = grid[end_y][end_x]
+            if endpoint.terrain.passable and endpoint.terrain not in protected:
+                return endpoint
+        return None
+
+    def _grow_suburb_patch(self, grid, endpoint, suburb, protected):
+        """Place a 6–12 tile suburb patch adjacent to a road offshoot endpoint."""
+        candidates = [
+            cell for cell in endpoint.nList
+            if (
+                cell.terrain.passable
+                and cell.terrain not in protected
+                and cell.terrain.name not in {"road", "tunnel"}
+            )
+        ]
+        if not candidates:
+            return
+        seed = self.rng.choice(candidates)
+        seed.terrain = suburb
+        patch = [seed]
+        target_size = self.rng.randint(6, 12)
+        while len(patch) < target_size:
+            candidates = [
+                neighbor
+                for cell in patch
+                for neighbor in cell.nList
+                if (
+                    neighbor.terrain.passable
+                    and neighbor.terrain not in protected
+                    and neighbor.terrain is not suburb
+                    and neighbor.terrain.name not in {"road", "tunnel"}
+                )
+            ]
+            if not candidates:
+                return
+            next_cell = self.rng.choice(candidates)
+            next_cell.terrain = suburb
+            patch.append(next_cell)
+
     def _density_multiplier(self, density):
         """Translate a readable map-density setting into a generation count."""
         try:
@@ -775,12 +885,16 @@ class MapGenerator:
         x, y = start
         target_x, target_y = end
         protected_terrain = set(protected_terrain)
+        road_cells = []
         while (x, y) != (target_x, target_y):
             if grid[y][x].terrain not in protected_terrain:
                 grid[y][x].terrain = terrain
+                road_cells.append(grid[y][x])
             if x != target_x and (y == target_y or self.rng.choice((True, False))):
                 x += 1 if target_x > x else -1
             elif y != target_y:
                 y += 1 if target_y > y else -1
         if grid[target_y][target_x].terrain not in protected_terrain:
             grid[target_y][target_x].terrain = terrain
+            road_cells.append(grid[target_y][target_x])
+        return road_cells
