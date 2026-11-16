@@ -67,6 +67,35 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertFalse(match.mountain.fireproof)
         self.assertTrue(any(cell.terrain is match.mountain for row in match.map for cell in row))
 
+    def test_water_is_sensor_clear_and_uses_float_or_titanic_movement_rules(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        mech = match.pov
+        mech.pos = [4, 4]
+        water = match.map[4][5]
+        water.terrain = match.water
+
+        self.assertEqual(match.water.visAbsorb, 0)
+        self.assertEqual(match.water.radarAbsorb, 0)
+        self.assertEqual(match.water.moveCost, [1, 1, 1, 2, 3, 4, 5])
+
+        with patch("builtins.print"):
+            mech.moveMech(match, "d")
+        self.assertEqual(mech.pos, [4, 4])
+
+        mech.mechClass.canFloat = True
+        mech.energy = 1
+        mech.moveMech(match, "d")
+        self.assertEqual(mech.pos, [5, 4])
+        self.assertEqual(mech.energy, 0)
+
+        mech.pos = [4, 4]
+        mech.mechClass.canFloat = False
+        mech.size = 6
+        mech.energy = 5
+        mech.moveMech(match, "d")
+        self.assertEqual(mech.pos, [5, 4])
+        self.assertEqual(mech.energy, 0)
+
     def test_mountain_edges_can_grow_a_sparse_forest_fringe(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))

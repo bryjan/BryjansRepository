@@ -92,6 +92,14 @@ class MapGenerator:
                                     moveCostBySize=[6, 5, 4, 3, 2, 2, 2],
                                     visualAbsorbtion=12, radarAbsorbtion=20,
                                     radarSig=100),
+            # Water is deliberately defined before river and pond generation.
+            # It is sensor-clear, but only floating, flying, or titanic mechs
+            # can enter it. The energy scale starts at one for sizes 0–2,
+            # then rises by one each class through size 6.
+            "water": TerrainType("water", "~", "cyan",
+                                  moveCostBySize=[1, 1, 1, 2, 3, 4, 5],
+                                  visualAbsorbtion=0, radarAbsorbtion=0,
+                                  radarSig=9999, requireFloat=True, fireproof=True),
             "road": TerrainType("road", "=", "dark_grey", moveCostBySize=[0] * 7,
                                 visualAbsorbtion=1, radarAbsorbtion=0, radarSig=9999,
                                 fireproof=True),

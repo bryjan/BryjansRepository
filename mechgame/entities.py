@@ -191,7 +191,8 @@ class Entity: #a character on the map
             # least the mech's size in energy.
             moveCost = max(moveCost, self.size)
 
-        if targetCell.terrain.requireFloat and not self.mechClass.canFloat and not self.flying:
+        can_cross_water = self.mechClass.canFloat or self.flying or self.size == 6
+        if targetCell.terrain.requireFloat and not can_cross_water:
             print("Your mech can't travel over water.")
             return
 
