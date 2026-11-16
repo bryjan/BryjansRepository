@@ -96,6 +96,31 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(mech.pos, [5, 4])
         self.assertEqual(mech.energy, 0)
 
+    def test_water_toggle_generates_sparse_ponds_and_one_area_scaled_lake(self):
+        disabled = MatchInfo(50, 9, [], "")
+        disabled.map = MapGenerator(50, random.Random(0)).build(disabled)
+        self.assertFalse(any(cell.terrain is disabled.water for row in disabled.map for cell in row))
+
+        enabled = MatchInfo(50, 9, [], "")
+        enabled.map = MapGenerator(
+            50, random.Random(0), terrain_enabled={"water": True},
+        ).build(enabled)
+        water_cells = [
+            cell for row in enabled.map for cell in row if cell.terrain is enabled.water
+        ]
+        self.assertGreaterEqual(len(water_cells), 16)
+
+    def test_water_patch_can_replace_a_mountain_tile(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        seed = grid[6][6]
+        seed.terrain = match.mountain
+
+        generator._grow_water_patch(grid, seed, match.water, 3)
+
+        self.assertIs(seed.terrain, match.water)
+
     def test_mountain_edges_can_grow_a_sparse_forest_fringe(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))

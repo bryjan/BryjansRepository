@@ -8,7 +8,9 @@ import random
 
 # Plains, borders, and blank cells define a usable rectangular map, so only
 # optional generated landscape types belong in this set.
-GENERATABLE_TERRAINS = ("forest", "desert", "road", "suburb", "urban", "mountain")
+GENERATABLE_TERRAINS = (
+    "forest", "desert", "road", "suburb", "urban", "mountain", "water",
+)
 DEFAULT_TERRAIN_ENABLED = {
     "forest": True,
     "desert": True,
@@ -18,6 +20,7 @@ DEFAULT_TERRAIN_ENABLED = {
     # opt-in so ordinary skirmishes retain more open maneuver space.
     "urban": False,
     "mountain": False,
+    "water": False,
 }
 
 
@@ -120,13 +123,16 @@ class MapGenerator:
             for cell in row:
                 cell.refNeighbors(grid)
 
-        # Mountains establish protected terrain first. Roads intentionally
-        # carve passes through them; future rivers and lava flows may also
-        # opt in. Every other current landscape pass preserves the rock.
+        # Mountains establish protected terrain first. Still water may replace
+        # mountain cells; roads intentionally carve mountain passes but stop
+        # at water until bridges are designed. Other passes preserve both.
         protected_terrain = ()
         if self.terrain_enabled["mountain"]:
             self._mountain_ranges(grid, terrain["mountain"])
             protected_terrain = (terrain["mountain"],)
+        if self.terrain_enabled["water"]:
+            self._still_water(grid, terrain["water"])
+            protected_terrain = (*protected_terrain, terrain["water"])
         if self.terrain_enabled["forest"]:
             self._scatter(grid, terrain["forest"], "Normal", protected_terrain)
             if self.terrain_enabled["mountain"]:
@@ -134,7 +140,10 @@ class MapGenerator:
         if self.terrain_enabled["desert"]:
             self._scatter(grid, terrain["desert"], "Light", protected_terrain)
         if self.terrain_enabled["road"]:
-            self._roads(grid, terrain["road"], "Normal")
+            # Roads remain the sole current exception to mountain protection,
+            # but water awaits a future bridge-generation rule.
+            road_protection = (terrain["water"],) if self.terrain_enabled["water"] else ()
+            self._roads(grid, terrain["road"], "Normal", road_protection)
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
@@ -196,6 +205,44 @@ class MapGenerator:
                 ridge_end = self._ridge_endpoint(peak)
                 if ridge_end is not None:
                     self._draw_mountain_ridge(grid, peak, ridge_end, mountain)
+
+    def _still_water(self, grid, water):
+        """Generate sparse connected ponds and, at most, one larger lake.
+
+        This deliberately creates no linear water path. Rivers will receive a
+        separate source-to-mouth design rather than being inferred from lakes.
+        """
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                # About one small pond seed per 1,600 interior tiles keeps
+                # ponds rare on large maps and unusual on compact ones.
+                if cell.terrain is not water and self.rng.randint(1, 1600) == 1:
+                    self._grow_water_patch(grid, cell, water, self.rng.randint(3, 6))
+
+        interior_area = max(1, (self.width - 2) * (self.height - 2))
+        lake_chance = min(1, interior_area / 900)
+        if self.rng.random() < lake_chance:
+            seed = grid[
+                self.rng.randrange(1, self.height - 1)
+            ][self.rng.randrange(1, self.width - 1)]
+            self._grow_water_patch(grid, seed, water, self.rng.randint(16, 28))
+
+    def _grow_water_patch(self, grid, seed, water, tile_count):
+        """Flood outward from a seed to make one connected pond or lake."""
+        seed.terrain = water
+        water_cells = [seed]
+        while len(water_cells) < tile_count:
+            candidates = [
+                neighbor
+                for cell in water_cells
+                for neighbor in cell.nList
+                if neighbor.terrain.passable and neighbor.terrain is not water
+            ]
+            if not candidates:
+                return
+            next_cell = self.rng.choice(candidates)
+            next_cell.terrain = water
+            water_cells.append(next_cell)
 
     def _place_mountain_peak(self, grid, peak, mountain):
         """Create a small irregular peak core before extending any ridges."""
