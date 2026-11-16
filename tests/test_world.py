@@ -1,4 +1,5 @@
 from collections import Counter
+import math
 import random
 import unittest
 from unittest.mock import patch
@@ -242,6 +243,9 @@ class MapGeneratorTests(unittest.TestCase):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))
         grid = generator.build(match)
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = match.plains
         center = grid[6][6]
         center.terrain = match.mountain
 
@@ -251,32 +255,41 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertIs(center.terrain, match.mountain)
         self.assertTrue(any(neighbor.terrain is match.forest for neighbor in center.nList))
 
-    def test_mountain_peaks_and_ridges_have_broader_shapes(self):
+    def test_mountain_peaks_and_ridges_have_doubled_variable_shapes(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))
         grid = generator.build(match)
 
-        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=3)
+        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=6)
         self.assertTrue(all(
             grid[y][x].terrain is match.mountain
-            for y in range(5, 8) for x in range(5, 8)
+            for y in range(3, 9) for x in range(3, 9)
         ))
 
-        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=5)
+        generator._place_mountain_peak(grid, [6, 6], match.mountain, width=10)
         self.assertTrue(all(
             grid[y][x].terrain is match.mountain
-            for y in range(4, 9) for x in range(4, 9)
+            for y in range(1, 11) for x in range(1, 11)
         ))
 
-        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=3)
+        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=4)
         self.assertTrue(all(
-            grid[y][5].terrain is match.mountain for y in range(5, 8)
+            grid[y][5].terrain is match.mountain for y in range(4, 8)
         ))
 
-        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=5)
+        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=10)
         self.assertTrue(all(
-            grid[y][5].terrain is match.mountain for y in range(4, 9)
+            grid[y][5].terrain is match.mountain for y in range(1, 11)
         ))
+
+    def test_large_mountain_ridges_extend_six_to_sixteen_tiles_when_space_allows(self):
+        generator = MapGenerator(50, random.Random(0))
+        peak = [25, 25]
+        endpoint = generator._ridge_endpoint(peak)
+
+        self.assertIsNotNone(endpoint)
+        self.assertGreaterEqual(math.dist(peak, endpoint), 6)
+        self.assertLessEqual(math.dist(peak, endpoint), 16)
 
     def test_roads_can_carve_a_pass_through_mountains(self):
         match = MatchInfo(12, 9, [], "")
@@ -297,6 +310,32 @@ class MapGeneratorTests(unittest.TestCase):
         generator._draw_road(grid, [3, 4], [5, 4], match.road)
 
         self.assertIs(grid[4][4].terrain, match.road)
+
+    def test_roads_connect_opposite_playable_map_edges(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = match.plains
+
+        generator._roads(grid, match.road, "Light")
+
+        reaches_left_and_right = (
+            any(grid[y][1].terrain is match.road for y in range(1, generator.height - 1))
+            and any(
+                grid[y][generator.width - 2].terrain is match.road
+                for y in range(1, generator.height - 1)
+            )
+        )
+        reaches_top_and_bottom = (
+            any(grid[1][x].terrain is match.road for x in range(1, generator.width - 1))
+            and any(
+                grid[generator.height - 2][x].terrain is match.road
+                for x in range(1, generator.width - 1)
+            )
+        )
+        self.assertTrue(reaches_left_and_right or reaches_top_and_bottom)
 
     def test_mountain_road_passes_can_make_single_and_two_lane_tunnels(self):
         match = MatchInfo(12, 9, [], "")

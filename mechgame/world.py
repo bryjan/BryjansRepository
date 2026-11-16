@@ -29,6 +29,16 @@ DEFAULT_TERRAIN_ENABLED = {
 DEFAULT_MAP_PRESET = "temperate_frontier"
 CUSTOM_MAP_PRESET = "custom"
 
+# Mountain dimensions are deliberately large enough to form meaningful areas
+# of elevated terrain on the strategic map. Variance scales with each base
+# size so a range can still look naturally irregular.
+MOUNTAIN_CORE_WIDTH = 6
+MOUNTAIN_CORE_VARIANCE = 4
+MOUNTAIN_RIDGE_WIDTH = 4
+MOUNTAIN_RIDGE_VARIANCE = 6
+MOUNTAIN_RIDGE_MIN_LENGTH = 6
+MOUNTAIN_RIDGE_MAX_LENGTH = 16
+
 
 @dataclass(frozen=True)
 class MapPreset:
@@ -307,10 +317,16 @@ class MapGenerator:
                 urban_neighbors.append(terrain["road"])
             if self.terrain_enabled["suburb"]:
                 urban_neighbors.append(terrain["suburb"])
-            # An urban-only map still needs seed districts before it can grow.
-            if len(urban_neighbors) == 1:
-                self._scatter(
-                    grid, terrain["urban"], self.map_preset.urban_density, protected_terrain,
+            # A terrain combination can leave no road or suburb tiles (for
+            # example, when a mountain pass converts a short road entirely to
+            # tunnel). Seed a district whenever no valid urban anchor exists.
+            has_urban_anchor = any(
+                cell.terrain in urban_neighbors
+                for row in grid[1:-1] for cell in row[1:-1]
+            )
+            if not has_urban_anchor:
+                self._seed_urban_district(
+                    grid, terrain["urban"], urban_neighbors, protected_terrain,
                 )
             self._associate(
                 grid,
@@ -319,7 +335,29 @@ class MapGenerator:
                 self.map_preset.urban_density,
                 protected_terrain,
             )
+            if not any(
+                cell.terrain is terrain["urban"]
+                for row in grid[1:-1] for cell in row[1:-1]
+            ):
+                self._seed_urban_district(
+                    grid, terrain["urban"], urban_neighbors, protected_terrain,
+                )
         return grid
+
+    def _seed_urban_district(self, grid, urban, anchors, protected_terrain):
+        """Place one guaranteed urban seed when random growth found none."""
+        protected = set(protected_terrain)
+        cells = [
+            cell for row in grid[1:-1] for cell in row[1:-1]
+            if cell.terrain in anchors and cell.terrain not in protected
+        ]
+        if not cells:
+            cells = [
+                cell for row in grid[1:-1] for cell in row[1:-1]
+                if cell.terrain.passable and cell.terrain not in protected
+            ]
+        if cells:
+            self.rng.choice(cells).terrain = urban
 
     def _scatter(self, grid, terrain, density, protected_terrain=()):
         multiplier = self._density_multiplier(density)
@@ -347,20 +385,19 @@ class MapGenerator:
                 cell.terrain = terrain
 
     def _mountain_ranges(self, grid, mountain):
-        """Place peaks with zero to two short ridges for shaped ranges."""
+        """Place large peak cores with zero to two irregular long ridges."""
         range_count = max(
             1,
             self._scaled_feature_count(2500, self.map_preset.mountain_weight),
         )
         for _ in range(range_count):
-            peak = [
-                self.rng.randrange(2, self.width - 2),
-                self.rng.randrange(2, self.height - 2),
-            ]
             # Keep the peak and each ridge independently irregular.  A range
             # can therefore have a compact core with a broad ridge, or the
             # reverse, instead of all of its features sharing one width.
-            peak_width = 3 + self.rng.randint(0, 2)
+            peak_width = MOUNTAIN_CORE_WIDTH + self.rng.randint(
+                0, MOUNTAIN_CORE_VARIANCE,
+            )
+            peak = self._mountain_peak_location(peak_width)
             self._place_mountain_peak(grid, peak, mountain, peak_width)
             for _ in range(self.rng.randint(0, 2)):
                 ridge_end = self._ridge_endpoint(peak)
@@ -370,7 +407,9 @@ class MapGenerator:
                         peak,
                         ridge_end,
                         mountain,
-                        self.rng.randint(2, 3) + self.rng.randint(0, 2),
+                        MOUNTAIN_RIDGE_WIDTH + self.rng.randint(
+                            0, MOUNTAIN_RIDGE_VARIANCE,
+                        ),
                     )
 
     def _still_water(self, grid, water):
@@ -600,8 +639,25 @@ class MapGenerator:
         for cell in conversions:
             cell.terrain = tunnel
 
+    def _mountain_peak_location(self, core_width):
+        """Choose a peak position that keeps its large core on the map when possible."""
+        return [
+            self._peak_axis_position(self.width, core_width),
+            self._peak_axis_position(self.height, core_width),
+        ]
+
+    def _peak_axis_position(self, map_limit, core_width):
+        """Choose one peak axis, gracefully centering oversized small-map cores."""
+        negative_radius = core_width // 2
+        positive_radius = core_width - negative_radius - 1
+        minimum = 1 + negative_radius
+        maximum = map_limit - 2 - positive_radius
+        if minimum > maximum:
+            return (map_limit - 1) // 2
+        return self.rng.randint(minimum, maximum)
+
     def _place_mountain_peak(self, grid, peak, mountain, width):
-        """Create a three- to five-tile-wide peak core before adding ridges."""
+        """Create a six- to ten-tile-wide peak core before adding ridges."""
         lower = -(width // 2)
         upper = lower + width
         for y in range(peak[1] + lower, peak[1] + upper):
@@ -624,14 +680,18 @@ class MapGenerator:
                 grid[y][x].terrain = mountain
 
     def _ridge_endpoint(self, peak):
-        """Choose an in-bounds endpoint three to eight tiles from one peak."""
+        """Choose an in-bounds endpoint six to sixteen tiles from one peak."""
         for _ in range(20):
-            delta_x = self.rng.randint(-8, 8)
-            delta_y = self.rng.randint(-8, 8)
+            delta_x = self.rng.randint(
+                -MOUNTAIN_RIDGE_MAX_LENGTH, MOUNTAIN_RIDGE_MAX_LENGTH,
+            )
+            delta_y = self.rng.randint(
+                -MOUNTAIN_RIDGE_MAX_LENGTH, MOUNTAIN_RIDGE_MAX_LENGTH,
+            )
             distance = math.hypot(delta_x, delta_y)
             endpoint = [peak[0] + delta_x, peak[1] + delta_y]
             if (
-                3 <= distance <= 8
+                MOUNTAIN_RIDGE_MIN_LENGTH <= distance <= MOUNTAIN_RIDGE_MAX_LENGTH
                 and 1 <= endpoint[0] < self.width - 1
                 and 1 <= endpoint[1] < self.height - 1
             ):
@@ -639,7 +699,7 @@ class MapGenerator:
         return None
 
     def _draw_mountain_ridge(self, grid, start, end, mountain, width):
-        """Draw a two- to five-tile-wide ridge from a peak to its endpoint."""
+        """Draw a four- to ten-tile-wide ridge from a peak to its endpoint."""
         steps = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
         horizontal = abs(end[0] - start[0]) >= abs(end[1] - start[1])
         lower = -(width // 2)
@@ -685,9 +745,10 @@ class MapGenerator:
                 cell.terrain = terrain
 
     def _roads(self, grid, terrain, density, protected_terrain=()):
+        """Draw each road across opposite playable edges of the map."""
         multiplier = self._density_multiplier(density)
         for _ in range(multiplier):
-            start, end = self._distant_cells(grid)
+            start, end = self._road_endpoints()
             self._draw_road(grid, start, end, terrain, protected_terrain)
 
     def _density_multiplier(self, density):
@@ -698,12 +759,17 @@ class MapGenerator:
             valid = ", ".join(self.DENSITY_MULTIPLIERS)
             raise ValueError(f"Unknown density {density!r}; choose one of: {valid}.") from error
 
-    def _distant_cells(self, grid):
-        while True:
-            start = [self.rng.randrange(2, self.width - 2), self.rng.randrange(2, self.height - 2)]
-            end = [self.rng.randrange(2, self.width - 2), self.rng.randrange(2, self.height - 2)]
-            if math.dist(start, end) >= min(self.width, self.height) / 2:
-                return start, end
+    def _road_endpoints(self):
+        """Return endpoints on two opposite interior edges of the map border."""
+        if self.rng.choice((True, False)):
+            return (
+                [1, self.rng.randrange(1, self.height - 1)],
+                [self.width - 2, self.rng.randrange(1, self.height - 1)],
+            )
+        return (
+            [self.rng.randrange(1, self.width - 1), 1],
+            [self.rng.randrange(1, self.width - 1), self.height - 2],
+        )
 
     def _draw_road(self, grid, start, end, terrain, protected_terrain=()):
         x, y = start
