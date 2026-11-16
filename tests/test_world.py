@@ -176,6 +176,22 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertIs(center.terrain, match.mountain)
         self.assertTrue(any(neighbor.terrain is match.forest for neighbor in center.nList))
 
+    def test_mountain_peaks_and_ridges_have_broader_shapes(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+
+        generator._place_mountain_peak(grid, [6, 6], match.mountain)
+        self.assertTrue(all(
+            grid[y][x].terrain is match.mountain
+            for y in range(5, 8) for x in range(5, 8)
+        ))
+
+        generator._draw_mountain_ridge(grid, [3, 6], [8, 6], match.mountain, width=3)
+        self.assertTrue(all(
+            grid[y][5].terrain is match.mountain for y in range(5, 8)
+        ))
+
     def test_roads_can_carve_a_pass_through_mountains(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))
