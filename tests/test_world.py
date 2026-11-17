@@ -22,7 +22,7 @@ from mechgame.world import (
 
 
 class MapGeneratorTests(unittest.TestCase):
-    def test_terrain_features_register_bridges_mountain_entries_and_thin_passes(self):
+    def test_terrain_features_register_bridges_mountain_entries_and_intersections(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))
         grid = generator.build(match)
@@ -36,11 +36,8 @@ class MapGeneratorTests(unittest.TestCase):
         generator.features.add_river("small_river", [(3, 10)])
         generator.features.refresh_bridges()
 
-        # This road first touches the range at [4, 4]. The separate mountain
-        # pair squeezes [7, 8] into a two-tile-wide-or-less pass corridor.
+        # This road first touches the range at [4, 4].
         grid[4][5].terrain = match.mountain
-        grid[8][6].terrain = match.mountain
-        grid[8][8].terrain = match.mountain
         generator._identify_terrain_locations(grid, {
             "mountain": match.mountain,
         })
@@ -50,20 +47,9 @@ class MapGeneratorTests(unittest.TestCase):
             for location in generator.features.tactical_locations
         }
         self.assertEqual(locations_by_kind["bridge"].tiles, ((3, 10),))
+        self.assertEqual(locations_by_kind["bridge"].marker_tiles, ((3, 10),))
         self.assertEqual(locations_by_kind["road_intersection"].tiles, ((3, 4),))
         self.assertIn((4, 4), locations_by_kind["mountain_entrance"].tiles)
-        self.assertIn((7, 8), locations_by_kind["mountain_pass"].tiles)
-        self.assertEqual(
-            locations_by_kind["mountain_pass"].marker_tiles,
-            ((7, 8),),
-        )
-        grid[8][7].terrain = match.water
-        self.assertFalse(generator._thin_mountain_passes(grid, match.mountain))
-
-    def test_long_mountain_passes_keep_area_data_but_mark_only_endpoints(self):
-        tiles = ((3, 4), (4, 4), (5, 4), (6, 4))
-
-        self.assertEqual(MapGenerator._pass_endpoints(tiles), ((3, 4), (6, 4)))
 
     def test_map_features_preserve_routes_and_accept_scenario_locations(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

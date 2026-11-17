@@ -466,9 +466,16 @@ class MapGenerator:
         Scenario setup can later choose suitable entries from this registry as
         objective, reinforcement, or patrol anchors.
         """
-        for index, position in enumerate(self.features.bridges, start=1):
+        # A wide river crossing can occupy several tiles. It is one tactical
+        # bridge area, so the overview gets one central marker rather than a
+        # row of markers that can read as a road running beside the river.
+        for index, tiles in enumerate(self._connected_position_groups(self.features.bridges), start=1):
             self.features.add_tactical_location(
-                f"bridge_{index}", f"Bridge {index}", "bridge", [position],
+                f"bridge_{index}",
+                f"Bridge {index}",
+                "bridge",
+                tiles,
+                marker_tiles=[self._central_tile(tiles)],
             )
 
         for index, tiles in enumerate(self._road_intersections(), start=1):
@@ -487,29 +494,15 @@ class MapGenerator:
                 tiles,
             )
 
-        for index, tiles in enumerate(self._thin_mountain_passes(grid, terrain["mountain"]), start=1):
-            self.features.add_tactical_location(
-                f"mountain_pass_{index}",
-                f"Mountain Pass {index}",
-                "mountain_pass",
-                tiles,
-                marker_tiles=self._pass_endpoints(tiles),
-            )
-
     @staticmethod
-    def _pass_endpoints(tiles):
-        """Choose the two most separated corridor tiles for a compact overlay."""
-        if len(tiles) < 2:
-            return tiles
-        first, second = max(
-            (
-                (first, second)
-                for index, first in enumerate(tiles)
-                for second in tiles[index + 1:]
-            ),
-            key=lambda pair: ((pair[0][0] - pair[1][0]) ** 2) + ((pair[0][1] - pair[1][1]) ** 2),
+    def _central_tile(tiles):
+        """Choose a stable representative tile for a compact area marker."""
+        center_x = sum(x for x, _ in tiles) / len(tiles)
+        center_y = sum(y for _, y in tiles) / len(tiles)
+        return min(
+            tiles,
+            key=lambda tile: ((tile[0] - center_x) ** 2) + ((tile[1] - center_y) ** 2),
         )
-        return (first, second)
 
     def _mountain_road_entrances(self, grid, mountain):
         """Find road route tiles where a route first meets mountain terrain."""
@@ -546,48 +539,6 @@ class MapGenerator:
             if route_count >= 2
         }
         return self._connected_position_groups(intersections)
-
-    def _thin_mountain_passes(self, grid, mountain, maximum_half_width=2):
-        """Find narrow corridors with mountains on opposite sides.
-
-        The bounded two-tile scan is deliberately local: it costs a constant
-        amount per map tile and finds practical choke points without running a
-        full pathfinding or line-of-sight analysis over the map.
-        """
-        candidates = set()
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                cell = grid[y][x]
-                # Water is technically passable for floating or titanic units,
-                # but a pond or river beside mountains is not a land pass.
-                if (
-                    cell.terrain is mountain
-                    or not cell.terrain.passable
-                    or cell.terrain.requireFloat
-                ):
-                    continue
-                squeezed_horizontally = (
-                    self._mountain_within(grid, x, y, -1, 0, mountain, maximum_half_width)
-                    and self._mountain_within(grid, x, y, 1, 0, mountain, maximum_half_width)
-                )
-                squeezed_vertically = (
-                    self._mountain_within(grid, x, y, 0, -1, mountain, maximum_half_width)
-                    and self._mountain_within(grid, x, y, 0, 1, mountain, maximum_half_width)
-                )
-                if squeezed_horizontally or squeezed_vertically:
-                    candidates.add((x, y))
-        return self._connected_position_groups(candidates)
-
-    def _mountain_within(self, grid, x, y, delta_x, delta_y, mountain, limit):
-        """Return whether mountain terrain appears along one short cardinal ray."""
-        for distance in range(1, limit + 1):
-            target_x = x + (delta_x * distance)
-            target_y = y + (delta_y * distance)
-            if not (0 <= target_x < self.width and 0 <= target_y < self.height):
-                return False
-            if grid[target_y][target_x].terrain is mountain:
-                return True
-        return False
 
     @staticmethod
     def _cardinal_positions(position):
