@@ -361,7 +361,7 @@ def _display_overview_chunk(matchInfo, chunk):
         marked_tiles = {
             tile
             for location in matchInfo.mapFeatures.tactical_locations
-            for tile in location.tiles
+            for tile in location.marker_tiles
         }
         if any(tuple(cell.pos) in marked_tiles for row in chunk for cell in row):
             print(termcolor.colored("X", "red"), end=" ")

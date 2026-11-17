@@ -174,6 +174,7 @@ class TacticalLocation:
     name: str
     kind: str
     tiles: tuple[tuple[int, int], ...]
+    marker_tiles: tuple[tuple[int, int], ...]
 
 
 @dataclass
@@ -214,10 +215,13 @@ class MapFeatures:
             MapObjective(objective_id, name, kind, self._coordinates(cells_or_tiles))
         )
 
-    def add_tactical_location(self, location_id, name, kind, cells_or_tiles):
-        """Add an AI-relevant area, such as a crossing or defensible ridge."""
+    def add_tactical_location(self, location_id, name, kind, cells_or_tiles,
+                              marker_tiles=None):
+        """Add an AI area, optionally using a smaller set of debug markers."""
+        tiles = self._coordinates(cells_or_tiles)
+        markers = tiles if marker_tiles is None else self._coordinates(marker_tiles)
         self.tactical_locations.append(
-            TacticalLocation(location_id, name, kind, self._coordinates(cells_or_tiles))
+            TacticalLocation(location_id, name, kind, tiles, markers)
         )
 
     def refresh_bridges(self):
@@ -477,8 +481,27 @@ class MapGenerator:
 
         for index, tiles in enumerate(self._thin_mountain_passes(grid, terrain["mountain"]), start=1):
             self.features.add_tactical_location(
-                f"mountain_pass_{index}", f"Mountain Pass {index}", "mountain_pass", tiles,
+                f"mountain_pass_{index}",
+                f"Mountain Pass {index}",
+                "mountain_pass",
+                tiles,
+                marker_tiles=self._pass_endpoints(tiles),
             )
+
+    @staticmethod
+    def _pass_endpoints(tiles):
+        """Choose the two most separated corridor tiles for a compact overlay."""
+        if len(tiles) < 2:
+            return tiles
+        first, second = max(
+            (
+                (first, second)
+                for index, first in enumerate(tiles)
+                for second in tiles[index + 1:]
+            ),
+            key=lambda pair: ((pair[0][0] - pair[1][0]) ** 2) + ((pair[0][1] - pair[1][1]) ** 2),
+        )
+        return (first, second)
 
     def _mountain_road_entrances(self, grid, mountain):
         """Find road route tiles where a route first meets mountain terrain."""

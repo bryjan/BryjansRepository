@@ -51,6 +51,15 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(locations_by_kind["bridge"].tiles, ((3, 10),))
         self.assertIn((4, 4), locations_by_kind["mountain_entrance"].tiles)
         self.assertIn((7, 8), locations_by_kind["mountain_pass"].tiles)
+        self.assertEqual(
+            locations_by_kind["mountain_pass"].marker_tiles,
+            ((7, 8),),
+        )
+
+    def test_long_mountain_passes_keep_area_data_but_mark_only_endpoints(self):
+        tiles = ((3, 4), (4, 4), (5, 4), (6, 4))
+
+        self.assertEqual(MapGenerator._pass_endpoints(tiles), ((3, 4), (6, 4)))
 
     def test_map_features_preserve_routes_and_accept_scenario_locations(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
@@ -68,6 +77,7 @@ class MapGeneratorTests(unittest.TestCase):
 
         self.assertEqual(features.objectives[0].name, "Relay Station")
         self.assertEqual(features.tactical_locations[-1].kind, "crossing")
+        self.assertEqual(features.tactical_locations[-1].marker_tiles, ((13, 12),))
 
     def test_teams_get_independent_future_map_visibility_flags(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
