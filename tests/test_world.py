@@ -32,6 +32,7 @@ class MapGeneratorTests(unittest.TestCase):
 
         generator.features = MapFeatures()
         generator.features.add_road("road", [(3, 4), (4, 4), (3, 10)])
+        generator.features.add_road("road", [(3, 3), (3, 4), (3, 5)])
         generator.features.add_river("small_river", [(3, 10)])
         generator.features.refresh_bridges()
 
@@ -49,12 +50,15 @@ class MapGeneratorTests(unittest.TestCase):
             for location in generator.features.tactical_locations
         }
         self.assertEqual(locations_by_kind["bridge"].tiles, ((3, 10),))
+        self.assertEqual(locations_by_kind["road_intersection"].tiles, ((3, 4),))
         self.assertIn((4, 4), locations_by_kind["mountain_entrance"].tiles)
         self.assertIn((7, 8), locations_by_kind["mountain_pass"].tiles)
         self.assertEqual(
             locations_by_kind["mountain_pass"].marker_tiles,
             ((7, 8),),
         )
+        grid[8][7].terrain = match.water
+        self.assertFalse(generator._thin_mountain_passes(grid, match.mountain))
 
     def test_long_mountain_passes_keep_area_data_but_mark_only_endpoints(self):
         tiles = ((3, 4), (4, 4), (5, 4), (6, 4))

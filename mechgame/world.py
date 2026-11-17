@@ -471,6 +471,14 @@ class MapGenerator:
                 f"bridge_{index}", f"Bridge {index}", "bridge", [position],
             )
 
+        for index, tiles in enumerate(self._road_intersections(), start=1):
+            self.features.add_tactical_location(
+                f"road_intersection_{index}",
+                f"Road Intersection {index}",
+                "road_intersection",
+                tiles,
+            )
+
         for index, tiles in enumerate(self._mountain_road_entrances(grid, terrain["mountain"]), start=1):
             self.features.add_tactical_location(
                 f"mountain_entrance_{index}",
@@ -527,6 +535,18 @@ class MapGenerator:
         }
         return self._connected_position_groups(entrances)
 
+    def _road_intersections(self):
+        """Find shared route tiles without mistaking parallel highway lanes for junctions."""
+        route_counts = {}
+        for route in self.features.roads:
+            for position in set(route.tiles):
+                route_counts[position] = route_counts.get(position, 0) + 1
+        intersections = {
+            position for position, route_count in route_counts.items()
+            if route_count >= 2
+        }
+        return self._connected_position_groups(intersections)
+
     def _thin_mountain_passes(self, grid, mountain, maximum_half_width=2):
         """Find narrow corridors with mountains on opposite sides.
 
@@ -538,7 +558,13 @@ class MapGenerator:
         for y in range(1, self.height - 1):
             for x in range(1, self.width - 1):
                 cell = grid[y][x]
-                if cell.terrain is mountain or not cell.terrain.passable:
+                # Water is technically passable for floating or titanic units,
+                # but a pond or river beside mountains is not a land pass.
+                if (
+                    cell.terrain is mountain
+                    or not cell.terrain.passable
+                    or cell.terrain.requireFloat
+                ):
                     continue
                 squeezed_horizontally = (
                     self._mountain_within(grid, x, y, -1, 0, mountain, maximum_half_width)
