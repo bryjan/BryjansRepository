@@ -1,8 +1,26 @@
 """Squad and team coordination, reporting, and map placement."""
 
 import random
+from dataclasses import dataclass
 
-__all__ = ["Squad", "Team"]
+__all__ = ["MapVisibilityFlags", "Squad", "Team"]
+
+
+@dataclass
+class MapVisibilityFlags:
+    """Future policy controls for a team's strategic-map information.
+
+    TODO(fog-of-war): give each team persistent terrain/effect knowledge, then
+    make the map overview use these flags when deciding what to draw.  The
+    debug reveal default deliberately preserves the current fully visible map.
+    """
+
+    debug_reveal_all: bool = True
+    remember_explored_terrain: bool = False
+    show_friendly_entities: bool = True
+    show_visual_enemies: bool = True
+    show_radar_contacts: bool = True
+    show_known_effects: bool = True
 
 
 class Squad:
@@ -152,6 +170,9 @@ class Team:
         # Team memory persists across each squad's turn in this match round.
         # Keys are enemy entities; values hold the strongest radar reading.
         self.radarContacts = {}
+        # TODO(fog-of-war): the tactical map will consult this policy after
+        # the team owns persistent terrain and effect discovery records.
+        self.mapVisibility = MapVisibilityFlags()
 
         for squads in self.squadsList:
             # Keep the object reference: turn sequencing needs its squad list.

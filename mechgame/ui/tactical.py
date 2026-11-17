@@ -336,8 +336,9 @@ def _display_overview_chunk(matchInfo, chunk):
 def print_overview(matchInfo):
     """Render a full-map debug overview inside the normal tactical frame.
 
-    Fog of war will later limit each chunk to terrain and contacts the team has
-    actually discovered. For now all terrain, effects, and entities are shown.
+    TODO(fog-of-war): use the viewing team's ``mapVisibility`` policy and its
+    persistent discovery records to limit each chunk.  For now the overview is
+    intentionally debug-visible: all terrain, effects, and entities are shown.
     """
     window_width = min(matchInfo.windowWidth, matchInfo.mapWidth)
     window_height = min(matchInfo.windowHeight, matchInfo.mapHeight)

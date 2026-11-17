@@ -21,6 +21,21 @@ from mechgame.world import (
 
 
 class MapGeneratorTests(unittest.TestCase):
+    def test_teams_get_independent_future_map_visibility_flags(self):
+        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        player_team, enemy_team = match.teamList
+
+        flags = player_team.mapVisibility
+        self.assertTrue(flags.debug_reveal_all)
+        self.assertFalse(flags.remember_explored_terrain)
+        self.assertTrue(flags.show_friendly_entities)
+        self.assertTrue(flags.show_visual_enemies)
+        self.assertTrue(flags.show_radar_contacts)
+        self.assertTrue(flags.show_known_effects)
+
+        flags.debug_reveal_all = False
+        self.assertTrue(enemy_team.mapVisibility.debug_reveal_all)
+
     def test_generator_creates_square_map_with_a_border(self):
         match = MatchInfo(12, 9, [], "")
         match.map = MapGenerator(12, random.Random(0)).build(match)

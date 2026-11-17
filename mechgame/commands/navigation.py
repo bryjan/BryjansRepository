@@ -24,7 +24,7 @@ def lookAt(matchInfo):
 
 
 def mapView(matchInfo):
-    """Open the scaled debug overview; strategic fog of war will follow."""
+    """Open the scaled debug overview; team visibility flags are not wired yet."""
     pv.print_overview(matchInfo)
     input("Map overview: press 'Enter' to return")
 
