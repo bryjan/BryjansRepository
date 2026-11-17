@@ -16,6 +16,8 @@ class MapVisibilityFlags:
     """
 
     debug_reveal_all: bool = True
+    show_all_terrain: bool = True
+    show_all_objectives: bool = True
     remember_explored_terrain: bool = False
     show_friendly_entities: bool = True
     show_visual_enemies: bool = True

@@ -27,6 +27,8 @@ class MapGeneratorTests(unittest.TestCase):
 
         flags = player_team.mapVisibility
         self.assertTrue(flags.debug_reveal_all)
+        self.assertTrue(flags.show_all_terrain)
+        self.assertTrue(flags.show_all_objectives)
         self.assertFalse(flags.remember_explored_terrain)
         self.assertTrue(flags.show_friendly_entities)
         self.assertTrue(flags.show_visual_enemies)
