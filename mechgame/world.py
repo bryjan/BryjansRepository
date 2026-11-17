@@ -74,6 +74,9 @@ class MapPreset:
     # scale those local growth passes instead of imposing fixed map-size caps.
     suburb_cluster_multiplier: float = 1
     urban_cluster_multiplier: float = 1
+    # A spacing value creates an orthogonal road grid. Every third playable
+    # row and column yields just over half of the interior as road tiles.
+    city_grid_spacing: int | None = None
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -126,13 +129,14 @@ MAP_PRESETS = (
     ),
     MapPreset(
         "urban_fringe",
-        "Urban Fringe",
-        "Dense developed cover beside roads.",
+        "Super City",
+        "A dense street grid with broad urban districts.",
         frozenset({"forest", "road", "suburb", "urban"}),
         forest_density="Light", desert_density="None", road_density="Thick",
         suburb_density="Thick", urban_density="Thick", mountain_weight=0,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
         suburb_cluster_multiplier=5, urban_cluster_multiplier=5,
+        city_grid_spacing=3,
     ),
     MapPreset(
         "open_steppe",
@@ -978,7 +982,12 @@ class MapGenerator:
     def _build_road_network(self, grid, terrain, protected_terrain):
         """Create ordinary roads, highways, and suburb spurs for one preset."""
         road = terrain["road"]
-        self._roads(grid, road, self.map_preset.road_density)
+        if self.map_preset.city_grid_spacing is None:
+            self._roads(grid, road, self.map_preset.road_density)
+        else:
+            self._city_grid_roads(
+                grid, road, self.map_preset.city_grid_spacing, protected_terrain,
+            )
         self._highways(grid, road, self.map_preset.highway_count)
         if self.terrain_enabled["suburb"]:
             self._road_offshoots(
@@ -993,6 +1002,26 @@ class MapGenerator:
 
         self._tunnel_passes(grid, road, terrain["mountain"], terrain["tunnel"])
         return (*protected_terrain, terrain["tunnel"])
+
+    def _city_grid_roads(self, grid, road, spacing, protected_terrain=()):
+        """Lay an evenly spaced road grid that scales with playable map span."""
+        protected = set(protected_terrain)
+        for y in range(1, self.height - 1, spacing):
+            route = []
+            for x in range(1, self.width - 1):
+                cell = grid[y][x]
+                if cell.terrain not in protected:
+                    cell.terrain = road
+                    route.append(cell)
+            self.features.add_road("city_grid_horizontal", route)
+        for x in range(1, self.width - 1, spacing):
+            route = []
+            for y in range(1, self.height - 1):
+                cell = grid[y][x]
+                if cell.terrain not in protected:
+                    cell.terrain = road
+                    route.append(cell)
+            self.features.add_road("city_grid_vertical", route)
 
     def _highways(self, grid, terrain, count):
         """Draw two-lane edge-to-edge highways alongside ordinary roads."""

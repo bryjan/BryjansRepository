@@ -29,7 +29,7 @@ teams, mech loadouts, spawns, or objectives.
 | Badlands | Heat-hazed desert, mountains, and sparse roads. |
 | Mountain Pass | Dense ridges, forest approaches, streams, tunnels, and roads. |
 | River Basin | Rivers, lakes, bridges, suburbs, and urban corridors. |
-| Urban Fringe | Road-linked suburbs and urban centers with light natural cover. |
+| Super City | A dense street grid with broad urban districts and light natural cover. |
 | Open Steppe | Long sightlines, scattered rough terrain, roads, and small ponds. |
 
 For a quick manual test, type `end` twice after the map appears. The first
