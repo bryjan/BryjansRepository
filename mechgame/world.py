@@ -74,9 +74,11 @@ class MapPreset:
     # scale those local growth passes instead of imposing fixed map-size caps.
     suburb_cluster_multiplier: float = 1
     urban_cluster_multiplier: float = 1
-    # A spacing value creates an orthogonal road grid. Every third playable
-    # row and column yields just over half of the interior as road tiles.
+    # A spacing value creates an orthogonal road grid inside a city district.
+    # Coverage describes the district's share of the playable map, not the
+    # proportion of every tile that becomes a road.
     city_grid_spacing: int | None = None
+    city_grid_coverage: float | None = None
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -136,7 +138,7 @@ MAP_PRESETS = (
         suburb_density="Thick", urban_density="Thick", mountain_weight=0,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
         suburb_cluster_multiplier=5, urban_cluster_multiplier=5,
-        city_grid_spacing=3,
+        city_grid_spacing=4, city_grid_coverage=0.5,
     ),
     MapPreset(
         "open_steppe",
@@ -986,8 +988,15 @@ class MapGenerator:
             self._roads(grid, road, self.map_preset.road_density)
         else:
             self._city_grid_roads(
-                grid, road, self.map_preset.city_grid_spacing, protected_terrain,
+                grid,
+                road,
+                self.map_preset.city_grid_spacing,
+                self.map_preset.city_grid_coverage,
+                protected_terrain,
             )
+            # The non-grid half retains conventional long routes, so the city
+            # district connects naturally to the rest of the generated map.
+            self._roads(grid, road, self.map_preset.road_density, protected_terrain)
         self._highways(grid, road, self.map_preset.highway_count)
         if self.terrain_enabled["suburb"]:
             self._road_offshoots(
@@ -1003,25 +1012,38 @@ class MapGenerator:
         self._tunnel_passes(grid, road, terrain["mountain"], terrain["tunnel"])
         return (*protected_terrain, terrain["tunnel"])
 
-    def _city_grid_roads(self, grid, road, spacing, protected_terrain=()):
-        """Lay an evenly spaced road grid that scales with playable map span."""
+    def _city_grid_roads(self, grid, road, spacing, coverage, protected_terrain=()):
+        """Lay a scalable road grid across one city district of the map."""
         protected = set(protected_terrain)
-        for y in range(1, self.height - 1, spacing):
+        x_min, y_min, x_max, y_max = self._city_grid_bounds(coverage)
+        for y in range(y_min, y_max + 1, spacing):
             route = []
-            for x in range(1, self.width - 1):
+            for x in range(x_min, x_max + 1):
                 cell = grid[y][x]
                 if cell.terrain not in protected:
                     cell.terrain = road
                     route.append(cell)
             self.features.add_road("city_grid_horizontal", route)
-        for x in range(1, self.width - 1, spacing):
+        for x in range(x_min, x_max + 1, spacing):
             route = []
-            for y in range(1, self.height - 1):
+            for y in range(y_min, y_max + 1):
                 cell = grid[y][x]
                 if cell.terrain not in protected:
                     cell.terrain = road
                     route.append(cell)
             self.features.add_road("city_grid_vertical", route)
+
+    def _city_grid_bounds(self, coverage):
+        """Choose a full-height or full-width district near the requested area."""
+        playable_width = self.width - 2
+        playable_height = self.height - 2
+        if self.rng.choice((True, False)):
+            district_width = max(1, math.ceil(playable_width * coverage))
+            x_min = self.rng.choice((1, self.width - 1 - district_width))
+            return x_min, 1, x_min + district_width - 1, self.height - 2
+        district_height = max(1, math.ceil(playable_height * coverage))
+        y_min = self.rng.choice((1, self.height - 1 - district_height))
+        return 1, y_min, self.width - 2, y_min + district_height - 1
 
     def _highways(self, grid, terrain, count):
         """Draw two-lane edge-to-edge highways alongside ordinary roads."""

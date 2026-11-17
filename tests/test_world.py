@@ -127,15 +127,19 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(urban_fringe.map_preset.name, "Super City")
         self.assertEqual(urban_fringe.map_preset.suburb_cluster_multiplier, 5)
         self.assertEqual(urban_fringe.map_preset.urban_cluster_multiplier, 5)
-        self.assertEqual(urban_fringe.map_preset.city_grid_spacing, 3)
+        self.assertEqual(urban_fringe.map_preset.city_grid_spacing, 4)
+        self.assertEqual(urban_fringe.map_preset.city_grid_coverage, 0.5)
 
-    def test_super_city_uses_a_scalable_majority_road_grid(self):
+    def test_super_city_uses_a_scalable_half_map_grid_district(self):
         match = MatchInfo(40, 9, [], "")
-        grid = MapGenerator(40, random.Random(0), map_preset="urban_fringe").build(match)
+        generator = MapGenerator(40, random.Random(0), map_preset="urban_fringe")
+        grid = generator.build(match)
         interior = [cell for row in grid[1:-1] for cell in row[1:-1]]
         road_tiles = [cell for cell in interior if cell.terrain is match.road]
 
-        self.assertGreater(len(road_tiles), len(interior) / 2)
+        self.assertLess(len(road_tiles), len(interior) / 2)
+        self.assertGreater(len(road_tiles), len(interior) / 8)
+        self.assertEqual(generator.map_preset.city_grid_coverage, 0.5)
 
     def test_custom_terrain_toggles_retain_temperate_generation_weights(self):
         generator = MapGenerator(
