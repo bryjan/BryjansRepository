@@ -29,7 +29,7 @@ teams, mech loadouts, spawns, or objectives.
 | Badlands | Heat-hazed desert, mountains, and sparse roads. |
 | Mountain Pass | Dense ridges, forest approaches, streams, tunnels, and roads. |
 | River Basin | Rivers, lakes, bridges, suburbs, and urban corridors. |
-| Super City | A half-map street-grid district linked to broad urban development. |
+| Super City | Connected 10×10 city blocks covering about half the map. |
 | Open Steppe | Long sightlines, scattered rough terrain, roads, and small ponds. |
 
 For a quick manual test, type `end` twice after the map appears. The first

@@ -57,7 +57,6 @@ class MapPreset:
     desert_density: str
     road_density: str
     suburb_density: str
-    urban_density: str
     mountain_weight: float = 1
     pond_weight: float = 1
     large_river_weight: float = 1
@@ -73,12 +72,10 @@ class MapPreset:
     # Development grows outward from roads and existing districts. Multipliers
     # scale those local growth passes instead of imposing fixed map-size caps.
     suburb_cluster_multiplier: float = 1
-    urban_cluster_multiplier: float = 1
-    # A spacing value creates an orthogonal road grid inside a city district.
-    # Coverage describes the district's share of the playable map, not the
-    # proportion of every tile that becomes a road.
-    city_grid_spacing: int | None = None
-    city_grid_coverage: float | None = None
+    # Urban terrain is stamped as complete city blocks. A coverage fraction
+    # scales the district across map sizes; a fixed size is optional.
+    city_block_coverage: float = 0
+    city_block_size: int | None = None
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -95,9 +92,9 @@ MAP_PRESETS = (
         "Balanced terrain and infrastructure.",
         frozenset(GENERATABLE_TERRAINS),
         forest_density="Thick", desert_density="Light", road_density="Normal",
-        suburb_density="Normal", urban_density="Thick", highway_count=1,
+        suburb_density="Normal", highway_count=1,
         suburb_offshoot_count=1, forest_extra_growth=2,
-        suburb_cluster_multiplier=1.25, urban_cluster_multiplier=1.25,
+        suburb_cluster_multiplier=1.25, city_block_coverage=0.06,
     ),
     MapPreset(
         "badlands",
@@ -105,7 +102,7 @@ MAP_PRESETS = (
         "Desert, mountains, and sparse roads.",
         frozenset({"desert", "road", "mountain"}),
         forest_density="None", desert_density="Dominant", road_density="Light",
-        suburb_density="None", urban_density="None", mountain_weight=1.5,
+        suburb_density="None", mountain_weight=1.5,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
     ),
     MapPreset(
@@ -114,7 +111,7 @@ MAP_PRESETS = (
         "Ridges, forests, streams, and roads.",
         frozenset({"forest", "road", "mountain", "water", "river"}),
         forest_density="Normal", desert_density="None", road_density="Thick",
-        suburb_density="None", urban_density="None", mountain_weight=2.5,
+        suburb_density="None", mountain_weight=2.5,
         pond_weight=0.5, large_river_weight=0.25, small_river_weight=1.5,
         lake_weight=0.25,
     ),
@@ -124,21 +121,21 @@ MAP_PRESETS = (
         "Rivers, lakes, bridges, and towns.",
         frozenset({"forest", "road", "suburb", "urban", "water", "river"}),
         forest_density="Light", desert_density="None", road_density="Thick",
-        suburb_density="Normal", urban_density="Normal", mountain_weight=0,
+        suburb_density="Normal", mountain_weight=0,
         pond_weight=1.5, large_river_weight=1.5, small_river_weight=2,
         lake_weight=1.5, suburb_cluster_multiplier=1.25,
-        urban_cluster_multiplier=1.25,
+        city_block_coverage=0.10,
     ),
     MapPreset(
         "urban_fringe",
         "Super City",
-        "A dense street grid with broad urban districts.",
+        "Connected city blocks and broad urban districts.",
         frozenset({"forest", "road", "suburb", "urban"}),
         forest_density="Light", desert_density="None", road_density="Thick",
-        suburb_density="Thick", urban_density="Thick", mountain_weight=0,
+        suburb_density="Thick", mountain_weight=0,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
-        suburb_cluster_multiplier=5, urban_cluster_multiplier=5,
-        city_grid_spacing=4, city_grid_coverage=0.5,
+        suburb_cluster_multiplier=5, city_block_coverage=0.5,
+        city_block_size=10,
     ),
     MapPreset(
         "open_steppe",
@@ -146,7 +143,7 @@ MAP_PRESETS = (
         "Open sightlines and sparse rough ground.",
         frozenset({"forest", "desert", "road", "mountain", "water"}),
         forest_density="Light", desert_density="Light", road_density="Normal",
-        suburb_density="None", urban_density="None", mountain_weight=0.5,
+        suburb_density="None", mountain_weight=0.5,
         pond_weight=0.25, large_river_weight=0, small_river_weight=0, lake_weight=0,
     ),
 )
@@ -183,6 +180,15 @@ class TacticalLocation:
     marker_tiles: tuple[tuple[int, int], ...]
 
 
+@dataclass(frozen=True)
+class CityBlock:
+    """One stamped urban block with its shared outer-road boundary."""
+
+    block_id: str
+    tiles: tuple[tuple[int, int], ...]
+    road_tiles: tuple[tuple[int, int], ...]
+
+
 @dataclass
 class MapFeatures:
     """Derived strategic information attached to a generated map.
@@ -194,6 +200,7 @@ class MapFeatures:
 
     roads: list[MapRoute] = field(default_factory=list)
     rivers: list[MapRoute] = field(default_factory=list)
+    city_blocks: list[CityBlock] = field(default_factory=list)
     bridges: list[tuple[int, int]] = field(default_factory=list)
     objectives: list[MapObjective] = field(default_factory=list)
     tactical_locations: list[TacticalLocation] = field(default_factory=list)
@@ -214,6 +221,16 @@ class MapFeatures:
         tiles = self._coordinates(cells_or_tiles)
         if tiles:
             self.rivers.append(MapRoute(f"river_{len(self.rivers) + 1}", kind, tiles))
+
+    def add_city_block(self, cells_or_tiles, road_cells_or_tiles):
+        """Record a stamped city block for AI and scenario placement rules."""
+        self.city_blocks.append(
+            CityBlock(
+                f"city_block_{len(self.city_blocks) + 1}",
+                self._coordinates(cells_or_tiles),
+                self._coordinates(road_cells_or_tiles),
+            )
+        )
 
     def add_objective(self, objective_id, name, kind, cells_or_tiles):
         """Add scenario content without coupling it to terrain generation."""
@@ -414,6 +431,16 @@ class MapGenerator:
             protected_terrain = self._build_road_network(
                 grid, terrain, protected_terrain,
             )
+        if self.terrain_enabled["urban"]:
+            self._stamp_city_blocks(
+                grid,
+                terrain["road"],
+                terrain["urban"],
+                protected_terrain,
+            )
+            # City-block interiors are the only source of urban terrain and
+            # must not be diluted by later suburb growth.
+            protected_terrain = (*protected_terrain, terrain["urban"])
         if self.terrain_enabled["suburb"]:
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
@@ -426,40 +453,6 @@ class MapGenerator:
                 protected_terrain,
                 cluster_multiplier=self.map_preset.suburb_cluster_multiplier,
             )
-        # Urban centers form dense pockets around developed road corridors,
-        # rather than appearing as isolated buildings across open terrain.
-        if self.terrain_enabled["urban"]:
-            urban_neighbors = [terrain["urban"]]
-            if self.terrain_enabled["road"]:
-                urban_neighbors.append(terrain["road"])
-            if self.terrain_enabled["suburb"]:
-                urban_neighbors.append(terrain["suburb"])
-            # A terrain combination can leave no road or suburb tiles (for
-            # example, when a mountain pass converts a short road entirely to
-            # tunnel). Seed a district whenever no valid urban anchor exists.
-            has_urban_anchor = any(
-                cell.terrain in urban_neighbors
-                for row in grid[1:-1] for cell in row[1:-1]
-            )
-            if not has_urban_anchor:
-                self._seed_urban_district(
-                    grid, terrain["urban"], urban_neighbors, protected_terrain,
-                )
-            self._associate(
-                grid,
-                terrain["urban"],
-                urban_neighbors,
-                self.map_preset.urban_density,
-                protected_terrain,
-                cluster_multiplier=self.map_preset.urban_cluster_multiplier,
-            )
-            if not any(
-                cell.terrain is terrain["urban"]
-                for row in grid[1:-1] for cell in row[1:-1]
-            ):
-                self._seed_urban_district(
-                    grid, terrain["urban"], urban_neighbors, protected_terrain,
-                )
         self.features.refresh_bridges()
         self._identify_terrain_locations(grid, terrain)
         match.mapFeatures = self.features
@@ -544,6 +537,8 @@ class MapGenerator:
         """Find shared route tiles without mistaking parallel highway lanes for junctions."""
         route_counts = {}
         for route in self.features.roads:
+            if route.kind == "city_block_perimeter":
+                continue
             for position in set(route.tiles):
                 route_counts[position] = route_counts.get(position, 0) + 1
         intersections = {
@@ -575,20 +570,95 @@ class MapGenerator:
             groups.append(tuple(sorted(group)))
         return sorted(groups)
 
-    def _seed_urban_district(self, grid, urban, anchors, protected_terrain):
-        """Place one guaranteed urban seed when random growth found none."""
-        protected = set(protected_terrain)
-        cells = [
-            cell for row in grid[1:-1] for cell in row[1:-1]
-            if cell.terrain in anchors and cell.terrain not in protected
-        ]
-        if not cells:
-            cells = [
-                cell for row in grid[1:-1] for cell in row[1:-1]
-                if cell.terrain.passable and cell.terrain not in protected
+    def _stamp_city_blocks(self, grid, road, urban, protected_terrain):
+        """Stamp connected urban blocks until a preset-scaled area is covered."""
+        coverage = self.map_preset.city_block_coverage
+        if coverage <= 0:
+            return
+
+        target_tiles = math.ceil((self.width - 2) * (self.height - 2) * coverage)
+        covered_tiles = set()
+        blocks = []
+        while len(covered_tiles) < target_tiles:
+            candidates = self._city_block_candidates(blocks)
+            viable = [
+                candidate for candidate in candidates
+                if self._can_stamp_city_block(grid, candidate, protected_terrain)
             ]
-        if cells:
-            self.rng.choice(cells).terrain = urban
+            if not viable:
+                return
+            block = self.rng.choice(viable)
+            block_tiles, road_tiles = self._stamp_city_block(grid, block, road, urban)
+            blocks.append(block)
+            covered_tiles.update(tuple(cell.pos) for cell in block_tiles)
+            self.features.add_city_block(block_tiles, road_tiles)
+            # City perimeter roads are stored for patrol routing, but excluded
+            # from generic intersection markers because shared block edges are
+            # a grid convention rather than individual tactical junctions.
+            self.features.add_road("city_block_perimeter", road_tiles)
+
+    def _city_block_candidates(self, blocks):
+        """Return first-block placements or placements sharing an existing road."""
+        sizes = self._city_block_sizes()
+        if not blocks:
+            return [
+                (x, y, size)
+                for size in sizes
+                for y in range(1, self.height - size)
+                for x in range(1, self.width - size)
+            ]
+
+        candidates = set()
+        for x, y, existing_size in blocks:
+            for size in sizes:
+                # Each placement shares one complete outer-road side with its
+                # parent block while retaining its own independently sized lot.
+                candidates.update((
+                    (x + existing_size - 1, y, size),
+                    (x - size + 1, y, size),
+                    (x, y + existing_size - 1, size),
+                    (x, y - size + 1, size),
+                ))
+        return sorted(candidates)
+
+    def _city_block_sizes(self):
+        """Return the preset's fixed block size or normal 8–14 tile variants."""
+        if self.map_preset.city_block_size is not None:
+            return (self.map_preset.city_block_size,)
+        return tuple(range(8, 15))
+
+    def _can_stamp_city_block(self, grid, block, protected_terrain):
+        """Reject placements outside the map, over protected terrain, or urban cores."""
+        x, y, size = block
+        if x < 1 or y < 1 or x + size >= self.width or y + size >= self.height:
+            return False
+        protected = set(protected_terrain)
+        return all(
+            grid[tile_y][tile_x].terrain not in protected
+            and grid[tile_y][tile_x].terrain.name != "urban center"
+            for tile_y in range(y, y + size)
+            for tile_x in range(x, x + size)
+        )
+
+    def _stamp_city_block(self, grid, block, road, urban):
+        """Create one square city block with roads around, not through, its edge."""
+        x, y, size = block
+        block_tiles = []
+        road_tiles = []
+        for tile_y in range(y, y + size):
+            for tile_x in range(x, x + size):
+                cell = grid[tile_y][tile_x]
+                block_tiles.append(cell)
+                is_boundary = (
+                    tile_x in (x, x + size - 1)
+                    or tile_y in (y, y + size - 1)
+                )
+                if is_boundary:
+                    cell.terrain = road
+                    road_tiles.append(cell)
+                elif cell.terrain is not road:
+                    cell.terrain = urban
+        return block_tiles, road_tiles
 
     def _scatter(self, grid, terrain, density, protected_terrain=(), extra_growth=0):
         """Seed and expand terrain patches, optionally favoring larger patches."""
@@ -990,19 +1060,7 @@ class MapGenerator:
     def _build_road_network(self, grid, terrain, protected_terrain):
         """Create ordinary roads, highways, and suburb spurs for one preset."""
         road = terrain["road"]
-        if self.map_preset.city_grid_spacing is None:
-            self._roads(grid, road, self.map_preset.road_density)
-        else:
-            self._city_grid_roads(
-                grid,
-                road,
-                self.map_preset.city_grid_spacing,
-                self.map_preset.city_grid_coverage,
-                protected_terrain,
-            )
-            # The non-grid half retains conventional long routes, so the city
-            # district connects naturally to the rest of the generated map.
-            self._roads(grid, road, self.map_preset.road_density, protected_terrain)
+        self._roads(grid, road, self.map_preset.road_density, protected_terrain)
         self._highways(grid, road, self.map_preset.highway_count)
         if self.terrain_enabled["suburb"]:
             self._road_offshoots(
@@ -1017,39 +1075,6 @@ class MapGenerator:
 
         self._tunnel_passes(grid, road, terrain["mountain"], terrain["tunnel"])
         return (*protected_terrain, terrain["tunnel"])
-
-    def _city_grid_roads(self, grid, road, spacing, coverage, protected_terrain=()):
-        """Lay a scalable road grid across one city district of the map."""
-        protected = set(protected_terrain)
-        x_min, y_min, x_max, y_max = self._city_grid_bounds(coverage)
-        for y in range(y_min, y_max + 1, spacing):
-            route = []
-            for x in range(x_min, x_max + 1):
-                cell = grid[y][x]
-                if cell.terrain not in protected:
-                    cell.terrain = road
-                    route.append(cell)
-            self.features.add_road("city_grid_horizontal", route)
-        for x in range(x_min, x_max + 1, spacing):
-            route = []
-            for y in range(y_min, y_max + 1):
-                cell = grid[y][x]
-                if cell.terrain not in protected:
-                    cell.terrain = road
-                    route.append(cell)
-            self.features.add_road("city_grid_vertical", route)
-
-    def _city_grid_bounds(self, coverage):
-        """Choose a full-height or full-width district near the requested area."""
-        playable_width = self.width - 2
-        playable_height = self.height - 2
-        if self.rng.choice((True, False)):
-            district_width = max(1, math.ceil(playable_width * coverage))
-            x_min = self.rng.choice((1, self.width - 1 - district_width))
-            return x_min, 1, x_min + district_width - 1, self.height - 2
-        district_height = max(1, math.ceil(playable_height * coverage))
-        y_min = self.rng.choice((1, self.height - 1 - district_height))
-        return 1, y_min, self.width - 2, y_min + district_height - 1
 
     def _highways(self, grid, terrain, count):
         """Draw two-lane edge-to-edge highways alongside ordinary roads."""

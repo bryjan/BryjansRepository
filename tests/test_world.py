@@ -134,20 +134,30 @@ class MapGeneratorTests(unittest.TestCase):
         urban_fringe = MapGenerator(20, random.Random(0), map_preset="urban_fringe")
         self.assertEqual(urban_fringe.map_preset.name, "Super City")
         self.assertEqual(urban_fringe.map_preset.suburb_cluster_multiplier, 5)
-        self.assertEqual(urban_fringe.map_preset.urban_cluster_multiplier, 5)
-        self.assertEqual(urban_fringe.map_preset.city_grid_spacing, 4)
-        self.assertEqual(urban_fringe.map_preset.city_grid_coverage, 0.5)
+        self.assertEqual(urban_fringe.map_preset.city_block_coverage, 0.5)
+        self.assertEqual(urban_fringe.map_preset.city_block_size, 10)
 
-    def test_super_city_uses_a_scalable_half_map_grid_district(self):
+    def test_super_city_uses_connected_standard_blocks_for_half_map_coverage(self):
         match = MatchInfo(40, 9, [], "")
         generator = MapGenerator(40, random.Random(0), map_preset="urban_fringe")
         grid = generator.build(match)
         interior = [cell for row in grid[1:-1] for cell in row[1:-1]]
-        road_tiles = [cell for cell in interior if cell.terrain is match.road]
+        blocks = match.mapFeatures.city_blocks
+        covered_tiles = {tile for block in blocks for tile in block.tiles}
 
-        self.assertLess(len(road_tiles), len(interior) / 2)
-        self.assertGreater(len(road_tiles), len(interior) / 8)
-        self.assertEqual(generator.map_preset.city_grid_coverage, 0.5)
+        self.assertGreaterEqual(len(covered_tiles), len(interior) / 2)
+        self.assertTrue(blocks)
+        self.assertTrue(all(len(block.tiles) == 100 for block in blocks))
+        self.assertTrue(all(len(block.road_tiles) == 36 for block in blocks))
+        self.assertEqual(generator.map_preset.city_block_coverage, 0.5)
+
+    def test_other_urban_presets_use_variable_eight_to_fourteen_tile_blocks(self):
+        match = MatchInfo(40, 9, [], "")
+        MapGenerator(40, random.Random(0), map_preset=DEFAULT_MAP_PRESET).build(match)
+
+        blocks = match.mapFeatures.city_blocks
+        self.assertTrue(blocks)
+        self.assertTrue(all(8 <= round(len(block.tiles) ** 0.5) <= 14 for block in blocks))
 
     def test_custom_terrain_toggles_retain_temperate_generation_weights(self):
         generator = MapGenerator(
