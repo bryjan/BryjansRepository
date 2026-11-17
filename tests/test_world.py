@@ -31,13 +31,15 @@ class MapGeneratorTests(unittest.TestCase):
                 cell.terrain = match.plains
 
         generator.features = MapFeatures()
-        generator.features.add_road("road", [(3, 4), (4, 4), (3, 10)])
-        generator.features.add_road("road", [(3, 3), (3, 4), (3, 5)])
+        generator.features.add_road("road", [(3, 4), (4, 4), (5, 4), (6, 4), (3, 10)])
+        generator.features.add_road("road", [(2, 4), (3, 4), (3, 3)])
         generator.features.add_river("small_river", [(3, 10)])
         generator.features.refresh_bridges()
 
-        # This road first touches the range at [4, 4].
-        grid[4][5].terrain = match.mountain
+        # This road follows the range from [4, 4] through [6, 4], so only
+        # the two endpoints are strategic entrances rather than its midpoint.
+        for x in range(4, 7):
+            grid[5][x].terrain = match.mountain
         generator._identify_terrain_locations(grid, {
             "mountain": match.mountain,
         })
@@ -49,7 +51,13 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(locations_by_kind["bridge"].tiles, ((3, 10),))
         self.assertEqual(locations_by_kind["bridge"].marker_tiles, ((3, 10),))
         self.assertEqual(locations_by_kind["road_intersection"].tiles, ((3, 4),))
-        self.assertIn((4, 4), locations_by_kind["mountain_entrance"].tiles)
+        entrance_tiles = {
+            tile
+            for location in generator.features.tactical_locations
+            if location.kind == "mountain_entrance"
+            for tile in location.tiles
+        }
+        self.assertEqual(entrance_tiles, {(4, 4), (6, 4)})
 
     def test_map_features_preserve_routes_and_accept_scenario_locations(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

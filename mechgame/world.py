@@ -511,8 +511,7 @@ class MapGenerator:
         )
 
     def _mountain_road_entrances(self, grid, mountain):
-        """Find road route tiles where a route first meets mountain terrain."""
-        road_tiles = {tile for route in self.features.roads for tile in route.tiles}
+        """Find only the endpoints of route segments beside mountain terrain."""
 
         def touches_mountain(position):
             x, y = position
@@ -523,15 +522,22 @@ class MapGenerator:
                 for delta_x, delta_y in ((1, 0), (-1, 0), (0, 1), (0, -1))
             )
 
-        entrances = {
-            position
-            for position in road_tiles
-            if touches_mountain(position)
-            and any(
-                neighbor in road_tiles and not touches_mountain(neighbor)
-                for neighbor in self._cardinal_positions(position)
-            )
-        }
+        entrances = set()
+        for route in self.features.roads:
+            route_tiles = route.tiles
+            for index, position in enumerate(route_tiles):
+                if not touches_mountain(position):
+                    continue
+                previous_touches = index > 0 and touches_mountain(route_tiles[index - 1])
+                next_touches = (
+                    index < len(route_tiles) - 1
+                    and touches_mountain(route_tiles[index + 1])
+                )
+                # A route can follow a mountain wall or tunnel through a
+                # range. Its strategic entrances are the segment endpoints,
+                # not every parallel lane or adjacent road tile.
+                if not previous_touches or not next_touches:
+                    entrances.add(position)
         return self._connected_position_groups(entrances)
 
     def _road_intersections(self):
