@@ -46,6 +46,10 @@ class MatchInfo:
         # and eventually suitable for replay or save-file support.
         self.rng = rng if rng is not None else random.Random()
         self.map = []
+        # MapGenerator replaces this with generated routes; scenarios may add
+        # objectives and tactical locations after the terrain is built.
+        from .world import MapFeatures
+        self.mapFeatures = MapFeatures()
         # Radar coverage is cached until a source changes in a meaningful way.
         self._radarSourceState = None
         self.advTurn = False #did POV take a turn ending action (ap costing). reading reports dont advance the turn, moving would, ect.

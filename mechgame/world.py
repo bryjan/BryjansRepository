@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # Plains, borders, and blank cells define a usable rectangular map, so only
@@ -140,6 +140,86 @@ MAP_PRESETS = (
 MAP_PRESETS_BY_KEY = {preset.key: preset for preset in MAP_PRESETS}
 
 
+@dataclass(frozen=True)
+class MapRoute:
+    """One generated route, stored independently from its terrain tiles."""
+
+    route_id: str
+    kind: str
+    tiles: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class MapObjective:
+    """A scenario-owned objective placed on one or more map tiles."""
+
+    objective_id: str
+    name: str
+    kind: str
+    tiles: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class TacticalLocation:
+    """A named area that AI or scenario rules may value strategically."""
+
+    location_id: str
+    name: str
+    kind: str
+    tiles: tuple[tuple[int, int], ...]
+
+
+@dataclass
+class MapFeatures:
+    """Derived strategic information attached to a generated map.
+
+    Terrain on ``match.map`` remains authoritative for movement and combat.
+    These lists preserve route and scenario intent for patrol AI, objectives,
+    and future strategic behavior without repeatedly searching every tile.
+    """
+
+    roads: list[MapRoute] = field(default_factory=list)
+    rivers: list[MapRoute] = field(default_factory=list)
+    bridges: list[tuple[int, int]] = field(default_factory=list)
+    objectives: list[MapObjective] = field(default_factory=list)
+    tactical_locations: list[TacticalLocation] = field(default_factory=list)
+
+    @staticmethod
+    def _coordinates(cells_or_tiles):
+        """Normalize Cells or coordinate pairs into immutable map positions."""
+        return tuple(tuple(cell.pos) if hasattr(cell, "pos") else tuple(cell) for cell in cells_or_tiles)
+
+    def add_road(self, kind, cells_or_tiles):
+        """Register one patrol-capable route in its generation order."""
+        tiles = self._coordinates(cells_or_tiles)
+        if tiles:
+            self.roads.append(MapRoute(f"road_{len(self.roads) + 1}", kind, tiles))
+
+    def add_river(self, kind, cells_or_tiles):
+        """Register one watercourse separately from lakes and ponds."""
+        tiles = self._coordinates(cells_or_tiles)
+        if tiles:
+            self.rivers.append(MapRoute(f"river_{len(self.rivers) + 1}", kind, tiles))
+
+    def add_objective(self, objective_id, name, kind, cells_or_tiles):
+        """Add scenario content without coupling it to terrain generation."""
+        self.objectives.append(
+            MapObjective(objective_id, name, kind, self._coordinates(cells_or_tiles))
+        )
+
+    def add_tactical_location(self, location_id, name, kind, cells_or_tiles):
+        """Add an AI-relevant area, such as a crossing or defensible ridge."""
+        self.tactical_locations.append(
+            TacticalLocation(location_id, name, kind, self._coordinates(cells_or_tiles))
+        )
+
+    def refresh_bridges(self):
+        """Record road/river overlaps after procedural route generation ends."""
+        road_tiles = {tile for route in self.roads for tile in route.tiles}
+        river_tiles = {tile for route in self.rivers for tile in route.tiles}
+        self.bridges = sorted(road_tiles & river_tiles)
+
+
 def get_map_preset(key):
     """Return one named terrain profile or explain the available choices."""
     try:
@@ -188,6 +268,7 @@ class MapGenerator:
         )
         self.map_preset = get_map_preset(preset_key)
         self.terrain_enabled = self._terrain_options(terrain_enabled)
+        self.features = MapFeatures()
         if self.width < 8 or self.height < 8:
             raise ValueError("Maps must be at least 8 tiles wide and 8 tiles high.")
 
@@ -209,6 +290,7 @@ class MapGenerator:
         # transitioned into smaller modules.
         from .terrain import Cell, TerrainType
 
+        self.features = MapFeatures()
         terrain = {
             "blank": TerrainType("blank", " ", "black", visualAbsorbtion=9999,
                                  radarAbsorbtion=9999, fireproof=True, passable=False,
@@ -359,6 +441,8 @@ class MapGenerator:
                 self._seed_urban_district(
                     grid, terrain["urban"], urban_neighbors, protected_terrain,
                 )
+        self.features.refresh_bridges()
+        match.mapFeatures = self.features
         return grid
 
     def _seed_urban_district(self, grid, urban, anchors, protected_terrain):
@@ -467,7 +551,9 @@ class MapGenerator:
         )
         large_river_cells = []
         for _ in range(large_river_count):
-            large_river_cells.extend(self._large_river(grid, water, width=3))
+            river_cells = self._large_river(grid, water, width=3)
+            large_river_cells.extend(river_cells)
+            self.features.add_river("large_river", river_cells)
         # Lake attempts retain the requested area-scaled rate, but cannot
         # exceed the number of broad rivers available to feed them.
         lake_count = min(
@@ -482,7 +568,7 @@ class MapGenerator:
             50, self.map_preset.small_river_weight,
         )
         for _ in range(small_river_count):
-            self._small_river(grid, water, mountain)
+            self.features.add_river("small_river", self._small_river(grid, water, mountain))
 
     def _scaled_feature_count(self, tiles_per_feature, weight=1):
         """Return an area-scaled feature count adjusted by a preset weight."""
@@ -603,12 +689,15 @@ class MapGenerator:
                 x, y, delta_x, delta_y = self.rng.randrange(1, self.width - 1), self.height - 2, 0, -1
 
         maximum_length = max(3, min(self.width, self.height) // 2)
+        river_cells = []
         for step in range(maximum_length):
             if not (1 <= x < self.width - 1 and 1 <= y < self.height - 1):
-                return
-            grid[y][x].terrain = water
+                return river_cells
+            cell = grid[y][x]
+            cell.terrain = water
+            river_cells.append(cell)
             if step and self.rng.random() < 0.25:
-                return
+                return river_cells
             if self.rng.random() < 0.45:
                 # Small streams change heading freely, making them windier
                 # than broad rivers and able to end in local low ground.
@@ -617,6 +706,7 @@ class MapGenerator:
                 )
             x += delta_x
             y += delta_y
+        return river_cells
 
     def _grow_water_patch(self, grid, seed, water, tile_count):
         """Flood outward from a seed to make one connected pond or lake."""
@@ -762,7 +852,8 @@ class MapGenerator:
         multiplier = self._density_multiplier(density)
         for _ in range(multiplier):
             start, end = self._road_endpoints()
-            self._draw_road(grid, start, end, terrain, protected_terrain)
+            road_cells = self._draw_road(grid, start, end, terrain, protected_terrain)
+            self.features.add_road("road", road_cells)
 
     def _build_road_network(self, grid, terrain, protected_terrain):
         """Create ordinary roads, highways, and suburb spurs for one preset."""
@@ -789,6 +880,7 @@ class MapGenerator:
             start, end = self._road_endpoints()
             path = self._draw_road(grid, start, end, terrain)
             horizontal = abs(end[0] - start[0]) >= abs(end[1] - start[1])
+            lanes = []
             for cell in path:
                 if horizontal:
                     lane_x = cell.pos[0]
@@ -797,6 +889,8 @@ class MapGenerator:
                     lane_x = cell.pos[0] + (1 if cell.pos[0] < self.width - 2 else -1)
                     lane_y = cell.pos[1]
                 grid[lane_y][lane_x].terrain = terrain
+                lanes.append(grid[lane_y][lane_x])
+            self.features.add_road("highway", [*path, *lanes])
 
     def _road_offshoots(self, grid, road, suburb, count, protected_terrain):
         """Add short road spurs that terminate beside small suburb patches."""
@@ -812,7 +906,8 @@ class MapGenerator:
             endpoint = self._offshoot_endpoint(grid, start, protected)
             if endpoint is None:
                 continue
-            self._draw_road(grid, start.pos, endpoint.pos, road, protected)
+            road_cells = self._draw_road(grid, start.pos, endpoint.pos, road, protected)
+            self.features.add_road("offshoot", road_cells)
             self._grow_suburb_patch(grid, endpoint, suburb, protected)
 
     def _offshoot_endpoint(self, grid, start, protected):

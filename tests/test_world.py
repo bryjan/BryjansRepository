@@ -21,6 +21,23 @@ from mechgame.world import (
 
 
 class MapGeneratorTests(unittest.TestCase):
+    def test_map_features_preserve_routes_and_accept_scenario_locations(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        features = match.mapFeatures
+
+        self.assertTrue(features.roads)
+        self.assertTrue(all(route.tiles for route in features.roads))
+        self.assertEqual(
+            [route.route_id for route in features.roads],
+            [f"road_{index}" for index in range(1, len(features.roads) + 1)],
+        )
+
+        features.add_objective("relay", "Relay Station", "capture", [(12, 12)])
+        features.add_tactical_location("ford", "River Crossing", "crossing", [(13, 12)])
+
+        self.assertEqual(features.objectives[0].name, "Relay Station")
+        self.assertEqual(features.tactical_locations[0].kind, "crossing")
+
     def test_teams_get_independent_future_map_visibility_flags(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         player_team, enemy_team = match.teamList
