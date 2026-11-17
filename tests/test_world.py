@@ -15,12 +15,43 @@ from mechgame.world import (
     DEFAULT_MAP_PRESET,
     DEFAULT_TERRAIN_ENABLED,
     MAP_PRESETS,
+    MapFeatures,
     MapGenerator,
     get_map_preset,
 )
 
 
 class MapGeneratorTests(unittest.TestCase):
+    def test_terrain_features_register_bridges_mountain_entries_and_thin_passes(self):
+        match = MatchInfo(12, 9, [], "")
+        generator = MapGenerator(12, random.Random(0))
+        grid = generator.build(match)
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = match.plains
+
+        generator.features = MapFeatures()
+        generator.features.add_road("road", [(3, 4), (4, 4), (3, 10)])
+        generator.features.add_river("small_river", [(3, 10)])
+        generator.features.refresh_bridges()
+
+        # This road first touches the range at [4, 4]. The separate mountain
+        # pair squeezes [7, 8] into a two-tile-wide-or-less pass corridor.
+        grid[4][5].terrain = match.mountain
+        grid[8][6].terrain = match.mountain
+        grid[8][8].terrain = match.mountain
+        generator._identify_terrain_locations(grid, {
+            "mountain": match.mountain,
+        })
+
+        locations_by_kind = {
+            location.kind: location
+            for location in generator.features.tactical_locations
+        }
+        self.assertEqual(locations_by_kind["bridge"].tiles, ((3, 10),))
+        self.assertIn((4, 4), locations_by_kind["mountain_entrance"].tiles)
+        self.assertIn((7, 8), locations_by_kind["mountain_pass"].tiles)
+
     def test_map_features_preserve_routes_and_accept_scenario_locations(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         features = match.mapFeatures
@@ -36,7 +67,7 @@ class MapGeneratorTests(unittest.TestCase):
         features.add_tactical_location("ford", "River Crossing", "crossing", [(13, 12)])
 
         self.assertEqual(features.objectives[0].name, "Relay Station")
-        self.assertEqual(features.tactical_locations[0].kind, "crossing")
+        self.assertEqual(features.tactical_locations[-1].kind, "crossing")
 
     def test_teams_get_independent_future_map_visibility_flags(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

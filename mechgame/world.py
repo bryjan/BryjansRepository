@@ -442,8 +442,117 @@ class MapGenerator:
                     grid, terrain["urban"], urban_neighbors, protected_terrain,
                 )
         self.features.refresh_bridges()
+        self._identify_terrain_locations(grid, terrain)
         match.mapFeatures = self.features
         return grid
+
+    def _identify_terrain_locations(self, grid, terrain):
+        """Register inexpensive, terrain-defined strategic areas.
+
+        These are facts about the generated board, not scenario objectives.
+        Scenario setup can later choose suitable entries from this registry as
+        objective, reinforcement, or patrol anchors.
+        """
+        for index, position in enumerate(self.features.bridges, start=1):
+            self.features.add_tactical_location(
+                f"bridge_{index}", f"Bridge {index}", "bridge", [position],
+            )
+
+        for index, tiles in enumerate(self._mountain_road_entrances(grid, terrain["mountain"]), start=1):
+            self.features.add_tactical_location(
+                f"mountain_entrance_{index}",
+                f"Mountain Road Entrance {index}",
+                "mountain_entrance",
+                tiles,
+            )
+
+        for index, tiles in enumerate(self._thin_mountain_passes(grid, terrain["mountain"]), start=1):
+            self.features.add_tactical_location(
+                f"mountain_pass_{index}", f"Mountain Pass {index}", "mountain_pass", tiles,
+            )
+
+    def _mountain_road_entrances(self, grid, mountain):
+        """Find road route tiles where a route first meets mountain terrain."""
+        road_tiles = {tile for route in self.features.roads for tile in route.tiles}
+
+        def touches_mountain(position):
+            x, y = position
+            return any(
+                0 <= x + delta_x < self.width
+                and 0 <= y + delta_y < self.height
+                and grid[y + delta_y][x + delta_x].terrain is mountain
+                for delta_x, delta_y in ((1, 0), (-1, 0), (0, 1), (0, -1))
+            )
+
+        entrances = {
+            position
+            for position in road_tiles
+            if touches_mountain(position)
+            and any(
+                neighbor in road_tiles and not touches_mountain(neighbor)
+                for neighbor in self._cardinal_positions(position)
+            )
+        }
+        return self._connected_position_groups(entrances)
+
+    def _thin_mountain_passes(self, grid, mountain, maximum_half_width=2):
+        """Find narrow corridors with mountains on opposite sides.
+
+        The bounded two-tile scan is deliberately local: it costs a constant
+        amount per map tile and finds practical choke points without running a
+        full pathfinding or line-of-sight analysis over the map.
+        """
+        candidates = set()
+        for y in range(1, self.height - 1):
+            for x in range(1, self.width - 1):
+                cell = grid[y][x]
+                if cell.terrain is mountain or not cell.terrain.passable:
+                    continue
+                squeezed_horizontally = (
+                    self._mountain_within(grid, x, y, -1, 0, mountain, maximum_half_width)
+                    and self._mountain_within(grid, x, y, 1, 0, mountain, maximum_half_width)
+                )
+                squeezed_vertically = (
+                    self._mountain_within(grid, x, y, 0, -1, mountain, maximum_half_width)
+                    and self._mountain_within(grid, x, y, 0, 1, mountain, maximum_half_width)
+                )
+                if squeezed_horizontally or squeezed_vertically:
+                    candidates.add((x, y))
+        return self._connected_position_groups(candidates)
+
+    def _mountain_within(self, grid, x, y, delta_x, delta_y, mountain, limit):
+        """Return whether mountain terrain appears along one short cardinal ray."""
+        for distance in range(1, limit + 1):
+            target_x = x + (delta_x * distance)
+            target_y = y + (delta_y * distance)
+            if not (0 <= target_x < self.width and 0 <= target_y < self.height):
+                return False
+            if grid[target_y][target_x].terrain is mountain:
+                return True
+        return False
+
+    @staticmethod
+    def _cardinal_positions(position):
+        """Yield the four immediately adjacent coordinates for route checks."""
+        x, y = position
+        return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+
+    def _connected_position_groups(self, positions):
+        """Group adjacent tactical tiles into deterministic named-area inputs."""
+        remaining = set(positions)
+        groups = []
+        while remaining:
+            frontier = [remaining.pop()]
+            group = []
+            while frontier:
+                position = frontier.pop()
+                group.append(position)
+                for neighbor in self._cardinal_positions(position):
+                    if neighbor in remaining:
+                        remaining.remove(neighbor)
+                        frontier.append(neighbor)
+            groups.append(tuple(sorted(group)))
+        return sorted(groups)
 
     def _seed_urban_district(self, grid, urban, anchors, protected_terrain):
         """Place one guaranteed urban seed when random growth found none."""
