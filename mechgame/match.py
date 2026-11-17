@@ -50,6 +50,9 @@ class MatchInfo:
         # objectives and tactical locations after the terrain is built.
         from .world import MapFeatures
         self.mapFeatures = MapFeatures()
+        # Debug-only strategic-map overlay. Tactical locations remain hidden
+        # during ordinary play until this is deliberately toggled in map view.
+        self.showTacticalLocations = False
         # Radar coverage is cached until a source changes in a meaningful way.
         self._radarSourceState = None
         self.advTurn = False #did POV take a turn ending action (ap costing). reading reports dont advance the turn, moving would, ect.

@@ -24,9 +24,16 @@ def lookAt(matchInfo):
 
 
 def mapView(matchInfo):
-    """Open the scaled debug overview; team visibility flags are not wired yet."""
-    pv.print_overview(matchInfo)
-    input("Map overview: press 'Enter' to return")
+    """Open the scaled debug overview and its tactical-location overlay."""
+    while True:
+        pv.print_overview(matchInfo)
+        choice = input("Map overview ('t' tactical locations; 'Enter' or 'x' return): ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice == "t":
+            matchInfo.showTacticalLocations = not matchInfo.showTacticalLocations
+            continue
+        print("Choose 't', 'Enter', or 'x'.")
 
 
 def statusPanel(matchInfo):

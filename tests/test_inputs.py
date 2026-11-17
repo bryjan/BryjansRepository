@@ -69,6 +69,17 @@ class InputTests(unittest.TestCase):
         map_mock.assert_called_once_with(match)
         self.assertFalse(match.advTurn)
 
+    def test_map_view_can_toggle_tactical_location_markers(self):
+        match = Game(map_size=40, window_size=9).create_match()
+
+        with patch("builtins.input", side_effect=["m", "t", "x"]), patch(
+            "mechgame.ui.tactical.print_overview"
+        ) as map_mock:
+            dispatch.receive_input(match)
+
+        self.assertTrue(match.showTacticalLocations)
+        self.assertEqual(map_mock.call_count, 2)
+
     def test_overview_uses_weighted_votes_and_connected_route_bonus(self):
         match = Game(map_size=40, window_size=9).create_match()
         chunk = [row[2:6] for row in match.map[2:6]]

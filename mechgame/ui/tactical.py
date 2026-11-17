@@ -357,6 +357,15 @@ def _overview_chunks(matchInfo, width, height):
 
 def _display_overview_chunk(matchInfo, chunk):
     """Render the selected terrain, or a debug-visible entity/effect on top."""
+    if getattr(matchInfo, "showTacticalLocations", False):
+        marked_tiles = {
+            tile
+            for location in matchInfo.mapFeatures.tactical_locations
+            for tile in location.tiles
+        }
+        if any(tuple(cell.pos) in marked_tiles for row in chunk for cell in row):
+            print(termcolor.colored("X", "red"), end=" ")
+            return
     entities = [
         entity
         for entity in matchInfo.entities
@@ -406,7 +415,11 @@ def print_overview(matchInfo):
             _display_overview_chunk(matchInfo, chunk)
         print(side_line)
     print(full_divider)
-    for line in _command_panel_lines(full_panel_width, "Map overview: 'Enter' or 'x' return"):
+    location_state = "ON" if matchInfo.showTacticalLocations else "OFF"
+    command_text = (
+        f"Map overview: 't' tactical locations {location_state} | 'Enter' or 'x' return"
+    )
+    for line in _command_panel_lines(full_panel_width, command_text):
         print(f"|{line:<{full_panel_width}}|")
     print(full_divider)
 
