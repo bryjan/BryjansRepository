@@ -114,13 +114,18 @@ class MapGeneratorTests(unittest.TestCase):
 
         river_basin = MapGenerator(20, random.Random(0), map_preset="river_basin")
         self.assertGreater(river_basin.map_preset.large_river_weight, 1)
+        self.assertGreater(river_basin.map_preset.small_river_weight, 1)
         self.assertTrue(river_basin.terrain_enabled["river"])
 
         frontier = MapGenerator(20, random.Random(0), map_preset=DEFAULT_MAP_PRESET)
         self.assertEqual(frontier.map_preset.road_density, "Normal")
         self.assertEqual(frontier.map_preset.highway_count, 1)
         self.assertEqual(frontier.map_preset.suburb_offshoot_count, 1)
-        self.assertEqual(frontier.map_preset.forest_extra_growth, 1)
+        self.assertEqual(frontier.map_preset.forest_extra_growth, 2)
+
+        urban_fringe = MapGenerator(20, random.Random(0), map_preset="urban_fringe")
+        self.assertEqual(urban_fringe.map_preset.suburb_cluster_multiplier, 5)
+        self.assertEqual(urban_fringe.map_preset.urban_cluster_multiplier, 5)
 
     def test_custom_terrain_toggles_retain_temperate_generation_weights(self):
         generator = MapGenerator(

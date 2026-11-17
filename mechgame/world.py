@@ -70,6 +70,10 @@ class MapPreset:
     # Adds local expansion passes without increasing the number of forest
     # seeds, so patches grow larger without becoming uniformly dense.
     forest_extra_growth: int = 0
+    # Development grows outward from roads and existing districts. Multipliers
+    # scale those local growth passes instead of imposing fixed map-size caps.
+    suburb_cluster_multiplier: float = 1
+    urban_cluster_multiplier: float = 1
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -87,7 +91,8 @@ MAP_PRESETS = (
         frozenset(GENERATABLE_TERRAINS),
         forest_density="Thick", desert_density="Light", road_density="Normal",
         suburb_density="Normal", urban_density="Thick", highway_count=1,
-        suburb_offshoot_count=1, forest_extra_growth=1,
+        suburb_offshoot_count=1, forest_extra_growth=2,
+        suburb_cluster_multiplier=1.25, urban_cluster_multiplier=1.25,
     ),
     MapPreset(
         "badlands",
@@ -115,8 +120,9 @@ MAP_PRESETS = (
         frozenset({"forest", "road", "suburb", "urban", "water", "river"}),
         forest_density="Light", desert_density="None", road_density="Thick",
         suburb_density="Normal", urban_density="Normal", mountain_weight=0,
-        pond_weight=1.5, large_river_weight=1.5, small_river_weight=1,
-        lake_weight=1.5,
+        pond_weight=1.5, large_river_weight=1.5, small_river_weight=2,
+        lake_weight=1.5, suburb_cluster_multiplier=1.25,
+        urban_cluster_multiplier=1.25,
     ),
     MapPreset(
         "urban_fringe",
@@ -126,6 +132,7 @@ MAP_PRESETS = (
         forest_density="Light", desert_density="None", road_density="Thick",
         suburb_density="Thick", urban_density="Thick", mountain_weight=0,
         pond_weight=0, large_river_weight=0, small_river_weight=0, lake_weight=0,
+        suburb_cluster_multiplier=5, urban_cluster_multiplier=5,
     ),
     MapPreset(
         "open_steppe",
@@ -407,6 +414,7 @@ class MapGenerator:
                 suburb_neighbors,
                 self.map_preset.suburb_density,
                 protected_terrain,
+                cluster_multiplier=self.map_preset.suburb_cluster_multiplier,
             )
         # Urban centers form dense pockets around developed road corridors,
         # rather than appearing as isolated buildings across open terrain.
@@ -433,6 +441,7 @@ class MapGenerator:
                 urban_neighbors,
                 self.map_preset.urban_density,
                 protected_terrain,
+                cluster_multiplier=self.map_preset.urban_cluster_multiplier,
             )
             if not any(
                 cell.terrain is terrain["urban"]
@@ -940,8 +949,10 @@ class MapGenerator:
         for cell in changes:
             cell.terrain = forest
 
-    def _associate(self, grid, terrain, associated, density, protected_terrain=()):
-        multiplier = self._density_multiplier(density)
+    def _associate(self, grid, terrain, associated, density, protected_terrain=(),
+                   cluster_multiplier=1):
+        """Grow clustered terrain around its anchors with scalable intensity."""
+        multiplier = math.ceil(self._density_multiplier(density) * cluster_multiplier)
         protected_terrain = set(protected_terrain)
         for _ in range(multiplier):
             changes = []
