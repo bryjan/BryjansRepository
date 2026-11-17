@@ -10,7 +10,7 @@ from mechgame.teams import Squad, Team
 
 class MatchFlowTests(unittest.TestCase):
     def test_demo_match_can_advance_between_teams_and_rounds(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         player_team = match.pov.team
 
         match.nextSquadTurn()
@@ -22,7 +22,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(match.matchRound, 1)
 
     def test_actions_do_not_change_squads_without_an_end_request(self):
-        game = Game(map_size=20, window_size=9, rng=random.Random(0))
+        game = Game(map_size=40, window_size=9, rng=random.Random(0))
         match = game.create_match()
         active_mech = match.pov
 
@@ -35,7 +35,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertIsNot(match.pov, active_mech)
 
     def test_destroyed_squad_is_skipped_in_turn_order(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         reserve_mech = Entity(create_mech("lancer.type_a"), Pilot("Reserve"))
         reserve_mech.pos = [4, 4]
         reserve_team = Team(
@@ -53,7 +53,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(match.matchRound, 0)
 
     def test_last_operational_team_wins_instead_of_crashing_turn_order(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         player_team = match.pov.team
 
         for enemy in list(match.teamList[1].squadsList[0].mechList):
@@ -65,7 +65,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertIn("wins", match.resultMessage)
 
     def test_round_effects_reselect_when_the_next_squad_is_destroyed(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         reserve_mech = Entity(create_mech("lancer.type_a"), Pilot("Reserve"))
         reserve_mech.pos = [4, 4]
         reserve_team = Team(

@@ -6,6 +6,14 @@ from mechgame.mechs import MAX_HULL_ART_HEIGHT
 from mechgame import radar
 
 SIDE_PANEL_WIDTH = 34
+COMMAND_PANEL_ROWS = 3
+# The outer map frame uses two columns per terrain tile and reserves the right
+# panel plus its three separating border columns.
+DISPLAY_WIDTH_OVERHEAD = SIDE_PANEL_WIDTH + 3
+# One outer border, two HUD rows, two shared dividers, a three-row command
+# panel, and its closing border sit outside the tactical map rows.
+DISPLAY_HEIGHT_OVERHEAD = 9
+MIN_TACTICAL_WIDTH = 21
 # A damaged mortar Lancer is the tallest current detail set. Reserve space
 # for its cockpit warning and the largest allowed hull art, then round up to
 # an odd dimension so the tactical camera can stay centered.
@@ -18,6 +26,39 @@ MIN_TACTICAL_HEIGHT = (
 # The normal game view is deliberately much larger than the minimum needed by
 # the information panels. Players can still choose any supported odd size.
 DEFAULT_TACTICAL_SIZE = 37
+DEFAULT_DISPLAY_WIDTH = (DEFAULT_TACTICAL_SIZE * 2) + DISPLAY_WIDTH_OVERHEAD
+DEFAULT_DISPLAY_HEIGHT = DEFAULT_TACTICAL_SIZE + DISPLAY_HEIGHT_OVERHEAD
+MIN_DISPLAY_WIDTH = (MIN_TACTICAL_WIDTH * 2) + DISPLAY_WIDTH_OVERHEAD
+MIN_DISPLAY_HEIGHT = MIN_TACTICAL_HEIGHT + DISPLAY_HEIGHT_OVERHEAD
+
+
+def tactical_dimensions(display_width, display_height):
+    """Convert an exact terminal frame size into its centered map viewport.
+
+    Terrain cells occupy two columns, so a centered odd-width map requires a
+    display width that is three more than a multiple of four.  A centered
+    odd-height map similarly requires an even full display height.
+    """
+    if display_width < MIN_DISPLAY_WIDTH or display_width % 4 != 3:
+        raise ValueError(
+            f"Display width must be at least {MIN_DISPLAY_WIDTH} and equal to 3 modulo 4."
+        )
+    if display_height < MIN_DISPLAY_HEIGHT or display_height % 2:
+        raise ValueError(
+            f"Display height must be an even number of at least {MIN_DISPLAY_HEIGHT}."
+        )
+    return (
+        (display_width - DISPLAY_WIDTH_OVERHEAD) // 2,
+        display_height - DISPLAY_HEIGHT_OVERHEAD,
+    )
+
+
+def display_dimensions(tactical_width, tactical_height):
+    """Return the complete terminal frame needed by a tactical viewport."""
+    return (
+        (tactical_width * 2) + DISPLAY_WIDTH_OVERHEAD,
+        tactical_height + DISPLAY_HEIGHT_OVERHEAD,
+    )
 
 
 def _print_panel_text(text, width):
@@ -231,6 +272,12 @@ def _command_lines(width, command_text=None):
     return [line.strip("| ") for line in textwrap.wrap(command_text, width=width)]
 
 
+def _command_panel_lines(width, command_text=None):
+    """Keep the bottom panel at its reserved height for a stable display."""
+    lines = _command_lines(width, command_text)
+    return lines + [""] * max(0, COMMAND_PANEL_ROWS - len(lines))
+
+
 # A continuous road or tunnel is the strategic representation of a route. It
 # needs to remain visible even across a broad river or lake, while water still
 # receives a smaller link bonus to preserve unbridged river crossings.
@@ -359,7 +406,7 @@ def print_overview(matchInfo):
             _display_overview_chunk(matchInfo, chunk)
         print(side_line)
     print(full_divider)
-    for line in _command_lines(full_panel_width, "Map overview: 'Enter' or 'x' return"):
+    for line in _command_panel_lines(full_panel_width, "Map overview: 'Enter' or 'x' return"):
         print(f"|{line:<{full_panel_width}}|")
     print(full_divider)
 
@@ -433,7 +480,7 @@ def printPOV(matchInfo, povX, povY, command_text=None, right_panel=None):
         print(sideLine)
     # This shared divider closes both upper panels and opens the command bar.
     print(fullDivider)
-    for line in _command_lines(fullPanelWidth, command_text):
+    for line in _command_panel_lines(fullPanelWidth, command_text):
         print(f"|{line:<{fullPanelWidth}}|")
     print(fullDivider)
     return

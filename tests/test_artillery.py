@@ -11,7 +11,7 @@ from mechgame.runner import Game
 
 class ArtilleryTests(unittest.TestCase):
     def setUp(self):
-        self.match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        self.match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         self.match.pov.pos = [2, 10]
         self.bands = {
             "close": [30, 0, 1],

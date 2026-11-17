@@ -10,8 +10,8 @@ def main():
         if settings is None:
             return
         match = Game(
-            window_width=settings.tactical_width,
-            window_height=settings.tactical_height,
+            display_width=settings.display_width,
+            display_height=settings.display_height,
             terrain_enabled=settings.terrain_enabled,
             map_preset=settings.map_preset,
         ).run()

@@ -11,9 +11,13 @@ from ..world import (
     MAP_PRESETS,
     get_map_preset,
 )
-from .tactical import DEFAULT_TACTICAL_SIZE, MIN_TACTICAL_HEIGHT
+from .tactical import (
+    DEFAULT_DISPLAY_HEIGHT,
+    DEFAULT_DISPLAY_WIDTH,
+    MIN_DISPLAY_HEIGHT,
+    tactical_dimensions,
+)
 
-MIN_TACTICAL_WIDTH = 5
 MENU_MIN_INNER_WIDTH = 40
 
 
@@ -21,21 +25,20 @@ MENU_MIN_INNER_WIDTH = 40
 class DisplaySettings:
     """Display and map-generation choices collected before a match begins."""
 
-    tactical_width: int = DEFAULT_TACTICAL_SIZE
-    tactical_height: int = DEFAULT_TACTICAL_SIZE
+    display_width: int = DEFAULT_DISPLAY_WIDTH
+    display_height: int = DEFAULT_DISPLAY_HEIGHT
     terrain_enabled: dict = field(default_factory=lambda: dict(DEFAULT_TERRAIN_ENABLED))
     map_preset: str = DEFAULT_MAP_PRESET
 
 
 def _frame_lines(lines, settings):
     """Build a fixed-size menu frame from the selected display dimensions."""
-    # Tactical cells consume two terminal columns. Reusing that scale makes a
-    # menu resized in Options visibly remain the same size on every page.
-    width = max(MENU_MIN_INNER_WIDTH, settings.tactical_width * 2)
+    # The start menu fills the same complete terminal frame as tactical play.
+    width = max(MENU_MIN_INNER_WIDTH, settings.display_width - 4)
     content = []
     for line in lines:
         content.extend(textwrap.wrap(line, width=width) or [""])
-    height = max(settings.tactical_height, len(content))
+    height = max(settings.display_height - 2, len(content))
     divider = "+" + ("-" * (width + 2)) + "+"
     return [
         divider,
@@ -51,17 +54,26 @@ def _frame(lines, settings):
         print(line)
 
 
-def _read_odd_size(dimension, current, minimum):
-    """Prompt for one usable centered-view dimension, or retain the old value."""
+def _read_display_size(dimension, current, other_dimension):
+    """Prompt for one full-frame dimension, retaining the old value on cancel."""
     while True:
         value = input(
-            f"{dimension} (odd whole number, at least {minimum}; 'x' to cancel): "
+            f"{dimension} (whole number; 'x' to cancel): "
         ).strip().lower()
         if value in ("", "x"):
             return current
-        if value.isdigit() and int(value) >= minimum and int(value) % 2 == 1:
-            return int(value)
-        print(f"Enter an odd whole number of at least {minimum}, or 'x' to cancel.")
+        if value.isdigit():
+            try:
+                dimensions = (
+                    (int(value), other_dimension)
+                    if dimension == "Display width" else (other_dimension, int(value))
+                )
+                tactical_dimensions(*dimensions)
+                return int(value)
+            except ValueError as error:
+                print(error)
+                continue
+        print("Enter a whole number or 'x' to cancel.")
 
 
 def options_menu(settings):
@@ -120,24 +132,25 @@ def preset_options_menu(settings):
 
 
 def display_options_menu(settings):
-    """Change the same tactical width and height available during a match."""
+    """Change the complete terminal frame used by menus and tactical play."""
     while True:
         _frame([
             "DISPLAY SIZE",
-            f"'w' Tactical width:  {settings.tactical_width}",
-            f"'h' Tactical height: {settings.tactical_height}",
+            f"'w' Display width:  {settings.display_width}",
+            f"'h' Display height: {settings.display_height}",
+            "Width must be 3 more than a multiple of 4; height must be even.",
             "'x' Back",
         ], settings)
         choice = input("Display: ").strip().lower()
         if choice in ("", "x"):
             return
         if choice == "w":
-            settings.tactical_width = _read_odd_size(
-                "Tactical width", settings.tactical_width, MIN_TACTICAL_WIDTH
+            settings.display_width = _read_display_size(
+                "Display width", settings.display_width, settings.display_height
             )
         elif choice == "h":
-            settings.tactical_height = _read_odd_size(
-                "Tactical height", settings.tactical_height, MIN_TACTICAL_HEIGHT
+            settings.display_height = _read_display_size(
+                "Display height", settings.display_height, settings.display_width
             )
         else:
             print("Choose 'w', 'h', or 'x'.")

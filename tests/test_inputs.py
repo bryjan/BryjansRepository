@@ -26,7 +26,7 @@ class InputTests(unittest.TestCase):
         self.assertTrue(match.pov.radarOn)
 
     def test_quit_command_requests_a_return_to_the_start_menu(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         match.advTurn = True
         match.turnEnded = True
 
@@ -39,7 +39,7 @@ class InputTests(unittest.TestCase):
         self.assertFalse(match.turnEnded)
 
     def test_weapon_menu_cancel_keeps_the_existing_default(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         lancer = match.teamList[0].squadsList[0].mechList[1]
         chain_gun = next(weapon for weapon in lancer.mechClass.gunList if weapon.name == "ChainGun")
         chain_gun.defaultGun = True
@@ -51,7 +51,7 @@ class InputTests(unittest.TestCase):
         self.assertTrue(chain_gun.defaultGun)
 
     def test_look_can_cancel_without_rendering_a_view(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
 
         with patch("builtins.input", return_value="x"), patch("mechgame.ui.tactical.printPOV") as view_mock:
             navigation.lookAt(match)
@@ -59,7 +59,7 @@ class InputTests(unittest.TestCase):
         view_mock.assert_not_called()
 
     def test_m_opens_the_full_debug_map_without_ending_the_turn(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
 
         with patch("builtins.input", side_effect=["m", ""]), patch(
             "mechgame.ui.tactical.print_overview"
@@ -70,7 +70,7 @@ class InputTests(unittest.TestCase):
         self.assertFalse(match.advTurn)
 
     def test_overview_uses_weighted_votes_and_connected_route_bonus(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         chunk = [row[2:6] for row in match.map[2:6]]
         for row in chunk:
             for cell in row:
@@ -99,7 +99,7 @@ class InputTests(unittest.TestCase):
         self.assertIs(tactical.overview_terrain(chunk), match.road)
 
     def test_n_switches_to_the_next_mech_in_the_squad(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         active_mech = match.pov
 
         with patch("builtins.input", return_value="n"), patch("builtins.print"):
@@ -107,30 +107,30 @@ class InputTests(unittest.TestCase):
 
         self.assertIsNot(match.pov, active_mech)
 
-    def test_options_can_change_tactical_width_and_height_independently(self):
-        match = Game(map_size=20, window_size=9).create_match()
+    def test_options_can_change_complete_display_width_and_height_independently(self):
+        match = Game(map_size=40).create_match()
 
-        with patch("builtins.input", side_effect=["w", "15"]), patch("builtins.print"):
+        with patch("builtins.input", side_effect=["w", "119"]), patch("builtins.print"):
             squad.optionsMenu(match)
-        with patch("builtins.input", side_effect=["h", "19", "21"]), patch("builtins.print"):
+        with patch("builtins.input", side_effect=["h", "50"]), patch("builtins.print"):
             squad.optionsMenu(match)
 
-        self.assertEqual(match.windowWidth, 15)
-        self.assertEqual(match.windowHeight, 21)
+        self.assertEqual((match.displayWidth, match.displayHeight), (119, 50))
+        self.assertEqual((match.windowWidth, match.windowHeight), (41, 41))
 
     def test_options_choices_render_in_the_tactical_bottom_panel(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
 
         with patch("builtins.input", return_value="x"), patch(
             "mechgame.commands.squad.pv.printPOV",
         ) as panel:
             squad.optionsMenu(match)
 
-        self.assertIn("'w' tactical width", panel.call_args.kwargs["command_text"])
-        self.assertIn("'h' tactical height", panel.call_args.kwargs["command_text"])
+        self.assertIn("'w' display width", panel.call_args.kwargs["command_text"])
+        self.assertIn("'h' display height", panel.call_args.kwargs["command_text"])
 
     def test_tactical_side_panel_summarizes_the_active_mech(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         match.pov.mechClass.legs.limbCon = 0.5
         match.pov.cockpit.status = 1
 
@@ -148,7 +148,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Abilities: Dash 2/2", panel)
 
     def test_tactical_side_panel_defaults_to_nearest_tracked_contact(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         observer = match.pov
         target = match.teamList[1].squadsList[0].mechList[0]
         observer.trackedEnemies = [target]
@@ -161,7 +161,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Tracked contacts:", panel)
 
     def test_tactical_side_panel_warns_about_unread_critical_reports(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         match.pov.squad.reportLog.append(["CRITICAL MESSAGE! Test", True, False])
 
         lines = tactical._side_panel_lines(match, height=19)
@@ -169,7 +169,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Critical reports!", lines[-1])
 
     def test_status_and_reports_use_tactical_panels(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
 
         with patch("mechgame.ui.tactical.printPOV") as view_mock, patch("builtins.input", return_value="x"):
@@ -183,7 +183,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Test report", entries[0])
 
     def test_target_summary_shows_distance_and_visual_hit_chance(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         shooter = match.pov
         target = match.teamList[1].squadsList[0].mechList[0]
         shooter.pos = [2, 10]
@@ -199,7 +199,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Hit chance:", output)
 
     def test_target_summary_shows_hit_chance_for_highest_radar_id(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         shooter = match.pov
         target = match.teamList[1].squadsList[0].mechList[0]
         shooter.pos = [2, 10]
@@ -220,7 +220,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("Hit chance:", output)
 
     def test_abilities_command_activates_the_selected_hull_ability(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         match.pov.pos = [4, 4]
         for index, entity in enumerate(match.entities):
             if entity is not match.pov:
@@ -233,7 +233,7 @@ class InputTests(unittest.TestCase):
         self.assertEqual(match.pov.mechClass.hull.abilities[0].charges, 1)
 
     def test_launcher_target_selection_reopens_the_launcher_menu(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         launcher_mech = next(
             mech for mech in match.teamList[0].squadsList[0].mechList
             if mech.pilot.name == "Chiki"
@@ -251,7 +251,7 @@ class InputTests(unittest.TestCase):
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
 
     def test_launcher_auto_lead_projects_visual_contact_by_flight_time(self):
-        match = Game(map_size=30, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         launcher_mech = next(
             mech for mech in match.teamList[0].squadsList[0].mechList
             if mech.pilot.name == "Chiki"
@@ -269,7 +269,7 @@ class InputTests(unittest.TestCase):
         self.assertIn("'L' auto lead", firing.launcherFirePrompt(match, launcher, target))
 
     def test_direct_fire_target_selection_reopens_the_full_target_menu(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         default_target = match.teamList[1].squadsList[0].mechList[0]
         selected_target = match.teamList[1].squadsList[0].mechList[1]
         weapon = match.pov.mechClass.gunList[0]
@@ -285,7 +285,7 @@ class InputTests(unittest.TestCase):
         )
 
     def test_weapon_selection_keeps_radar_selected_target(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         bastion = match.teamList[1].squadsList[0].mechList[0]
         selected_target = match.pov
         match.pov = bastion
@@ -297,7 +297,7 @@ class InputTests(unittest.TestCase):
         fire_mock.assert_called_once_with(match, selected_target)
 
     def test_non_explosive_launcher_ammo_hides_damage_in_its_profile(self):
-        match = Game(map_size=20, window_size=9).create_match()
+        match = Game(map_size=40, window_size=9).create_match()
         mortar = next(
             mech for mech in match.teamList[0].squadsList[0].mechList
             if mech.pilot.name == "Chiki"

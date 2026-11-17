@@ -22,6 +22,10 @@ class MatchInfo:
         self.windowSize = windowSize
         self.windowWidth = windowSize
         self.windowHeight = windowSize
+        # These retain the intended terminal frame dimensions. Tactical map
+        # dimensions exclude the HUD, side panel, and command panel.
+        self.displayWidth = None
+        self.displayHeight = None
         self.teamList = teams #team0 are nuetral entities
         self.playerSquad = ""
         self.entities = []

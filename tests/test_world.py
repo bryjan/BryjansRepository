@@ -22,7 +22,7 @@ from mechgame.world import (
 
 class MapGeneratorTests(unittest.TestCase):
     def test_teams_get_independent_future_map_visibility_flags(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         player_team, enemy_team = match.teamList
 
         flags = player_team.mapVisibility
@@ -111,7 +111,7 @@ class MapGeneratorTests(unittest.TestCase):
 
     def test_game_forwards_its_map_preset_to_world_generation(self):
         match = Game(
-            map_size=20,
+            map_size=40,
             window_size=9,
             rng=random.Random(0),
             map_preset="urban_fringe",
@@ -170,7 +170,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(any(cell.terrain is match.mountain for row in match.map for cell in row))
 
     def test_water_is_sensor_clear_and_uses_float_or_titanic_movement_rules(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         mech = match.pov
         mech.pos = [4, 4]
         water = match.map[4][5]
@@ -422,7 +422,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(match.tunnel.moveCost, [0, 0, 0, 0, 2, 2, 2])
 
     def test_mountains_buff_medium_shooters_and_cover_small_targets(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         shooter = match.teamList[1].squadsList[0].mechList[1]  # Kestrel, size 3.
         target = match.pov  # Pathfinder Lancer, size 2.
         weapon = shooter.mechClass.gunList[0]
@@ -459,7 +459,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(all(cell.terrain in (disabled.border, disabled.plains) for row in disabled.map for cell in row))
 
     def test_game_creates_a_small_match(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
 
         self.assertEqual(len(match.entities), 8)
         self.assertEqual(match.pov.pilot.name, "B")
@@ -480,8 +480,8 @@ class MapGeneratorTests(unittest.TestCase):
         )
 
     def test_seeded_games_reproduce_terrain_and_spawn_positions(self):
-        first = Game(map_size=20, window_size=9, rng=random.Random(7)).create_match()
-        second = Game(map_size=20, window_size=9, rng=random.Random(7)).create_match()
+        first = Game(map_size=40, window_size=9, rng=random.Random(7)).create_match()
+        second = Game(map_size=40, window_size=9, rng=random.Random(7)).create_match()
 
         first_terrain = [[cell.terrain.name for cell in row] for row in first.map]
         second_terrain = [[cell.terrain.name for cell in row] for row in second.map]
@@ -493,7 +493,7 @@ class MapGeneratorTests(unittest.TestCase):
         )
 
     def test_squad_roster_lists_pilots_mechs_and_positions(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
 
         roster = match.pov.squad.rosterReport()
 
@@ -522,7 +522,7 @@ class MapGeneratorTests(unittest.TestCase):
         )
         self.assertTrue(flying_mech.initFlying)
 
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         flyer = match.pov
         flyer.pos = [4, 4]
         flyer.flying = True
@@ -543,7 +543,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(part.bonusArmor, 2)
 
     def test_lancer_hull_dash_crosses_restrictive_terrain_without_cost(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         lancer = match.pov
         dash = lancer.mechClass.hull.abilities[0]
         lancer.pos = [4, 4]
@@ -566,7 +566,7 @@ class MapGeneratorTests(unittest.TestCase):
             self.assertTrue(any(isinstance(effect, effects.ChaffEffect) for effect in trail_effects))
 
     def test_dash_boosts_plasma_lance_damage_until_turn_end(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         lancer = match.teamList[0].squadsList[0].mechList[1]
         lancer.pos = [4, 4]
         dash = lancer.mechClass.hull.abilities[0]
@@ -579,7 +579,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(lance.dmg, 18)
 
     def test_kestrel_sensor_overdrive_boosts_and_then_clears_sensors(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         kestrel = match.teamList[1].squadsList[0].mechList[1]
         overdrive = kestrel.mechClass.hull.abilities[0]
         starting_energy = kestrel.energy
@@ -597,7 +597,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(kestrel.sensorBoostMultiplier, 1)
 
     def test_bastion_field_repair_restores_parts_and_modules(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         bastion = match.teamList[1].squadsList[0].mechList[0]
         repair = bastion.mechClass.hull.abilities[0]
         legs, hull = bastion.mechClass.legs, bastion.mechClass.hull
@@ -623,7 +623,7 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(beam.accuracy, 27)
 
     def test_squad_ammo_report_uses_each_mechs_average_ammo_percent(self):
-        match = Game(map_size=20, window_size=9, rng=random.Random(0)).create_match()
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
 
         report = match.pov.squad.statusReport()
 

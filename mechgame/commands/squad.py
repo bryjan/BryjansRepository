@@ -86,8 +86,8 @@ def radarMenu(matchInfo):
 def optionsMenu(matchInfo):
     """Offer display preferences that do not alter match state."""
     option_prompt = (
-        f"Options: 'w' tactical width ({matchInfo.windowWidth}) | "
-        f"'h' tactical height ({matchInfo.windowHeight}) | 'x' exit"
+        f"Options: 'w' display width ({matchInfo.displayWidth}) | "
+        f"'h' display height ({matchInfo.displayHeight}) | 'x' exit"
     )
     _print_options_panel(matchInfo, option_prompt)
     choice = input("Options: ").strip().lower()
@@ -98,25 +98,31 @@ def optionsMenu(matchInfo):
         return
 
     dimension = "width" if choice == "w" else "height"
-    minimum = 5 if choice == "w" else pv.MIN_TACTICAL_HEIGHT
     while True:
         _print_options_panel(
             matchInfo,
-            f"Options: enter odd {dimension} of at least {minimum} | 'x' cancel",
+            f"Options: enter display {dimension} | 'x' cancel",
         )
         size = input(
-            f"Tactical {dimension} (odd whole number, at least {minimum}; 'x' to cancel): "
+            f"Display {dimension} (whole number; 'x' to cancel): "
         ).strip().lower()
         if size == "x":
             return
-        if size.isdigit() and int(size) >= minimum and int(size) % 2 == 1:
-            if choice == "w":
-                matchInfo.windowWidth = int(size)
-            else:
-                matchInfo.windowHeight = int(size)
-            print(f"Tactical {dimension} set to {size}.")
+        if size.isdigit():
+            display_width = int(size) if choice == "w" else matchInfo.displayWidth
+            display_height = int(size) if choice == "h" else matchInfo.displayHeight
+            try:
+                matchInfo.windowWidth, matchInfo.windowHeight = pv.tactical_dimensions(
+                    display_width, display_height,
+                )
+            except ValueError as error:
+                print(error)
+                continue
+            matchInfo.displayWidth = display_width
+            matchInfo.displayHeight = display_height
+            print(f"Display {dimension} set to {size}.")
             return
-        print(f"Enter an odd whole number of at least {minimum}, or 'x' to cancel.")
+        print("Enter a whole number or 'x' to cancel.")
 
 
 def selectSquadMech(matchInfo, squad):

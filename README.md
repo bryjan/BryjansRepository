@@ -12,13 +12,16 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-The start menu offers `'s'` to launch the demo skirmish and `'o'` for display
-size and map generation. Under Options, `'p'` selects a terrain-only map
-preset and `'m'` exposes individual tile toggles. Changing an individual
-toggle marks the map as **Custom**; choosing a preset again replaces those
-custom selections. Custom maps use Temperate Frontier generation frequencies
-for every enabled tile type. Presets do not change teams, mech loadouts,
-spawns, or objectives.
+Playable maps are a minimum of **40×40** tiles. The start menu offers `'s'` to
+launch the demo skirmish and `'o'` for complete display size and map generation.
+Display width and height describe the whole terminal frame, including the HUD,
+tactical map, right-hand information panel, and command panel. The default
+111×46 display provides the standard 37×37 tactical map. Under Options, `'p'`
+selects a terrain-only map preset and `'m'` exposes individual tile toggles.
+Changing an individual toggle marks the map as **Custom**; choosing a preset
+again replaces those custom selections. Custom maps use Temperate Frontier
+generation frequencies for every enabled tile type. Presets do not change
+teams, mech loadouts, spawns, or objectives.
 
 | Preset | Terrain emphasis |
 | --- | --- |

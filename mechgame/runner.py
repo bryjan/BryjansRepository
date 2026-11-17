@@ -7,12 +7,16 @@ from .match import MatchInfo
 from .content import create_demo_teams
 
 
+MIN_PLAYABLE_MAP_SIZE = 40
+
+
 class Game:
     """Owns match creation and the interactive loop."""
 
     def __init__(
         self, map_size=100, window_size=None, rng=None, map_width=None,
-        map_height=None, window_width=None, window_height=None, terrain_enabled=None,
+        map_height=None, window_width=None, window_height=None, display_width=None,
+        display_height=None, terrain_enabled=None,
         map_preset=None,
     ):
         if window_size is None:
@@ -22,11 +26,27 @@ class Game:
             window_size = DEFAULT_TACTICAL_SIZE
         self.map_width = map_size if map_width is None else map_width
         self.map_height = map_size if map_height is None else map_height
-        # ``window_size`` remains the legacy square-view shorthand. The menu
-        # can provide independent dimensions without changing test callers.
+        if self.map_width < MIN_PLAYABLE_MAP_SIZE or self.map_height < MIN_PLAYABLE_MAP_SIZE:
+            raise ValueError(
+                f"Playable maps must be at least {MIN_PLAYABLE_MAP_SIZE}x{MIN_PLAYABLE_MAP_SIZE}."
+            )
+        # ``window_size`` remains the legacy square tactical-view shorthand.
+        # Player-facing menus instead provide complete display dimensions.
         self.window_size = window_size
-        self.window_width = window_size if window_width is None else window_width
-        self.window_height = window_size if window_height is None else window_height
+        if display_width is not None or display_height is not None:
+            if display_width is None or display_height is None:
+                raise ValueError("Provide both display_width and display_height.")
+            from .ui.tactical import tactical_dimensions
+            self.window_width, self.window_height = tactical_dimensions(display_width, display_height)
+            self.display_width = display_width
+            self.display_height = display_height
+        else:
+            self.window_width = window_size if window_width is None else window_width
+            self.window_height = window_size if window_height is None else window_height
+            from .ui.tactical import display_dimensions
+            self.display_width, self.display_height = display_dimensions(
+                self.window_width, self.window_height,
+            )
         self.terrain_enabled = terrain_enabled
         self.map_preset = map_preset
         self.rng = rng if rng is not None else random.Random()
@@ -42,14 +62,16 @@ class Game:
         )
         match.windowWidth = self.window_width
         match.windowHeight = self.window_height
+        match.displayWidth = self.display_width
+        match.displayHeight = self.display_height
         match.mapInit(
             terrain_enabled=self.terrain_enabled,
             map_preset=self.map_preset,
         )
-        # Spawn points are kept away from the impassable map border, but their
-        # margin scales down safely for compact custom maps.
-        xMargin = min(40, max(2, self.map_width // 4))
-        yMargin = min(40, max(2, self.map_height // 4))
+        # Playable maps are at least 40x40, so a quarter-map spawn margin
+        # keeps opposing squads apart without compact-map special cases.
+        xMargin = self.map_width // 4
+        yMargin = self.map_height // 4
         for team in match.teamList:
             for squad in team.squadsList:
                 if squad.playerControlled:
