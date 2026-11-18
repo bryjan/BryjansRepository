@@ -10,6 +10,7 @@ from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
 from mechgame.terrain import TerrainType
+from mechgame.stamps import MilitaryBaseStamp
 from mechgame.world import (
     CUSTOM_MAP_PRESET,
     DEFAULT_MAP_PRESET,
@@ -22,6 +23,27 @@ from mechgame.world import (
 
 
 class MapGeneratorTests(unittest.TestCase):
+    def test_large_military_base_stamps_and_connects_to_the_nearest_road(self):
+        match = MatchInfo(20, 9, [], "")
+        generator = MapGenerator(20, random.Random(0))
+        grid = generator.build(match)
+        for row in grid[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = match.plains
+        grid[1][1].terrain = match.road
+        generator.features = MapFeatures()
+
+        stamp = MilitaryBaseStamp(3, 5)
+        with patch("mechgame.world.MilitaryBaseStamp.random", return_value=stamp), patch.object(
+            generator.rng, "choice", side_effect=lambda values: values[-1],
+        ):
+            generator._stamp_military_bases(grid, match.road, match.suburb, ())
+
+        base = generator.features.military_bases[0]
+        self.assertEqual((base.width, base.height), (3, 5))
+        self.assertEqual(len(base.tiles), 15)
+        self.assertGreater(len(base.road_tiles), len(stamp.boundary_positions((0, 0))))
+
     def test_terrain_features_register_bridges_mountain_entries_and_intersections(self):
         match = MatchInfo(12, 9, [], "")
         generator = MapGenerator(12, random.Random(0))

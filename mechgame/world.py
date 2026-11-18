@@ -6,6 +6,8 @@ import math
 import random
 from dataclasses import dataclass, field
 
+from .stamps import CityBlockStamp, MilitaryBaseStamp
+
 
 # Plains, borders, and blank cells define a usable rectangular map, so only
 # optional generated landscape types belong in this set.
@@ -76,6 +78,7 @@ class MapPreset:
     # scales the district across map sizes; a fixed size is optional.
     city_block_coverage: float = 0
     city_block_size: int | None = None
+    military_base_weight: float = 1
 
     def terrain_options(self):
         """Return a fresh toggle dictionary for this preset's terrain."""
@@ -189,6 +192,17 @@ class CityBlock:
     road_tiles: tuple[tuple[int, int], ...]
 
 
+@dataclass(frozen=True)
+class MilitaryBase:
+    """One generated base compound, including its road access route."""
+
+    base_id: str
+    tiles: tuple[tuple[int, int], ...]
+    road_tiles: tuple[tuple[int, int], ...]
+    width: int
+    height: int
+
+
 @dataclass
 class MapFeatures:
     """Derived strategic information attached to a generated map.
@@ -201,6 +215,7 @@ class MapFeatures:
     roads: list[MapRoute] = field(default_factory=list)
     rivers: list[MapRoute] = field(default_factory=list)
     city_blocks: list[CityBlock] = field(default_factory=list)
+    military_bases: list[MilitaryBase] = field(default_factory=list)
     bridges: list[tuple[int, int]] = field(default_factory=list)
     objectives: list[MapObjective] = field(default_factory=list)
     tactical_locations: list[TacticalLocation] = field(default_factory=list)
@@ -229,6 +244,18 @@ class MapFeatures:
                 f"city_block_{len(self.city_blocks) + 1}",
                 self._coordinates(cells_or_tiles),
                 self._coordinates(road_cells_or_tiles),
+            )
+        )
+
+    def add_military_base(self, cells_or_tiles, road_cells_or_tiles, stamp):
+        """Record a base footprint and its perimeter/access roads."""
+        self.military_bases.append(
+            MilitaryBase(
+                f"military_base_{len(self.military_bases) + 1}",
+                self._coordinates(cells_or_tiles),
+                self._coordinates(road_cells_or_tiles),
+                stamp.width,
+                stamp.height,
             )
         )
 
@@ -442,6 +469,12 @@ class MapGenerator:
             # must not be diluted by later suburb growth.
             protected_terrain = (*protected_terrain, terrain["urban"])
         if self.terrain_enabled["suburb"]:
+            self._stamp_military_bases(
+                grid,
+                terrain["road"],
+                terrain["suburb"],
+                protected_terrain,
+            )
             suburb_neighbors = [terrain["suburb"]]
             if self.terrain_enabled["road"]:
                 suburb_neighbors.append(terrain["road"])
@@ -643,22 +676,105 @@ class MapGenerator:
     def _stamp_city_block(self, grid, block, road, urban):
         """Create one square city block with roads around, not through, its edge."""
         x, y, size = block
+        stamp = CityBlockStamp(size, size)
+        boundary = set(stamp.boundary_positions((x, y)))
         block_tiles = []
         road_tiles = []
-        for tile_y in range(y, y + size):
-            for tile_x in range(x, x + size):
-                cell = grid[tile_y][tile_x]
-                block_tiles.append(cell)
-                is_boundary = (
-                    tile_x in (x, x + size - 1)
-                    or tile_y in (y, y + size - 1)
-                )
-                if is_boundary:
-                    cell.terrain = road
-                    road_tiles.append(cell)
-                elif cell.terrain is not road:
-                    cell.terrain = urban
+        for tile_x, tile_y in stamp.positions((x, y)):
+            cell = grid[tile_y][tile_x]
+            block_tiles.append(cell)
+            if (tile_x, tile_y) in boundary:
+                cell.terrain = road
+                road_tiles.append(cell)
+            elif cell.terrain is not road:
+                cell.terrain = urban
         return block_tiles, road_tiles
+
+    def _stamp_military_bases(self, grid, road, suburb, protected_terrain):
+        """Place scalable base compounds and link larger ones to the road network."""
+        weight = self.map_preset.military_base_weight
+        if weight <= 0:
+            return
+        base_count = max(1, self._scaled_feature_count(2500, weight))
+        occupied_tiles = set()
+        for _ in range(base_count):
+            stamp = MilitaryBaseStamp.random(self.rng)
+            candidates = [
+                origin for origin in self._stamp_candidates(stamp, grid, protected_terrain)
+                if not (set(stamp.positions(origin)) & occupied_tiles)
+            ]
+            if not candidates:
+                return
+            origin = self.rng.choice(candidates)
+            nearby_roads = [
+                cell for row in grid for cell in row
+                if cell.terrain is road
+            ]
+            base_tiles, perimeter_roads = self._stamp_military_base(
+                grid, origin, stamp, road, suburb,
+            )
+            occupied_tiles.update(tuple(cell.pos) for cell in base_tiles)
+            access_road = []
+            if stamp.area >= MilitaryBaseStamp.ROAD_CONNECTION_AREA and nearby_roads:
+                access_road = self._connect_base_to_nearest_road(
+                    grid, perimeter_roads, nearby_roads, road, protected_terrain,
+                )
+                self.features.add_road("military_base_access", access_road)
+            self.features.add_road("military_base_perimeter", perimeter_roads)
+            self.features.add_military_base(
+                base_tiles,
+                [*perimeter_roads, *access_road],
+                stamp,
+            )
+
+    def _stamp_candidates(self, stamp, grid, protected_terrain):
+        """Return all clear origins for a rectangular stamp on this map."""
+        candidates = []
+        for y in range(1, self.height - stamp.height):
+            for x in range(1, self.width - stamp.width):
+                if self._can_stamp_rectangle(grid, (x, y), stamp, protected_terrain):
+                    candidates.append((x, y))
+        return candidates
+
+    @staticmethod
+    def _can_stamp_rectangle(grid, origin, stamp, protected_terrain):
+        """Keep procedural stamps out of protected terrain and urban cores."""
+        protected = set(protected_terrain)
+        return all(
+            grid[y][x].terrain not in protected
+            and grid[y][x].terrain.name != "urban center"
+            for x, y in stamp.positions(origin)
+        )
+
+    @staticmethod
+    def _stamp_military_base(grid, origin, stamp, road, suburb):
+        """Render a base as a suburb compound encircled by its perimeter road."""
+        boundary = set(stamp.boundary_positions(origin))
+        base_tiles = []
+        road_tiles = []
+        for x, y in stamp.positions(origin):
+            cell = grid[y][x]
+            base_tiles.append(cell)
+            if (x, y) in boundary:
+                cell.terrain = road
+                road_tiles.append(cell)
+            elif cell.terrain is not road:
+                cell.terrain = suburb
+        return base_tiles, road_tiles
+
+    def _connect_base_to_nearest_road(self, grid, base_roads, nearby_roads, road, protected_terrain):
+        """Draw one access route from the closest base perimeter to a prior road."""
+        start, end = min(
+            (
+                (base_cell, road_cell)
+                for base_cell in base_roads
+                for road_cell in nearby_roads
+            ),
+            key=lambda pair: abs(pair[0].pos[0] - pair[1].pos[0]) + abs(pair[0].pos[1] - pair[1].pos[1]),
+        )
+        return self._draw_road(
+            grid, start.pos, end.pos, road, protected_terrain,
+        )
 
     def _scatter(self, grid, terrain, density, protected_terrain=(), extra_growth=0):
         """Seed and expand terrain patches, optionally favoring larger patches."""
