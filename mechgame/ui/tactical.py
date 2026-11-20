@@ -381,6 +381,14 @@ def _display_overview_chunk(matchInfo, chunk):
     if len(entities) > 1:
         print(termcolor.colored("+", "yellow"), end=" ")
         return
+    base_tiles = {
+        tile
+        for base in matchInfo.mapFeatures.military_bases
+        for tile in base.tiles
+    }
+    if any(tuple(cell.pos) in base_tiles for row in chunk for cell in row):
+        print(termcolor.colored("M", "green"), end=" ")
+        return
     effects = [effect for row in chunk for cell in row for effect in cell.effects]
     if effects:
         effect = next((effect for effect in effects if effect.name == "fire"), effects[0])

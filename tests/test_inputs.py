@@ -109,6 +109,20 @@ class InputTests(unittest.TestCase):
             cell.terrain = match.road
         self.assertIs(tactical.overview_terrain(chunk), match.road)
 
+    def test_overview_marks_military_bases_with_a_green_m(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        match.entities = []
+        base_x, base_y = match.mapFeatures.military_bases[0].tiles[0]
+        chunk = [[match.map[base_y][base_x]]]
+
+        with patch("mechgame.ui.tactical.termcolor.colored", return_value="green M") as color, patch(
+            "builtins.print",
+        ) as printed:
+            tactical._display_overview_chunk(match, chunk)
+
+        color.assert_called_once_with("M", "green")
+        printed.assert_called_once_with("green M", end=" ")
+
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=40, window_size=9).create_match()
         active_mech = match.pov
