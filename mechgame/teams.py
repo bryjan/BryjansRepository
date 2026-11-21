@@ -69,7 +69,11 @@ class Squad:
         ready_mechs = [mech for mech in self.mechList if mech.combatReady]
         self.combatReadyCount = len(ready_mechs)
         self.combatForce = round(
-            sum(self._combat_force_for_size(mech.size) for mech in ready_mechs),
+            sum(
+                self._combat_force_for_size(mech.size)
+                * mech.mechClass.combatForceMultiplier
+                for mech in ready_mechs
+            ),
             2,
         )
         return self.combatForce

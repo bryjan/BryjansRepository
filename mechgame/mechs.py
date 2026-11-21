@@ -5,6 +5,17 @@ import math
 
 from . import artillery
 
+
+# These roles primarily create information, logistics, or recovery value
+# instead of direct battlefield force. Artillery and fire support remain
+# attacking roles because they actively damage or deny enemy positions.
+NON_ATTACKING_ROLES = frozenset({
+    "sensor", "scout", "electronic_warfare", "logistics", "recovery", "medical",
+})
+NON_ATTACKING_ROLE_PENALTY = 0.10
+COMBAT_SPECIALIST_BONUS = 1.10
+MIN_COMBAT_ROLE_MULTIPLIER = 0.60
+
 __all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
 
@@ -203,7 +214,8 @@ class FieldRepairAbility(Ability):
 class MechClass: #a constructed mech not a npc or player
     """Reusable mech blueprint composed from hull, helm, legs, and weapon limbs."""
     def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=None,
-                 description="", roles=None, readiness_profile=None):
+                 description="", roles=None, readiness_profile=None,
+                 combat_force_multiplier=None):
 
         #basic details
         self.name = name
@@ -213,6 +225,24 @@ class MechClass: #a constructed mech not a npc or player
         # These are intended roles, not hard restrictions. Later squad AI can
         # choose from this list and read the live Entity.roleReadiness values.
         self.roles = list(roles or ["combat"])
+        self.nonAttackingRoles = [
+            role for role in self.roles if role in NON_ATTACKING_ROLES
+        ]
+        # Dedicated combat chassis receive a modest specialist bonus. Every
+        # information/logistics role represents a design concession and lowers
+        # only strategic combat-force estimates, never weapon damage.
+        role_multiplier = (
+            COMBAT_SPECIALIST_BONUS
+            if not self.nonAttackingRoles
+            else max(
+                MIN_COMBAT_ROLE_MULTIPLIER,
+                1 - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles)),
+            )
+        )
+        self.combatForceMultiplier = (
+            role_multiplier
+            if combat_force_multiplier is None else combat_force_multiplier
+        )
         # Empty means "use the shared Entity defaults". A chassis can later
         # override only the thresholds that make sense for its doctrine.
         self.readinessProfile = dict(readiness_profile or {})

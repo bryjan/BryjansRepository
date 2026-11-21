@@ -58,13 +58,22 @@ class MatchFlowTests(unittest.TestCase):
         enemy_squad.refreshCombatForce()
 
         self.assertEqual(player_squad.combatReadyCount, 5)
-        self.assertEqual(player_squad.combatForce, 5)
+        self.assertEqual(player_squad.combatForce, 5.2)
         self.assertEqual(enemy_squad.combatReadyCount, 3)
-        self.assertEqual(enemy_squad.combatForce, 9)
+        self.assertEqual(enemy_squad.combatForce, 9.3)
 
         player_squad.mechList[0].combatReady = False
         player_squad.refreshCombatForce()
-        self.assertEqual(player_squad.combatForce, 4)
+        self.assertEqual(player_squad.combatForce, 4.4)
+
+    def test_non_attacking_roles_reduce_force_while_combat_specialists_gain_bonus(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        pathfinder = match.teamList[0].squadsList[0].mechList[0]
+        standard_lancer = match.teamList[0].squadsList[0].mechList[1]
+
+        self.assertEqual(pathfinder.mechClass.nonAttackingRoles, ["sensor", "scout"])
+        self.assertEqual(pathfinder.mechClass.combatForceMultiplier, 0.8)
+        self.assertEqual(standard_lancer.mechClass.combatForceMultiplier, 1.1)
 
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
