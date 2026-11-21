@@ -87,6 +87,9 @@ class Game:
                     ],
                     rng=self.rng,
                 )
+        # Goals are assigned only after map features and team placement both
+        # exist, giving later planners valid terrain and objective references.
+        match.assignTeamGoals()
         match.pov = match.playerSquad.mechList[0]
         return match
 

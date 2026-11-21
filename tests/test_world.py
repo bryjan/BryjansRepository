@@ -180,6 +180,16 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertEqual(mortar.mechClass.roles, ["artillery", "fire_support"])
         self.assertEqual(mortar.roleReadiness["artillery"], 100)
 
+    def test_mech_readiness_uses_shared_defaults_but_accepts_chassis_overrides(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        lancer = match.pov
+        lancer.mechClass.readinessProfile = {"retreat_integrity": 0.8}
+        lancer.mechClass.condition = 70
+
+        lancer.refreshReadiness(match)
+
+        self.assertTrue(lancer.needsRetreat)
+
     def test_generator_creates_square_map_with_a_border(self):
         match = MatchInfo(12, 9, [], "")
         match.map = MapGenerator(12, random.Random(0)).build(match)

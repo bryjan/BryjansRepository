@@ -73,6 +73,12 @@ class MatchInfo:
             if any(squad.mechList for squad in team.squadsList)
         ]
 
+    def assignTeamGoals(self):
+        """Assign match-level intent after scenario objectives are available."""
+        from .ai import assign_team_goals
+
+        assign_team_goals(self)
+
     def request_quit(self):
         """Abandon this unsaved match and prevent any further turn transition."""
         self.quitRequested = True

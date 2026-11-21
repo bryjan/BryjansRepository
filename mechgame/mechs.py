@@ -203,7 +203,7 @@ class FieldRepairAbility(Ability):
 class MechClass: #a constructed mech not a npc or player
     """Reusable mech blueprint composed from hull, helm, legs, and weapon limbs."""
     def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=None,
-                 description="", roles=None):
+                 description="", roles=None, readiness_profile=None):
 
         #basic details
         self.name = name
@@ -213,6 +213,9 @@ class MechClass: #a constructed mech not a npc or player
         # These are intended roles, not hard restrictions. Later squad AI can
         # choose from this list and read the live Entity.roleReadiness values.
         self.roles = list(roles or ["combat"])
+        # Empty means "use the shared Entity defaults". A chassis can later
+        # override only the thresholds that make sense for its doctrine.
+        self.readinessProfile = dict(readiness_profile or {})
 
         #limb objects
         self.hull = copy.deepcopy(mechHull)

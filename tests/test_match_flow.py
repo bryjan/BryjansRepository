@@ -34,6 +34,25 @@ class MatchFlowTests(unittest.TestCase):
         game.advance_turn_if_requested(match)
         self.assertIsNot(match.pov, active_mech)
 
+    def test_match_assigns_default_elimination_goals_to_teams(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+
+        for team in match.teamList:
+            self.assertEqual(team.currentGoal.kind, "eliminate_enemies")
+            self.assertEqual(team.currentGoal.priority, 100)
+            self.assertEqual(team.goalHistory, [team.currentGoal])
+
+    def test_match_goals_prefer_declared_scenario_objectives(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        match.mapFeatures.add_objective("relay", "Relay Station", "capture", [(12, 12)])
+
+        match.assignTeamGoals()
+
+        for team in match.teamList:
+            self.assertEqual(team.currentGoal.kind, "secure_objective")
+            self.assertEqual(team.currentGoal.objective_id, "relay")
+            self.assertEqual(team.currentGoal.target_tiles, ((12, 12),))
+
     def test_destroyed_squad_is_skipped_in_turn_order(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         reserve_mech = Entity(create_mech("lancer.type_a"), Pilot("Reserve"))

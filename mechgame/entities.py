@@ -256,13 +256,20 @@ class Entity: #a character on the map
         baseline_speed = self.baseRoadPatrolSpeed or self.roadPatrolSpeed
         mobility = self.roadPatrolSpeed / baseline_speed if baseline_speed else 0
 
+        thresholds = self.mechClass.readinessProfile
         self.hasUsableWeapon = operational_weapons > 0
         self.hasArtillery = any(weapon.isLauncher for weapon in self.mechClass.gunList)
-        self.lowEnergy = energy < 0.3
-        self.needsResupply = ammo < 0.25
-        self.needsRepair = integrity < 0.6 or self.cockpit.status < 2
-        self.needsRetreat = integrity < 0.3 or self.cockpit.status < 1
-        self.mobilityImpaired = mobility < 0.75
+        self.lowEnergy = energy < thresholds.get("low_energy", 0.3)
+        self.needsResupply = ammo < thresholds.get("resupply_ammo", 0.25)
+        self.needsRepair = (
+            integrity < thresholds.get("repair_integrity", 0.6)
+            or self.cockpit.status < 2
+        )
+        self.needsRetreat = (
+            integrity < thresholds.get("retreat_integrity", 0.3)
+            or self.cockpit.status < 1
+        )
+        self.mobilityImpaired = mobility < thresholds.get("mobility_ratio", 0.75)
         self.canMaintainFormation = (
             not self.destroyed and self.roadPatrolSpeed > 0 and not self.mobilityImpaired
         )
@@ -277,7 +284,7 @@ class Entity: #a character on the map
         )
         self.combatReadiness = round(score)
         self.combatReady = (
-            self.combatReadiness >= 60
+            self.combatReadiness >= thresholds.get("combat_ready", 60)
             and self.hasUsableWeapon
             and not self.needsResupply
             and not self.needsRetreat
