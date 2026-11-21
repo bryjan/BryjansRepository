@@ -202,13 +202,17 @@ class FieldRepairAbility(Ability):
 
 class MechClass: #a constructed mech not a npc or player
     """Reusable mech blueprint composed from hull, helm, legs, and weapon limbs."""
-    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=None, description=""):
+    def __init__(self, name, symbol, color, mechHull, mechHelm, mechLeg, limblist=None,
+                 description="", roles=None):
 
         #basic details
         self.name = name
         self.symbol = symbol
         self.color = color
         self.mech = ""
+        # These are intended roles, not hard restrictions. Later squad AI can
+        # choose from this list and read the live Entity.roleReadiness values.
+        self.roles = list(roles or ["combat"])
 
         #limb objects
         self.hull = copy.deepcopy(mechHull)
@@ -620,6 +624,7 @@ class WeaponLimb(MechPart):
             self.charges -= 1
         matchInfo.pov.ap -= self.apCost + aimApCost
         matchInfo.pov.energy -= self.energyCost
+        matchInfo.pov.refreshReadiness(matchInfo)
         # Store the attempted location even on a miss so a follow-up shot can
         # be ordered without re-entering coordinates.
         matchInfo.pov.lastFiredAt = list(pos)
@@ -675,6 +680,7 @@ class WeaponLimb(MechPart):
             ammo.charges -= 1
         matchInfo.pov.ap -= self.apCost
         matchInfo.pov.energy -= self.energyCost
+        matchInfo.pov.refreshReadiness(matchInfo)
         matchInfo.pov.lastFiredAt = list(targetPosition)
         self.emitSound(matchInfo)
 

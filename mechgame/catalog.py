@@ -441,6 +441,7 @@ def _lancer_type_a():
         create_part(2, "lancer.standard_helm"),
         create_part(2, "lancer.standard_legs"),
         [create_part(2, "chaingun"), create_part(2, "plasma_lance")],
+        roles=["front_line", "skirmisher"],
     )
 
 
@@ -451,6 +452,7 @@ def _lancer_pathfinder():
         create_part(2, "pathfinder.sensor_helm"),
         create_part(2, "pathfinder.legs"),
         [create_part(2, "scout_rifle")],
+        roles=["sensor", "scout", "skirmisher"],
     )
 
 
@@ -461,6 +463,7 @@ def _lancer_mortar_variant():
         create_part(2, "lancer.standard_helm"),
         create_part(2, "lancer.standard_legs"),
         [create_part(2, "lancer_mortar")],
+        roles=["artillery", "fire_support"],
     )
 
 
@@ -471,6 +474,7 @@ def _kestrel():
         create_part(3, "kestrel.sensor_helm"),
         create_part(3, "kestrel.legs"),
         [create_part(3, "kestrel_energy_beam")],
+        roles=["sensor", "skirmisher"],
     )
 
 
@@ -481,6 +485,7 @@ def _bastion():
         create_part(3, "bastion.helm"),
         create_part(3, "bastion.legs"),
         [create_part(3, "heavy_melting_beam"), create_part(3, "sustained_chaingun")],
+        roles=["front_line", "anchor"],
     )
 
 

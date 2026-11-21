@@ -157,6 +157,29 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(lancer.mobilityImpaired)
         self.assertFalse(lancer.combatReady)
 
+    def test_role_readiness_keeps_sensor_useful_without_sidearm_ammo(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        pathfinder = match.pov
+        rifle = pathfinder.mechClass.gunList[0]
+        rifle.charges = 0
+
+        pathfinder.refreshReadiness(match)
+
+        self.assertEqual(pathfinder.mechClass.roles, ["sensor", "scout", "skirmisher"])
+        self.assertTrue(pathfinder.roleReadiness["sensor"] > 80)
+        self.assertLess(pathfinder.roleReadiness["skirmisher"], pathfinder.roleReadiness["sensor"])
+
+    def test_mortar_mechs_expose_artillery_role_and_readiness(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        mortar = next(
+            mech for mech in match.pov.squad.mechList if mech.pilot.name == "Chiki"
+        )
+        mortar.refreshReadiness(match)
+
+        self.assertTrue(mortar.hasArtillery)
+        self.assertEqual(mortar.mechClass.roles, ["artillery", "fire_support"])
+        self.assertEqual(mortar.roleReadiness["artillery"], 100)
+
     def test_generator_creates_square_map_with_a_border(self):
         match = MatchInfo(12, 9, [], "")
         match.map = MapGenerator(12, random.Random(0)).build(match)

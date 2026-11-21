@@ -73,6 +73,8 @@ class Entity: #a character on the map
         self.mobilityImpaired = False
         self.canMaintainFormation = False
         self.hasUsableWeapon = False
+        self.hasArtillery = False
+        self.roleReadiness = {}
         self.travelSpeed = 0
         self.needrest = False
         # Tactical memory is useful to both AI and the player fire menu.
@@ -170,6 +172,23 @@ class Entity: #a character on the map
         return sum(ammunition) / len(ammunition) if ammunition else 1
 
     @staticmethod
+    def _weapons_ammo_readiness(weapons):
+        """Return supply readiness for one role's relevant weapon set."""
+        ammunition = []
+        for weapon in weapons:
+            if weapon.isMelee or weapon.charges is None and not weapon.isLauncher:
+                ammunition.append(1)
+            elif weapon.isLauncher:
+                ammunition.extend(
+                    1 if ammo.charges is None else ammo.charges / ammo.maxCharges
+                    for ammo in weapon.ammoTypes
+                    if ammo.maxCharges
+                )
+            elif weapon.maxCharges:
+                ammunition.append(weapon.charges / weapon.maxCharges)
+        return sum(ammunition) / len(ammunition) if ammunition else 0
+
+    @staticmethod
     def _weapon_is_usable(weapon):
         """Return whether a mounted weapon can still make at least one attack."""
         if weapon.hp <= 0:
@@ -181,6 +200,36 @@ class Entity: #a character on the map
         if weapon.charges is None:
             return True
         return weapon.charges > 0
+
+    def _role_readiness(self, role, integrity, energy, mobility, weapon_readiness):
+        """Score one stated role without forcing it through combat readiness."""
+        sensor_operational = self.mechClass.helm.hp > 0 and self.mechClass.visPower > 0
+        artillery_weapons = [
+            weapon for weapon in self.mechClass.gunList if weapon.isLauncher
+        ]
+        artillery_ammo = self._weapons_ammo_readiness(artillery_weapons)
+        artillery_operational = any(
+            self._weapon_is_usable(weapon) for weapon in artillery_weapons
+        )
+
+        if role in ("sensor", "scout"):
+            # Sensors remain valuable for a team even after their sidearm is
+            # empty, so their score intentionally ignores weapon ammunition.
+            score = integrity * 40 + energy * 25 + mobility * 20 + (15 if sensor_operational else 0)
+            return round(score) if sensor_operational else 0
+        if role in ("artillery", "fire_support"):
+            if not artillery_operational:
+                return 0
+            return round(integrity * 35 + artillery_ammo * 35 + energy * 15 + mobility * 15)
+        if role == "skirmisher":
+            return round(
+                integrity * 25 + weapon_readiness * 25 + energy * 20 + mobility * 30
+            )
+        if role in ("front_line", "anchor", "assault", "combat"):
+            return self.combatReadiness
+        # New content can declare a role before it has bespoke logic; it gets
+        # the general combat score rather than disappearing from AI planning.
+        return self.combatReadiness
 
     def refreshReadiness(self, matchInfo=None):
         """Recalculate AI-facing condition, supply, and sustained-travel flags.
@@ -208,6 +257,7 @@ class Entity: #a character on the map
         mobility = self.roadPatrolSpeed / baseline_speed if baseline_speed else 0
 
         self.hasUsableWeapon = operational_weapons > 0
+        self.hasArtillery = any(weapon.isLauncher for weapon in self.mechClass.gunList)
         self.lowEnergy = energy < 0.3
         self.needsResupply = ammo < 0.25
         self.needsRepair = integrity < 0.6 or self.cockpit.status < 2
@@ -240,6 +290,10 @@ class Entity: #a character on the map
             "mobility": round(mobility * 100),
             "weapons": round(weapon_readiness * 100),
             "score": self.combatReadiness,
+        }
+        self.roleReadiness = {
+            role: self._role_readiness(role, integrity, energy, mobility, weapon_readiness)
+            for role in self.mechClass.roles
         }
 
 
