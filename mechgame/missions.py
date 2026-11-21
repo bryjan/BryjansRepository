@@ -79,6 +79,22 @@ class MissionGenerator:
             f"Recover {pilot_name} from the marked location.", ("sensor", "scout"),
         )
 
+    def add_recover_or_steal_mech(self, team, location, mech_name="Disabled Mech", priority=75):
+        """Create a mission to retrieve, capture, or deny an unattended mech.
+
+        TODO(retrieval): place a recoverable mech entity or wreck at the
+        objective and define interaction, towing, ownership transfer, and
+        pilot-rescue rules. For now this is intentionally a strategic order
+        only, so it does not grant a free combat unit.
+        """
+        locations = self._locations(location)
+        return self._issue(
+            team, "recover_or_steal_mech", f"Recover or Steal {mech_name}",
+            locations, priority,
+            f"Recover, capture, or deny {mech_name} at the marked location.",
+            ("front_line", "skirmisher"),
+        )
+
     def add_attack_military_base(self, team, priority=70):
         """Create an assault mission against an existing or newly stamped base."""
         base = self._ensure_military_base()

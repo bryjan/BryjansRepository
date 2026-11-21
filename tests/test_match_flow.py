@@ -78,6 +78,7 @@ class MatchFlowTests(unittest.TestCase):
         player, enemy = match.teamList
 
         recovery = missions.add_pilot_recovery(player, (8, 8), "Downed Scout")
+        mech_recovery = missions.add_recover_or_steal_mech(player, (10, 8), "Warden")
         attack = missions.add_attack_military_base(enemy)
         patrol = missions.add_map_patrol(enemy)
         local_patrol = missions.add_patrol_near_location(enemy, (12, 12))
@@ -85,12 +86,17 @@ class MatchFlowTests(unittest.TestCase):
 
         self.assertEqual(recovery.kind, "pilot_recovery")
         self.assertEqual(recovery.required_roles, ("sensor", "scout"))
+        self.assertEqual(mech_recovery.kind, "recover_or_steal_mech")
+        self.assertEqual(mech_recovery.required_roles, ("front_line", "skirmisher"))
         self.assertTrue(attack.locations)
         self.assertTrue(match.mapFeatures.military_bases)
         self.assertGreaterEqual(len(patrol.locations), 1)
         self.assertEqual(local_patrol.kind, "patrol_location")
         self.assertEqual(defense.required_roles, ("front_line", "anchor"))
-        self.assertEqual(match.missions, [recovery, attack, patrol, local_patrol, defense])
+        self.assertEqual(
+            match.missions,
+            [recovery, mech_recovery, attack, patrol, local_patrol, defense],
+        )
 
     def test_base_attack_mission_can_stamp_a_base_when_map_generation_did_not(self):
         match = Game(
