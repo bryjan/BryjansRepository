@@ -43,6 +43,12 @@ class MatchFlowTests(unittest.TestCase):
             self.assertEqual(team.currentGoal.priority, 1)
             self.assertEqual(team.goalHistory, [team.currentGoal])
 
+        player_squad = match.teamList[0].squadsList[0]
+        enemy_squad = match.teamList[1].squadsList[0]
+        self.assertIsNone(player_squad.currentGoal)
+        self.assertEqual(enemy_squad.currentGoal.kind, "eliminate_enemies")
+        self.assertEqual(enemy_squad.currentGoal.team_goal_id, "eliminate_enemies")
+
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         match.mapFeatures.add_objective("relay", "Relay Station", "capture", [(12, 12)])
@@ -71,6 +77,13 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(patrol.locations, ((4, 6), (8, 6)))
         self.assertEqual(patrol.message, "Patrol the western road.")
         self.assertEqual(patrol.required_roles, ("sensor", "skirmisher"))
+        enemy_squad = team.squadsList[0]
+        self.assertEqual(enemy_squad.currentGoal.kind, "defend")
+        self.assertEqual(
+            [goal.kind for goal in enemy_squad.currentGoals],
+            ["defend", "patrol", "eliminate_enemies"],
+        )
+        self.assertGreaterEqual(enemy_squad.roleReadiness()["front_line"], 60)
 
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

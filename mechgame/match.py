@@ -87,12 +87,14 @@ class MatchInfo:
     def issueTeamObjective(self, team, kind, priority, locations=(), message="",
                            required_roles=(), objective_id=None, goal_id=None):
         """Add one priority-sorted strategic objective to a live team's queue."""
-        from .ai import issue_team_goal
+        from .ai import assign_team_goals_to_squads, issue_team_goal
 
-        return issue_team_goal(
+        goal = issue_team_goal(
             self, team, kind, priority, locations, message,
             required_roles, objective_id, goal_id,
         )
+        assign_team_goals_to_squads(team)
+        return goal
 
     def request_quit(self):
         """Abandon this unsaved match and prevent any further turn transition."""

@@ -7,7 +7,10 @@ objective records rather than inventing incompatible state.
 
 from dataclasses import dataclass
 
-__all__ = ["TeamGoal", "assign_team_goals", "issue_team_goal"]
+__all__ = [
+    "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
+    "issue_team_goal",
+]
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,25 @@ class TeamGoal:
         return self.message
 
 
+@dataclass(frozen=True)
+class SquadGoal:
+    """A team objective tailored and handed down to one non-player squad."""
+
+    goal_id: str
+    team_goal_id: str
+    kind: str
+    priority: int
+    locations: tuple[tuple[int, int], ...] = ()
+    message: str = ""
+    required_roles: tuple[str, ...] = ()
+    objective_id: str | None = None
+
+    @property
+    def target_tiles(self):
+        """Compatibility name shared with TeamGoal."""
+        return self.locations
+
+
 def _coordinates(locations):
     """Normalize Cells and coordinate pairs into immutable locations."""
     return tuple(
@@ -57,6 +79,18 @@ def _install_goals(team, goals, replace=False):
     )
     team.currentGoal = team.currentGoals[0] if team.currentGoals else None
     team.goalHistory.extend(goals)
+
+
+def _install_squad_goals(squad, goals, replace=False):
+    """Store one squad's priority-sorted orders and preserve its active alias."""
+    existing = [] if replace else list(squad.currentGoals)
+    new_ids = {goal.goal_id for goal in goals}
+    existing = [goal for goal in existing if goal.goal_id not in new_ids]
+    squad.currentGoals = sorted(
+        [*existing, *goals], key=lambda goal: (-goal.priority, goal.goal_id),
+    )
+    squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
+    squad.goalHistory.extend(goals)
 
 
 def _next_goal_id(match_info):
@@ -84,6 +118,60 @@ def issue_team_goal(match_info, team, kind, priority, locations=(), message="",
     )
     _install_goals(team, [goal])
     return goal
+
+
+def _squad_role_readiness(squad, required_roles):
+    """Return the weakest required capability supplied anywhere in a squad."""
+    if not required_roles:
+        return 100
+    readiness = squad.roleReadiness()
+    return min(readiness.get(role, 0) for role in required_roles)
+
+
+def assign_team_goals_to_squads(team):
+    """Hand each team order to the best capable non-player squad.
+
+    A squad can fulfill separate required roles with different mechs, which is
+    why readiness is evaluated across the squad rather than only on its lead.
+    This only records orders; the later squad-leader layer decides routes and
+    individual actions.
+    """
+    ai_squads = [squad for squad in team.squadsList if not squad.playerControlled]
+    team_goal_ids = {goal.goal_id for goal in team.currentGoals}
+    for squad in ai_squads:
+        # Replace stale hand-downs while preserving future local-only orders.
+        squad.currentGoals = [
+            goal for goal in squad.currentGoals
+            if goal.team_goal_id in team_goal_ids
+        ]
+        squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
+
+    for team_goal in team.currentGoals:
+        candidates = [
+            squad for squad in ai_squads
+            if _squad_role_readiness(squad, team_goal.required_roles) >= 60
+        ]
+        if not candidates:
+            continue
+        squad = max(
+            candidates,
+            key=lambda candidate: (
+                _squad_role_readiness(candidate, team_goal.required_roles),
+                len(candidate.mechList),
+            ),
+        )
+        squad_index = team.squadsList.index(squad) + 1
+        squad_goal = SquadGoal(
+            goal_id=f"{team_goal.goal_id}:squad_{squad_index}",
+            team_goal_id=team_goal.goal_id,
+            kind=team_goal.kind,
+            priority=team_goal.priority,
+            locations=team_goal.locations,
+            message=team_goal.message,
+            required_roles=team_goal.required_roles,
+            objective_id=team_goal.objective_id,
+        )
+        _install_squad_goals(squad, [squad_goal])
 
 
 def _goal_for_objective(objective):
@@ -115,3 +203,4 @@ def assign_team_goals(match_info):
             message="Eliminate all opposing operational mechs.",
         )
         _install_goals(team, [goal], replace=True)
+        assign_team_goals_to_squads(team)

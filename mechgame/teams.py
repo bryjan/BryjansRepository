@@ -30,6 +30,10 @@ class Squad:
 
         self.role = squadRole
         self.playerControlled = playerControlled
+        # Teams hand down matching objective records to AI squads only.
+        self.currentGoal = None
+        self.currentGoals = []
+        self.goalHistory = []
         self.macroObjective = ""
         self.microObjective = ""
         self.Ammo = 0
@@ -48,6 +52,14 @@ class Squad:
         self.radarTrackedEnemies = []
         for entity in self.mechList:
             entity.roundRefresh(matchInfo)
+
+    def roleReadiness(self):
+        """Return the best live readiness available for every role in the squad."""
+        readiness = {}
+        for mech in self.mechList:
+            for role, score in mech.roleReadiness.items():
+                readiness[role] = max(readiness.get(role, 0), score)
+        return readiness
 
     def statusReport(self):
         """Return a squad readiness summary for the player or future AI."""
