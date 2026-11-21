@@ -69,24 +69,25 @@ class InputTests(unittest.TestCase):
         map_mock.assert_called_once()
         self.assertIs(map_mock.call_args.args[0], match)
         self.assertIn("'r' radar contacts", map_mock.call_args.kwargs["command_text"])
+        self.assertIn("'d' debug options", map_mock.call_args.kwargs["command_text"])
         self.assertFalse(match.advTurn)
 
     def test_map_view_can_toggle_tactical_location_markers(self):
         match = Game(map_size=40, window_size=9).create_match()
 
-        with patch("builtins.input", side_effect=["m", "t", "x"]), patch(
+        with patch("builtins.input", side_effect=["m", "d", "t", "x", "x"]), patch(
             "mechgame.ui.tactical.print_overview"
         ) as map_mock:
             dispatch.receive_input(match)
 
         self.assertTrue(match.showTacticalLocations)
-        self.assertEqual(map_mock.call_count, 2)
+        self.assertEqual(map_mock.call_count, 4)
 
     def test_map_view_can_toggle_fog_and_debug_reveal(self):
         match = Game(map_size=40, window_size=9).create_match()
         visibility = match.pov.team.mapVisibility
 
-        with patch("builtins.input", side_effect=["m", "f", "d", "x"]), patch(
+        with patch("builtins.input", side_effect=["m", "d", "f", "v", "x", "x"]), patch(
             "mechgame.ui.tactical.print_overview",
         ):
             dispatch.receive_input(match)

@@ -28,16 +28,40 @@ def lookAt(matchInfo):
 def mapView(matchInfo):
     """Open strategic-map controls without crowding the combat command bar."""
     while True:
+        pv.print_overview(
+            matchInfo,
+            command_text="Map: 'r' radar contacts | 'd' debug options | 'x' return",
+        )
+        choice = input("Map: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice == "d":
+            debugMapMenu(matchInfo)
+            continue
+        if choice == "r":
+            radarMenu(matchInfo)
+            continue
+        print("Choose 'r', 'd', or 'x'.")
+
+
+def debugMapMenu(matchInfo):
+    """Keep temporary map-inspection controls out of the normal map menu."""
+    while True:
         visibility = matchInfo.pov.team.mapVisibility
         tactical_state = "ON" if matchInfo.showTacticalLocations else "OFF"
         fog_state = "OFF" if visibility.show_all_terrain else "ON"
-        debug_state = "ON" if visibility.debug_reveal_all else "OFF"
-        command_text = (
-            f"Map: 't' tactical tiles {tactical_state} | 'f' fog {fog_state} | "
-            f"'d' debug reveal {debug_state} | 'r' radar contacts | 'x' return"
+        reveal_state = "ON" if visibility.debug_reveal_all else "OFF"
+        entries = [
+            f"'t' Tactical markers: {tactical_state}",
+            f"'f' Fog of war: {fog_state}",
+            f"'v' Reveal unseen units: {reveal_state}",
+        ]
+        pv.print_overview(
+            matchInfo,
+            command_text="Debug: 't' markers | 'f' fog | 'v' reveal all | 'x' return to map",
+            right_panel=("MAP DEBUG", entries),
         )
-        pv.print_overview(matchInfo, command_text=command_text)
-        choice = input("Map: ").strip().lower()
+        choice = input("Map debug: ").strip().lower()
         if choice in ("", "x"):
             return
         if choice == "t":
@@ -46,13 +70,10 @@ def mapView(matchInfo):
         if choice == "f":
             visibility.show_all_terrain = not visibility.show_all_terrain
             continue
-        if choice == "d":
+        if choice == "v":
             visibility.debug_reveal_all = not visibility.debug_reveal_all
             continue
-        if choice == "r":
-            radarMenu(matchInfo)
-            continue
-        print("Choose 't', 'f', 'd', 'r', or 'x'.")
+        print("Choose 't', 'f', 'v', or 'x'.")
 
 
 def radarMenu(matchInfo):
