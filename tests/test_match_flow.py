@@ -60,7 +60,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(player_squad.combatReadyCount, 5)
         self.assertEqual(player_squad.combatForce, 5.8)
         self.assertEqual(enemy_squad.combatReadyCount, 3)
-        self.assertEqual(enemy_squad.combatForce, 9.3)
+        self.assertEqual(enemy_squad.combatForce, 8.1)
 
         player_squad.mechList[0].combatReady = False
         player_squad.refreshCombatForce()
@@ -75,6 +75,11 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(pathfinder.mechClass.combatForceMultiplier, 0.8)
         self.assertIn("anti_heavy", standard_lancer.mechClass.roles)
         self.assertEqual(standard_lancer.mechClass.combatForceMultiplier, 1.3)
+
+        bastion = match.teamList[1].squadsList[0].mechList[0]
+        self.assertIn("anti_swarm", bastion.mechClass.roles)
+        self.assertIn("sustain", bastion.mechClass.roles)
+        self.assertEqual(bastion.mechClass.combatForceMultiplier, 0.9)
 
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

@@ -485,7 +485,10 @@ def _bastion():
         create_part(3, "bastion.helm"),
         create_part(3, "bastion.legs"),
         [create_part(3, "heavy_melting_beam"), create_part(3, "sustained_chaingun")],
-        roles=["front_line", "anchor"],
+        # Seven AP and a 120-round, AP-1 chain gun let the Bastion keep
+        # suppressing small targets. A Lancer's shorter 60-round gun does not
+        # meet that anti-swarm standard by itself. Field Repair adds sustain.
+        roles=["front_line", "anchor", "anti_swarm", "sustain"],
     )
 
 
