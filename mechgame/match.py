@@ -50,6 +50,8 @@ class MatchInfo:
         # objectives and tactical locations after the terrain is built.
         from .world import MapFeatures
         self.mapFeatures = MapFeatures()
+        # Monotonic IDs let the match add and update team objectives safely.
+        self._nextTeamGoalId = 0
         # Debug-only strategic-map overlay. Tactical locations remain hidden
         # during ordinary play until this is deliberately toggled in map view.
         self.showTacticalLocations = False
@@ -78,6 +80,16 @@ class MatchInfo:
         from .ai import assign_team_goals
 
         assign_team_goals(self)
+
+    def issueTeamObjective(self, team, kind, priority, locations=(), message="",
+                           required_roles=(), objective_id=None, goal_id=None):
+        """Add one priority-sorted strategic objective to a live team's queue."""
+        from .ai import issue_team_goal
+
+        return issue_team_goal(
+            self, team, kind, priority, locations, message,
+            required_roles, objective_id, goal_id,
+        )
 
     def request_quit(self):
         """Abandon this unsaved match and prevent any further turn transition."""

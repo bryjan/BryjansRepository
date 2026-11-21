@@ -39,7 +39,7 @@ class MatchFlowTests(unittest.TestCase):
 
         for team in match.teamList:
             self.assertEqual(team.currentGoal.kind, "eliminate_enemies")
-            self.assertEqual(team.currentGoal.priority, 100)
+            self.assertEqual(team.currentGoal.priority, 1)
             self.assertEqual(team.goalHistory, [team.currentGoal])
 
     def test_match_goals_prefer_declared_scenario_objectives(self):
@@ -52,6 +52,24 @@ class MatchFlowTests(unittest.TestCase):
             self.assertEqual(team.currentGoal.kind, "secure_objective")
             self.assertEqual(team.currentGoal.objective_id, "relay")
             self.assertEqual(team.currentGoal.target_tiles, ((12, 12),))
+
+    def test_match_can_issue_multiple_role_aware_team_objectives(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        team = match.teamList[1]
+        patrol = match.issueTeamObjective(
+            team, "patrol", 40, [(4, 6), (8, 6)],
+            "Patrol the western road.", required_roles=["sensor", "skirmisher"],
+        )
+        defense = match.issueTeamObjective(
+            team, "defend", 80, [(12, 12)],
+            "Hold the relay station.", required_roles=["front_line"],
+        )
+
+        self.assertIs(team.currentGoal, defense)
+        self.assertEqual(team.currentGoals, [defense, patrol, team.goalHistory[0]])
+        self.assertEqual(patrol.locations, ((4, 6), (8, 6)))
+        self.assertEqual(patrol.message, "Patrol the western road.")
+        self.assertEqual(patrol.required_roles, ("sensor", "skirmisher"))
 
     def test_destroyed_squad_is_skipped_in_turn_order(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

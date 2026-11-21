@@ -168,6 +168,7 @@ class Team:
         # MatchInfo assigns this after scenario terrain and objectives exist.
         # It is deliberately data-only until the team-planning layer arrives.
         self.currentGoal = None
+        self.currentGoals = []
         self.goalHistory = []
         # Team memory persists across each squad's turn in this match round.
         # Keys are enemy entities; values hold the strongest radar reading.
