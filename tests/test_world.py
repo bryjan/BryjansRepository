@@ -177,7 +177,10 @@ class MapGeneratorTests(unittest.TestCase):
         mortar.refreshReadiness(match)
 
         self.assertTrue(mortar.hasArtillery)
-        self.assertEqual(mortar.mechClass.roles, ["artillery", "fire_support"])
+        self.assertEqual(
+            mortar.mechClass.roles,
+            ["artillery", "fire_support", "long_range_fire_support"],
+        )
         self.assertEqual(mortar.roleReadiness["artillery"], 100)
 
     def test_mech_readiness_uses_shared_defaults_but_accepts_chassis_overrides(self):

@@ -58,13 +58,13 @@ class MatchFlowTests(unittest.TestCase):
         enemy_squad.refreshCombatForce()
 
         self.assertEqual(player_squad.combatReadyCount, 5)
-        self.assertEqual(player_squad.combatForce, 6.3)
+        self.assertEqual(player_squad.combatForce, 6.4)
         self.assertEqual(enemy_squad.combatReadyCount, 3)
         self.assertEqual(enemy_squad.combatForce, 10.2)
 
         player_squad.mechList[0].combatReady = False
         player_squad.refreshCombatForce()
-        self.assertEqual(player_squad.combatForce, 5.4)
+        self.assertEqual(player_squad.combatForce, 5.5)
 
     def test_non_attacking_roles_reduce_force_while_combat_specialists_gain_bonus(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
@@ -80,6 +80,11 @@ class MatchFlowTests(unittest.TestCase):
         self.assertIn("anti_swarm", bastion.mechClass.roles)
         self.assertIn("sustain", bastion.mechClass.roles)
         self.assertEqual(bastion.mechClass.combatForceMultiplier, 1.2)
+
+        mortar = match.teamList[0].squadsList[0].mechList[-1]
+        self.assertTrue(mortar.mechClass.hasLongRangeFireSupport)
+        self.assertIn("long_range_fire_support", mortar.mechClass.roles)
+        self.assertEqual(mortar.mechClass.combatForceMultiplier, 1.3)
 
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

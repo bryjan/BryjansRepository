@@ -24,6 +24,7 @@ MIN_COMBAT_ROLE_MULTIPLIER = 0.60
 # These are extra bonuses beyond the base +10% granted to every attacking
 # role. ``anti_heavy`` therefore contributes +20% total.
 ROLE_COMBAT_FORCE_BONUSES = {"anti_heavy": 0.10}
+LONG_RANGE_FIRE_SUPPORT_RANGE = 60
 
 __all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
@@ -237,6 +238,7 @@ class MechClass: #a constructed mech not a npc or player
         self._combatForceMultiplierOverride = combat_force_multiplier
         self.nonAttackingRoles = []
         self.combatForceMultiplier = 1
+        self.hasLongRangeFireSupport = False
         # Empty means "use the shared Entity defaults". A chassis can later
         # override only the thresholds that make sense for its doctrine.
         self.readinessProfile = dict(readiness_profile or {})
@@ -309,6 +311,24 @@ class MechClass: #a constructed mech not a npc or player
         )
         if anti_swarm_weapon and "anti_swarm" not in self.roles:
             self.roles.append("anti_swarm")
+
+        self.hasLongRangeFireSupport = any(
+            (
+                weapon.isLauncher
+                and any(
+                    ammo.rangeBands["far"][0] >= LONG_RANGE_FIRE_SUPPORT_RANGE
+                    for ammo in weapon.ammoTypes
+                )
+            )
+            or (
+                not weapon.isLauncher
+                and weapon.maxRange is not None
+                and weapon.maxRange >= LONG_RANGE_FIRE_SUPPORT_RANGE
+            )
+            for weapon in self.gunList
+        )
+        if self.hasLongRangeFireSupport and "long_range_fire_support" not in self.roles:
+            self.roles.append("long_range_fire_support")
 
     def _update_combat_force_multiplier(self):
         """Apply role tradeoffs to strategic force without changing combat math."""
