@@ -696,36 +696,47 @@ class MapGenerator:
         if weight <= 0:
             return
         base_count = max(1, self._scaled_feature_count(2500, weight))
-        occupied_tiles = set()
         for _ in range(base_count):
-            stamp = MilitaryBaseStamp.random(self.rng)
-            candidates = [
-                origin for origin in self._stamp_candidates(stamp, grid, protected_terrain)
-                if not (set(stamp.positions(origin)) & occupied_tiles)
-            ]
-            if not candidates:
+            if self.add_military_base(grid, road, suburb, protected_terrain) is None:
                 return
-            origin = self.rng.choice(candidates)
-            nearby_roads = [
-                cell for row in grid for cell in row
-                if cell.terrain is road
-            ]
-            base_tiles, perimeter_roads = self._stamp_military_base(
-                grid, origin, stamp, road, suburb,
+
+    def add_military_base(self, grid, road, suburb, protected_terrain=()):
+        """Stamp one base for terrain generation or a scenario mission.
+
+        The public method lets mission setup add a genuine base after terrain
+        generation, while preserving the same footprint, roads, and metadata
+        used by the procedural generator.
+        """
+        stamp = MilitaryBaseStamp.random(self.rng)
+        occupied_tiles = {
+            tile
+            for base in self.features.military_bases
+            for tile in base.tiles
+        }
+        candidates = [
+            origin for origin in self._stamp_candidates(stamp, grid, protected_terrain)
+            if not (set(stamp.positions(origin)) & occupied_tiles)
+        ]
+        if not candidates:
+            return None
+        origin = self.rng.choice(candidates)
+        nearby_roads = [cell for row in grid for cell in row if cell.terrain is road]
+        base_tiles, perimeter_roads = self._stamp_military_base(
+            grid, origin, stamp, road, suburb,
+        )
+        access_road = []
+        if stamp.area >= MilitaryBaseStamp.ROAD_CONNECTION_AREA and nearby_roads:
+            access_road = self._connect_base_to_nearest_road(
+                grid, perimeter_roads, nearby_roads, road, protected_terrain,
             )
-            occupied_tiles.update(tuple(cell.pos) for cell in base_tiles)
-            access_road = []
-            if stamp.area >= MilitaryBaseStamp.ROAD_CONNECTION_AREA and nearby_roads:
-                access_road = self._connect_base_to_nearest_road(
-                    grid, perimeter_roads, nearby_roads, road, protected_terrain,
-                )
-                self.features.add_road("military_base_access", access_road)
-            self.features.add_road("military_base_perimeter", perimeter_roads)
-            self.features.add_military_base(
-                base_tiles,
-                [*perimeter_roads, *access_road],
-                stamp,
-            )
+            self.features.add_road("military_base_access", access_road)
+        self.features.add_road("military_base_perimeter", perimeter_roads)
+        self.features.add_military_base(
+            base_tiles,
+            [*perimeter_roads, *access_road],
+            stamp,
+        )
+        return self.features.military_bases[-1]
 
     def _stamp_candidates(self, stamp, grid, protected_terrain):
         """Return all clear origins for a rectangular stamp on this map."""

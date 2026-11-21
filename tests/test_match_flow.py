@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from mechgame.catalog import create_mech
 from mechgame.entities import Entity, Pilot
+from mechgame.missions import MissionGenerator
 from mechgame.runner import Game
 from mechgame.teams import Squad, Team
 
@@ -70,6 +71,37 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(patrol.locations, ((4, 6), (8, 6)))
         self.assertEqual(patrol.message, "Patrol the western road.")
         self.assertEqual(patrol.required_roles, ("sensor", "skirmisher"))
+
+    def test_mission_generator_creates_initial_mission_templates(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        missions = MissionGenerator(match)
+        player, enemy = match.teamList
+
+        recovery = missions.add_pilot_recovery(player, (8, 8), "Downed Scout")
+        attack = missions.add_attack_military_base(enemy)
+        patrol = missions.add_map_patrol(enemy)
+        local_patrol = missions.add_patrol_near_location(enemy, (12, 12))
+        defense = missions.add_defend_location(player, (14, 14))
+
+        self.assertEqual(recovery.kind, "pilot_recovery")
+        self.assertEqual(recovery.required_roles, ("sensor", "scout"))
+        self.assertTrue(attack.locations)
+        self.assertTrue(match.mapFeatures.military_bases)
+        self.assertGreaterEqual(len(patrol.locations), 1)
+        self.assertEqual(local_patrol.kind, "patrol_location")
+        self.assertEqual(defense.required_roles, ("front_line", "anchor"))
+        self.assertEqual(match.missions, [recovery, attack, patrol, local_patrol, defense])
+
+    def test_base_attack_mission_can_stamp_a_base_when_map_generation_did_not(self):
+        match = Game(
+            map_size=40, window_size=9, rng=random.Random(0), map_preset="badlands",
+        ).create_match()
+        self.assertFalse(match.mapFeatures.military_bases)
+
+        attack = MissionGenerator(match).add_attack_military_base(match.teamList[1])
+
+        self.assertEqual(attack.kind, "attack_military_base")
+        self.assertEqual(len(match.mapFeatures.military_bases), 1)
 
     def test_destroyed_squad_is_skipped_in_turn_order(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

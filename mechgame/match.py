@@ -52,6 +52,9 @@ class MatchInfo:
         self.mapFeatures = MapFeatures()
         # Monotonic IDs let the match add and update team objectives safely.
         self._nextTeamGoalId = 0
+        self._nextMissionId = 0
+        # MissionGenerator appends the exact team orders it creates here.
+        self.missions = []
         # Debug-only strategic-map overlay. Tactical locations remain hidden
         # during ordinary play until this is deliberately toggled in map view.
         self.showTacticalLocations = False
