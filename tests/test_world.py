@@ -130,6 +130,33 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(scout_tiles <= team.sharedVisibleTiles)
         self.assertTrue(scout_tiles <= team.exploredTiles)
 
+    def test_mech_readiness_reports_sustainable_road_and_offroad_patrol_speeds(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        lancer = match.pov
+
+        lancer.refreshReadiness(match)
+
+        self.assertEqual(lancer.offRoadPatrolSpeed, 3)
+        self.assertEqual(lancer.roadPatrolSpeed, 6)
+        self.assertTrue(lancer.combatReady)
+        self.assertTrue(lancer.canMaintainFormation)
+        self.assertEqual(lancer.readinessMetrics["energy"], 100)
+
+    def test_mech_readiness_flags_low_supply_energy_and_mobility(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        lancer = match.pov
+        rifle = lancer.mechClass.gunList[0]
+        rifle.charges = 0
+        lancer.energy = 0
+        lancer.mechClass.mpMax = 2
+
+        lancer.refreshReadiness(match)
+
+        self.assertTrue(lancer.needsResupply)
+        self.assertTrue(lancer.lowEnergy)
+        self.assertTrue(lancer.mobilityImpaired)
+        self.assertFalse(lancer.combatReady)
+
     def test_generator_creates_square_map_with_a_border(self):
         match = MatchInfo(12, 9, [], "")
         match.map = MapGenerator(12, random.Random(0)).build(match)

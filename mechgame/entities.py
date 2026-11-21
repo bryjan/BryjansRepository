@@ -56,7 +56,24 @@ class Entity: #a character on the map
         self.radarIDlist = [] #items in form of [location, size, direction, speed, objectSymbol, ObjectName] level of radar power reveals more info
 
         #ai flags
-        self.travelSpeed = max(self.mechClass.apMax, self.mechClass.mpMax)
+        # Patrol speeds describe the distance this mech can repeat every turn
+        # without draining its energy reserve. They deliberately use plain
+        # ground for off-road travel so later AI can compare units cheaply.
+        self.offRoadPatrolSpeed = 0
+        self.roadPatrolSpeed = 0
+        self.baseOffRoadPatrolSpeed = 0
+        self.baseRoadPatrolSpeed = 0
+        self.readinessMetrics = {}
+        self.combatReadiness = 0
+        self.combatReady = False
+        self.needsResupply = False
+        self.needsRepair = False
+        self.needsRetreat = False
+        self.lowEnergy = False
+        self.mobilityImpaired = False
+        self.canMaintainFormation = False
+        self.hasUsableWeapon = False
+        self.travelSpeed = 0
         self.needrest = False
         # Tactical memory is useful to both AI and the player fire menu.
         self.lastFiredAt = None
@@ -68,6 +85,9 @@ class Entity: #a character on the map
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
+        self.refreshReadiness()
+        self.baseOffRoadPatrolSpeed = self.offRoadPatrolSpeed
+        self.baseRoadPatrolSpeed = self.roadPatrolSpeed
 
 
     def __repr__(self):
@@ -106,9 +126,7 @@ class Entity: #a character on the map
         #get visuals
         self.getVisuals(matchInfo)
 
-        #ai flags calc
-        if self.ap == 0 or self.mp == 0 or self.energy <= (self.mechClass.energyMax * .4):
-            self.needrest = True
+        self.refreshReadiness(matchInfo)
 
     def clearTurnAbilities(self):
         """Remove temporary hull-ability effects as this mech begins a new turn."""
@@ -118,6 +136,111 @@ class Entity: #a character on the map
             if weapon.turnDamageBonus:
                 weapon.turnDamageBonus = 0
                 weapon.updateWeaponStats()
+
+    def _patrol_speed_for_cost(self, movement_cost):
+        """Return sustainable tiles per turn after AP, MP, and energy limits."""
+        action_limit = max(0, min(self.mechClass.apMax, self.mechClass.mpMax))
+        if movement_cost <= 0:
+            return action_limit
+        return min(action_limit, max(0, self.mechClass.energyGen // movement_cost))
+
+    def _patrol_cost(self, matchInfo, terrain_name, fallback_cost):
+        """Read a terrain's current movement cost without requiring a match."""
+        terrain = getattr(matchInfo, terrain_name, None) if matchInfo is not None else None
+        if terrain is None:
+            return fallback_cost
+        return terrain.moveCost[self.size]
+
+    def _ammo_readiness(self):
+        """Return average finite-ammo readiness, treating unlimited arms as full."""
+        ammunition = []
+        for weapon in self.mechClass.gunList:
+            if weapon.isMelee:
+                ammunition.append(1)
+            elif weapon.isLauncher:
+                for ammo in weapon.ammoTypes:
+                    if ammo.charges is None:
+                        ammunition.append(1)
+                    elif ammo.maxCharges:
+                        ammunition.append(ammo.charges / ammo.maxCharges)
+            elif weapon.charges is None:
+                ammunition.append(1)
+            elif weapon.maxCharges:
+                ammunition.append(weapon.charges / weapon.maxCharges)
+        return sum(ammunition) / len(ammunition) if ammunition else 1
+
+    @staticmethod
+    def _weapon_is_usable(weapon):
+        """Return whether a mounted weapon can still make at least one attack."""
+        if weapon.hp <= 0:
+            return False
+        if weapon.isMelee:
+            return True
+        if weapon.isLauncher:
+            return any(ammo.charges is None or ammo.charges > 0 for ammo in weapon.ammoTypes)
+        if weapon.charges is None:
+            return True
+        return weapon.charges > 0
+
+    def refreshReadiness(self, matchInfo=None):
+        """Recalculate AI-facing condition, supply, and sustained-travel flags.
+
+        This does not choose an action. It gives future squad leaders a compact,
+        stable picture of what each mech can safely contribute.
+        """
+        plains_cost = self._patrol_cost(matchInfo, "plains", 1)
+        road_cost = self._patrol_cost(matchInfo, "road", 0)
+        self.offRoadPatrolSpeed = self._patrol_speed_for_cost(plains_cost)
+        self.roadPatrolSpeed = self._patrol_speed_for_cost(road_cost)
+        self.travelSpeed = self.offRoadPatrolSpeed
+
+        integrity = max(0, min(1, self.mechClass.condition / 100))
+        ammo = self._ammo_readiness()
+        energy = self.energy / self.mechClass.energyMax if self.mechClass.energyMax else 0
+        operational_weapons = sum(
+            self._weapon_is_usable(weapon) for weapon in self.mechClass.gunList
+        )
+        weapon_readiness = (
+            operational_weapons / len(self.mechClass.gunList)
+            if self.mechClass.gunList else 0
+        )
+        baseline_speed = self.baseRoadPatrolSpeed or self.roadPatrolSpeed
+        mobility = self.roadPatrolSpeed / baseline_speed if baseline_speed else 0
+
+        self.hasUsableWeapon = operational_weapons > 0
+        self.lowEnergy = energy < 0.3
+        self.needsResupply = ammo < 0.25
+        self.needsRepair = integrity < 0.6 or self.cockpit.status < 2
+        self.needsRetreat = integrity < 0.3 or self.cockpit.status < 1
+        self.mobilityImpaired = mobility < 0.75
+        self.canMaintainFormation = (
+            not self.destroyed and self.roadPatrolSpeed > 0 and not self.mobilityImpaired
+        )
+        # Integrity is deliberately the strongest input: a well-armed mech
+        # with a failing cockpit should not be sent into a prolonged fight.
+        score = (
+            integrity * 45
+            + ammo * 20
+            + energy * 15
+            + mobility * 10
+            + weapon_readiness * 10
+        )
+        self.combatReadiness = round(score)
+        self.combatReady = (
+            self.combatReadiness >= 60
+            and self.hasUsableWeapon
+            and not self.needsResupply
+            and not self.needsRetreat
+        )
+        self.needrest = self.lowEnergy or self.needsRepair or not self.hasUsableWeapon
+        self.readinessMetrics = {
+            "integrity": round(integrity * 100),
+            "ammo": round(ammo * 100),
+            "energy": round(energy * 100),
+            "mobility": round(mobility * 100),
+            "weapons": round(weapon_readiness * 100),
+            "score": self.combatReadiness,
+        }
 
 
 
@@ -202,6 +325,7 @@ class Entity: #a character on the map
         self.pos = list(targetPos)
         self.speed += 1
         effects.apply_entry_effects(matchInfo, self)
+        self.refreshReadiness(matchInfo)
         matchInfo.advTurn = True
 
     def _spend_radar_energy(self):
