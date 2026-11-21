@@ -15,6 +15,10 @@ NON_ATTACKING_ROLES = frozenset({
 NON_ATTACKING_ROLE_PENALTY = 0.10
 COMBAT_SPECIALIST_BONUS = 1.10
 MIN_COMBAT_ROLE_MULTIPLIER = 0.60
+# ``anti_heavy`` represents equipment specifically meant to threaten larger
+# classes, such as a Lancer's Plasma Lance. It remains a force estimate only;
+# accuracy, armor, range, and positioning still decide an actual engagement.
+ROLE_COMBAT_FORCE_BONUSES = {"anti_heavy": 0.20}
 
 __all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
@@ -238,6 +242,9 @@ class MechClass: #a constructed mech not a npc or player
                 MIN_COMBAT_ROLE_MULTIPLIER,
                 1 - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles)),
             )
+        )
+        role_multiplier += sum(
+            ROLE_COMBAT_FORCE_BONUSES.get(role, 0) for role in self.roles
         )
         self.combatForceMultiplier = (
             role_multiplier

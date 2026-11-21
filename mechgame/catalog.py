@@ -441,7 +441,7 @@ def _lancer_type_a():
         create_part(2, "lancer.standard_helm"),
         create_part(2, "lancer.standard_legs"),
         [create_part(2, "chaingun"), create_part(2, "plasma_lance")],
-        roles=["front_line", "skirmisher"],
+        roles=["front_line", "skirmisher", "anti_heavy"],
     )
 
 
