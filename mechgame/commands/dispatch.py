@@ -3,7 +3,7 @@
 from .firing import fire, gunMenu
 from .navigation import abilityMenu, lookAt, mapView, radarToggle, statusPanel
 from .shared import read_nonempty
-from .squad import helpCommand, optionsMenu, radarMenu, reportMenu, squadMenu, unreadReportMenu
+from .squad import helpCommand, optionsMenu, reportMenu, squadMenu, unreadReportMenu
 
 
 def receive_input(matchInfo):
@@ -35,8 +35,6 @@ def receive_input(matchInfo):
             return matchInfo.pov.pulseRadar(matchInfo)
         case "ab" | "abilities":
             return abilityMenu(matchInfo)
-        case "rd":
-            return radarMenu(matchInfo)
         case "end":
             # This is the sole command that hands control to the next squad.
             matchInfo.turnEnded = True

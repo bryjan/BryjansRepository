@@ -71,7 +71,7 @@ def _print_tactical_footer(width):
     """Print the command row in a standalone frame for menu-only callers."""
     divider = "+" + ("-" * width) + "+"
     print(divider)
-    _print_panel_text("'f' Fire | 'r' Toggle Radar | 'rd' Contacts | 'ab' Abilities | 'sq' Squad | 'o' Options | 'n' Next | '?' Help | 'end' End Turn", width)
+    _print_panel_text("'f' Fire | 'r' Toggle Radar | 'ab' Abilities | 'sq' Squad | 'o' Options | 'n' Next | '?' Help | 'end' End Turn", width)
     print(divider)
 
 
@@ -264,7 +264,7 @@ def _command_lines(width, command_text=None):
     """Build either the normal commands or the active menu's available keys."""
     if command_text is None:
         command_text = (
-            "Commands | 'f' Fire | 'r' Toggle Radar | 'rd' Contacts | 'ab' Abilities | 'sq' Squad | "
+            "Commands | 'f' Fire | 'r' Toggle Radar | 'ab' Abilities | 'sq' Squad | "
             "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
         )
     # Separators may land at a wrap boundary; trimming both edges prevents a
@@ -365,8 +365,8 @@ def _display_overview_chunk(matchInfo, chunk):
     viewing_team = matchInfo.pov.team
     visibility = viewing_team.mapVisibility
     chunk_tiles = {tuple(cell.pos) for row in chunk for cell in row}
-    reveal_all = visibility.debug_reveal_all or visibility.show_all_terrain
-    known_tiles = None if reveal_all else viewing_team.exploredTiles
+    terrain_revealed = visibility.debug_reveal_all or visibility.show_all_terrain
+    known_tiles = None if terrain_revealed else viewing_team.exploredTiles
     visible_tiles = chunk_tiles if known_tiles is None else chunk_tiles & known_tiles
 
     # A completely undiscovered chunk conveys no terrain, units, bases, or
@@ -394,7 +394,10 @@ def _display_overview_chunk(matchInfo, chunk):
             or (
                 entity.team is not viewing_team
                 and visibility.show_visual_enemies
-                and (reveal_all or tuple(entity.pos) in viewing_team.sharedVisibleTiles)
+                and (
+                    visibility.debug_reveal_all
+                    or tuple(entity.pos) in viewing_team.sharedVisibleTiles
+                )
             )
         )
     ]
@@ -430,8 +433,8 @@ def _display_overview_chunk(matchInfo, chunk):
     overview_terrain(chunk, known_tiles).displayTerrain()
 
 
-def print_overview(matchInfo):
-    """Render the team's strategic map inside the normal tactical frame."""
+def print_overview(matchInfo, command_text=None, right_panel=None):
+    """Render the team's strategic map with an optional map-specific panel."""
     window_width = min(matchInfo.windowWidth, matchInfo.mapWidth)
     window_height = min(matchInfo.windowHeight, matchInfo.mapHeight)
     chunks = _overview_chunks(matchInfo, window_width, window_height)
@@ -439,7 +442,11 @@ def print_overview(matchInfo):
     top_divider = "+" + ("-" * panel_width) + "+" + ("-" * SIDE_PANEL_WIDTH) + "+"
     full_panel_width = panel_width + SIDE_PANEL_WIDTH + 1
     full_divider = "+" + ("-" * full_panel_width) + "+"
-    side_lines = _side_panel_lines(matchInfo, window_height)
+    side_lines = (
+        menu_panel_lines(*right_panel, window_height)
+        if right_panel is not None
+        else _side_panel_lines(matchInfo, window_height)
+    )
 
     print(full_divider)
     for line in _hud_lines(matchInfo, full_panel_width):
@@ -451,10 +458,11 @@ def print_overview(matchInfo):
             _display_overview_chunk(matchInfo, chunk)
         print(side_line)
     print(full_divider)
-    location_state = "ON" if matchInfo.showTacticalLocations else "OFF"
-    command_text = (
-        f"Map overview: 't' tactical locations {location_state} | 'Enter' or 'x' return"
-    )
+    if command_text is None:
+        location_state = "ON" if matchInfo.showTacticalLocations else "OFF"
+        command_text = (
+            f"Map: 't' tactical locations {location_state} | 'Enter' or 'x' return"
+        )
     for line in _command_panel_lines(full_panel_width, command_text):
         print(f"|{line:<{full_panel_width}}|")
     print(full_divider)

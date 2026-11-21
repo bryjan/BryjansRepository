@@ -66,7 +66,9 @@ class InputTests(unittest.TestCase):
         ) as map_mock:
             dispatch.receive_input(match)
 
-        map_mock.assert_called_once_with(match)
+        map_mock.assert_called_once()
+        self.assertIs(map_mock.call_args.args[0], match)
+        self.assertIn("'r' radar contacts", map_mock.call_args.kwargs["command_text"])
         self.assertFalse(match.advTurn)
 
     def test_map_view_can_toggle_tactical_location_markers(self):
@@ -79,6 +81,29 @@ class InputTests(unittest.TestCase):
 
         self.assertTrue(match.showTacticalLocations)
         self.assertEqual(map_mock.call_count, 2)
+
+    def test_map_view_can_toggle_fog_and_debug_reveal(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        visibility = match.pov.team.mapVisibility
+
+        with patch("builtins.input", side_effect=["m", "f", "d", "x"]), patch(
+            "mechgame.ui.tactical.print_overview",
+        ):
+            dispatch.receive_input(match)
+
+        self.assertTrue(visibility.show_all_terrain)
+        self.assertTrue(visibility.debug_reveal_all)
+
+    def test_map_radar_menu_uses_the_zoomed_out_map(self):
+        match = Game(map_size=40, window_size=9).create_match()
+
+        with patch("builtins.input", side_effect=["m", "r", "x", "x"]), patch(
+            "mechgame.ui.tactical.print_overview",
+        ) as map_mock:
+            dispatch.receive_input(match)
+
+        self.assertEqual(map_mock.call_count, 3)
+        self.assertIn("TEAM RADAR", map_mock.call_args_list[1].kwargs["right_panel"][0])
 
     def test_overview_uses_weighted_votes_and_connected_route_bonus(self):
         match = Game(map_size=40, window_size=9).create_match()
@@ -360,8 +385,9 @@ class InputTests(unittest.TestCase):
         with patch("builtins.print") as print_mock:
             squad.helpCommand(match)
         help_output = "\n".join(str(call.args[0]) for call in print_mock.call_args_list)
-        for command in ("'fire'", "'r'", "'p'", "'rd'", "'ab'", "'look'", "'m'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
+        for command in ("'fire'", "'r'", "'p'", "'ab'", "'look'", "'m'", "'st'", "'sq'", "'rep'", "'o'", "'n'", "'end'", "'?'"):
             self.assertIn(command, help_output)
+        self.assertNotIn("'rd'", help_output)
         self.assertFalse(match.advTurn)
 
         with patch("builtins.print") as print_mock:
@@ -370,5 +396,6 @@ class InputTests(unittest.TestCase):
         self.assertIn("'ab' Abilities", footer_output)
         self.assertIn("'o'", footer_output)
         self.assertIn("Options", footer_output)
-        self.assertIn("'n' Next", footer_output)
+        self.assertIn("'n'", footer_output)
+        self.assertIn("Next", footer_output)
         self.assertNotIn("'st' status", footer_output)

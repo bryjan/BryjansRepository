@@ -1,8 +1,10 @@
 """Commands for local movement support, viewing, and hull abilities."""
 
 from ..ui import tactical as pv
+from .. import radar
 
 from ..coordinates import get_coordinate_input
+from .firing import fire
 
 
 def radarToggle(matchInfo):
@@ -24,16 +26,81 @@ def lookAt(matchInfo):
 
 
 def mapView(matchInfo):
-    """Open the scaled strategic map and its tactical-location overlay."""
+    """Open strategic-map controls without crowding the combat command bar."""
     while True:
-        pv.print_overview(matchInfo)
-        choice = input("Map overview ('t' tactical locations; 'Enter' or 'x' return): ").strip().lower()
+        visibility = matchInfo.pov.team.mapVisibility
+        tactical_state = "ON" if matchInfo.showTacticalLocations else "OFF"
+        fog_state = "OFF" if visibility.show_all_terrain else "ON"
+        debug_state = "ON" if visibility.debug_reveal_all else "OFF"
+        command_text = (
+            f"Map: 't' tactical tiles {tactical_state} | 'f' fog {fog_state} | "
+            f"'d' debug reveal {debug_state} | 'r' radar contacts | 'x' return"
+        )
+        pv.print_overview(matchInfo, command_text=command_text)
+        choice = input("Map: ").strip().lower()
         if choice in ("", "x"):
             return
         if choice == "t":
             matchInfo.showTacticalLocations = not matchInfo.showTacticalLocations
             continue
-        print("Choose 't', 'Enter', or 'x'.")
+        if choice == "f":
+            visibility.show_all_terrain = not visibility.show_all_terrain
+            continue
+        if choice == "d":
+            visibility.debug_reveal_all = not visibility.debug_reveal_all
+            continue
+        if choice == "r":
+            radarMenu(matchInfo)
+            continue
+        print("Choose 't', 'f', 'd', 'r', or 'x'.")
+
+
+def radarMenu(matchInfo):
+    """Browse shared radar contacts over the strategic map."""
+    observer = matchInfo.pov
+    contacts = radar.team_contacts(observer)
+    entries = []
+    for index, contact in enumerate(contacts, start=1):
+        detail = radar.contact_details(observer, matchInfo, contact)
+        entries.append(
+            f"'{index}' {detail['classification']} at {detail['position']} "
+            f"| {detail['distance']:.1f} tiles"
+        )
+    if not entries:
+        entries.append("No enemy radar contacts are currently shared with your team.")
+
+    pv.print_overview(
+        matchInfo,
+        command_text="Radar: enter a listed contact number | 'x' return to map",
+        right_panel=("TEAM RADAR — NEAREST FIRST", entries),
+    )
+    selection = input("Radar contact ('x' to return): ").strip().lower()
+    if selection in ("", "x"):
+        return
+    if not selection.isdigit() or not 1 <= int(selection) <= len(contacts):
+        print("Choose a listed contact number or 'x'.")
+        return
+
+    selected_target = contacts[int(selection) - 1]
+    observer.focusedEnemy = selected_target
+    detail = radar.contact_details(observer, matchInfo, selected_target)
+    confirmation = "yes" if detail["visually_confirmed"] else "no"
+    detail_entries = [
+        f"Classification: {detail['classification']}",
+        f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles",
+        f"Movement: {detail['movement']} | Visually confirmed: {confirmation}",
+        f"Radar return: {detail['return_power']} / {detail['threshold']} required",
+    ]
+    pv.print_overview(
+        matchInfo,
+        command_text="Radar contact: 'f' fire at this contact | 'x' return to map",
+        right_panel=("RADAR CONTACT", detail_entries),
+    )
+    action = input("Radar contact: ").strip().lower()
+    if action == "f":
+        return fire(matchInfo, selected_target)
+    if action not in ("", "x"):
+        print("Choose 'f' or 'x'.")
 
 
 def statusPanel(matchInfo):

@@ -1,9 +1,7 @@
-"""Commands for squad management, radar contacts, reports, and options."""
+"""Commands for squad management, reports, and display options."""
 
 from ..ui import tactical as pv
 
-from .. import radar
-from .firing import fire
 from .shared import read_nonempty
 
 
@@ -30,57 +28,6 @@ def squadMenu(matchInfo):
     if choice == "s":
         return selectControllableSquad(matchInfo)
     print("Choose 'm', 's', or 'x'.")
-
-
-def radarMenu(matchInfo):
-    """Show every friendly squad's radar contacts nearest to the active mech."""
-    observer = matchInfo.pov
-    contacts = radar.team_contacts(observer)
-    if not contacts:
-        print("No enemy radar contacts are currently shared with your team.")
-        return
-
-    entries = []
-    for index, contact in enumerate(contacts, start=1):
-        detail = radar.contact_details(observer, matchInfo, contact)
-        entries.append(
-            f"'{index}' {detail['classification']} at {detail['position']} "
-            f"| {detail['distance']:.1f} tiles"
-        )
-
-    pv.printPOV(
-        matchInfo, *observer.pos,
-        command_text="Radar: enter a listed contact number | 'x' exit",
-        right_panel=("TEAM RADAR — NEAREST FIRST", entries),
-    )
-
-    selection = input("Select a contact for details, or 'x' to exit: ").strip().lower()
-    if selection in ("", "x"):
-        return
-    if not selection.isdigit() or not 1 <= int(selection) <= len(contacts):
-        print("Choose a listed contact number or 'x'.")
-        return
-
-    selected_target = contacts[int(selection) - 1]
-    observer.focusedEnemy = selected_target
-    detail = radar.contact_details(observer, matchInfo, selected_target)
-    confirmation = "yes" if detail["visually_confirmed"] else "no"
-    detail_entries = [
-        f"Classification: {detail['classification']}",
-        f"Position: {detail['position']} | Distance: {detail['distance']:.1f} tiles",
-        f"Movement: {detail['movement']} | Visually confirmed: {confirmation}",
-        f"Radar return: {detail['return_power']} / {detail['threshold']} required",
-    ]
-    pv.printPOV(
-        matchInfo, *detail["position"],
-        command_text="Radar contact: 'f' fire at this contact | 'x' exit",
-        right_panel=("RADAR CONTACT", detail_entries),
-    )
-    action = input("Radar contact: 'f' fire at this contact | 'x' exit: ").strip().lower()
-    if action == "f":
-        return fire(matchInfo, selected_target)
-    if action not in ("", "x"):
-        print("Choose 'f' or 'x'.")
 
 
 def optionsMenu(matchInfo):
@@ -224,10 +171,9 @@ def helpCommand(matchInfo):
     print("'fire' — choose the default weapon used by 'f'.")
     print("'r' or 'radar' — toggle continuous active radar; it has an energy cost each turn.")
     print("'p' — send a one-turn active-radar pulse.")
-    print("'rd' — view shared team radar contacts and fire at one.")
     print("'ab' or 'abilities' — open the active mech's hull abilities.")
     print("'look' or 'l' — inspect the tactical view around map coordinates.")
-    print("'m' — open the shared strategic map; unexplored terrain remains hidden.")
+    print("'m' — open the strategic map for radar contacts and map display controls.")
     print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
