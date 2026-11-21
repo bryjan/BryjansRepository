@@ -285,7 +285,7 @@ OVERVIEW_ROUTE_BONUSES = {"road": 100, "tunnel": 100, "water": 24}
 OVERVIEW_ROUTE_TERRAINS = set(OVERVIEW_ROUTE_BONUSES)
 
 
-def _route_crosses_chunk(chunk, terrain):
+def _route_crosses_chunk(chunk, terrain, known_tiles=None):
     """Return whether connected route tiles reach at least two chunk edges."""
     height, width = len(chunk), len(chunk[0])
     positions = {
@@ -293,6 +293,7 @@ def _route_crosses_chunk(chunk, terrain):
         for row_index, row in enumerate(chunk)
         for column_index, cell in enumerate(row)
         if cell.terrain is terrain
+        and (known_tiles is None or tuple(cell.pos) in known_tiles)
     }
     while positions:
         frontier = [positions.pop()]
@@ -320,17 +321,21 @@ def _route_crosses_chunk(chunk, terrain):
     return False
 
 
-def overview_terrain(chunk):
-    """Choose a chunk symbol through weighted terrain voting and route links."""
+def overview_terrain(chunk, known_tiles=None):
+    """Choose a chunk symbol from terrain that the viewing team has explored."""
     terrain_counts = {}
     for row in chunk:
         for cell in row:
+            if known_tiles is not None and tuple(cell.pos) not in known_tiles:
+                continue
             terrain_counts[cell.terrain] = terrain_counts.get(cell.terrain, 0) + 1
 
     scored_terrain = []
     for terrain, count in terrain_counts.items():
         score = count * terrain.overviewWeight
-        if terrain.name in OVERVIEW_ROUTE_TERRAINS and _route_crosses_chunk(chunk, terrain):
+        if terrain.name in OVERVIEW_ROUTE_TERRAINS and _route_crosses_chunk(
+            chunk, terrain, known_tiles,
+        ):
             score += OVERVIEW_ROUTE_BONUSES[terrain.name]
         scored_terrain.append((score, count, terrain.overviewWeight, terrain))
     # The stable terrain name tie-break keeps seeded map rendering reproducible.
@@ -356,20 +361,42 @@ def _overview_chunks(matchInfo, width, height):
 
 
 def _display_overview_chunk(matchInfo, chunk):
-    """Render the selected terrain, or a debug-visible entity/effect on top."""
+    """Render one overview chunk without exposing unexplored information."""
+    viewing_team = matchInfo.pov.team
+    visibility = viewing_team.mapVisibility
+    chunk_tiles = {tuple(cell.pos) for row in chunk for cell in row}
+    reveal_all = visibility.debug_reveal_all or visibility.show_all_terrain
+    known_tiles = None if reveal_all else viewing_team.exploredTiles
+    visible_tiles = chunk_tiles if known_tiles is None else chunk_tiles & known_tiles
+
+    # A completely undiscovered chunk conveys no terrain, units, bases, or
+    # effects. The question mark intentionally makes this distinct from a
+    # known stretch of open plains.
+    if not visible_tiles:
+        print(termcolor.colored("?", "dark_grey"), end=" ")
+        return
+
     if getattr(matchInfo, "showTacticalLocations", False):
         marked_tiles = {
             tile
             for location in matchInfo.mapFeatures.tactical_locations
             for tile in location.marker_tiles
         }
-        if any(tuple(cell.pos) in marked_tiles for row in chunk for cell in row):
+        if visible_tiles & marked_tiles:
             print(termcolor.colored("X", "red"), end=" ")
             return
     entities = [
         entity
         for entity in matchInfo.entities
         if any(entity.pos == cell.pos for row in chunk for cell in row)
+        and (
+            (entity.team is viewing_team and visibility.show_friendly_entities)
+            or (
+                entity.team is not viewing_team
+                and visibility.show_visual_enemies
+                and (reveal_all or tuple(entity.pos) in viewing_team.sharedVisibleTiles)
+            )
+        )
     ]
     active = next((entity for entity in entities if entity is matchInfo.pov), None)
     if active is not None:
@@ -386,24 +413,25 @@ def _display_overview_chunk(matchInfo, chunk):
         for base in matchInfo.mapFeatures.military_bases
         for tile in base.tiles
     }
-    if any(tuple(cell.pos) in base_tiles for row in chunk for cell in row):
+    if visible_tiles & base_tiles:
         print(termcolor.colored("M", "green"), end=" ")
         return
-    effects = [effect for row in chunk for cell in row for effect in cell.effects]
+    effects = [
+        effect
+        for row in chunk
+        for cell in row
+        if tuple(cell.pos) in visible_tiles
+        for effect in cell.effects
+    ]
     if effects:
         effect = next((effect for effect in effects if effect.name == "fire"), effects[0])
         print(termcolor.colored(effect.symbol, effect.color), end=" ")
         return
-    overview_terrain(chunk).displayTerrain()
+    overview_terrain(chunk, known_tiles).displayTerrain()
 
 
 def print_overview(matchInfo):
-    """Render a full-map debug overview inside the normal tactical frame.
-
-    TODO(fog-of-war): use the viewing team's ``mapVisibility`` policy and its
-    persistent discovery records to limit each chunk.  For now the overview is
-    intentionally debug-visible: all terrain, effects, and entities are shown.
-    """
+    """Render the team's strategic map inside the normal tactical frame."""
     window_width = min(matchInfo.windowWidth, matchInfo.mapWidth)
     window_height = min(matchInfo.windowHeight, matchInfo.mapHeight)
     chunks = _overview_chunks(matchInfo, window_width, window_height)

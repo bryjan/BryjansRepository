@@ -58,7 +58,7 @@ class InputTests(unittest.TestCase):
 
         view_mock.assert_not_called()
 
-    def test_m_opens_the_full_debug_map_without_ending_the_turn(self):
+    def test_m_opens_the_strategic_map_without_ending_the_turn(self):
         match = Game(map_size=40, window_size=9).create_match()
 
         with patch("builtins.input", side_effect=["m", ""]), patch(
@@ -112,6 +112,7 @@ class InputTests(unittest.TestCase):
     def test_overview_marks_military_bases_with_a_green_m(self):
         match = Game(map_size=40, window_size=9).create_match()
         match.entities = []
+        match.pov.team.mapVisibility.debug_reveal_all = True
         base_x, base_y = match.mapFeatures.military_bases[0].tiles[0]
         chunk = [[match.map[base_y][base_x]]]
 
@@ -122,6 +123,23 @@ class InputTests(unittest.TestCase):
 
         color.assert_called_once_with("M", "green")
         printed.assert_called_once_with("green M", end=" ")
+
+    def test_overview_hides_undiscovered_chunks_and_uses_shared_exploration(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        cell = match.map[2][2]
+        chunk = [[cell]]
+
+        with patch("mechgame.ui.tactical.termcolor.colored", return_value="fog"), patch(
+            "builtins.print",
+        ) as printed:
+            tactical._display_overview_chunk(match, chunk)
+
+        printed.assert_called_once_with("fog", end=" ")
+
+        match.pov.team.exploredTiles.add(tuple(cell.pos))
+        with patch.object(cell.terrain, "displayTerrain") as display:
+            tactical._display_overview_chunk(match, chunk)
+        display.assert_called_once_with()
 
     def test_n_switches_to_the_next_mech_in_the_squad(self):
         match = Game(map_size=40, window_size=9).create_match()

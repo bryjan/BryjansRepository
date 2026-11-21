@@ -8,17 +8,13 @@ __all__ = ["MapVisibilityFlags", "Squad", "Team"]
 
 @dataclass
 class MapVisibilityFlags:
-    """Future policy controls for a team's strategic-map information.
+    """Policy controls for a team's strategic-map fog of war."""
 
-    TODO(fog-of-war): give each team persistent terrain/effect knowledge, then
-    make the map overview use these flags when deciding what to draw.  The
-    debug reveal default deliberately preserves the current fully visible map.
-    """
-
-    debug_reveal_all: bool = True
-    show_all_terrain: bool = True
-    show_all_objectives: bool = True
-    remember_explored_terrain: bool = False
+    # Explicitly retained as a debugging override; normal matches use fog.
+    debug_reveal_all: bool = False
+    show_all_terrain: bool = False
+    show_all_objectives: bool = False
+    remember_explored_terrain: bool = True
     show_friendly_entities: bool = True
     show_visual_enemies: bool = True
     show_radar_contacts: bool = True
@@ -172,12 +168,27 @@ class Team:
         # Team memory persists across each squad's turn in this match round.
         # Keys are enemy entities; values hold the strongest radar reading.
         self.radarContacts = {}
-        # TODO(fog-of-war): the tactical map will consult this policy after
-        # the team owns persistent terrain and effect discovery records.
         self.mapVisibility = MapVisibilityFlags()
+        # Terrain knowledge persists for the match, while sharedVisibleTiles
+        # is rebuilt from the currently contributing friendly observers.
+        self.exploredTiles = set()
+        self.sharedVisibleTiles = set()
 
         for squads in self.squadsList:
             # Keep the object reference: turn sequencing needs its squad list.
             squads.team = self
             for mech in squads.mechList:
                 mech.team = self
+
+    def clear_shared_vision(self):
+        """Discard only current visual coverage, retaining explored terrain."""
+        self.sharedVisibleTiles.clear()
+
+    def share_vision(self, mech, cells):
+        """Share one capable mech's visual cells with the full team map."""
+        if not mech.mechClass.shareData:
+            return
+        positions = {tuple(cell.pos) for cell in cells}
+        self.sharedVisibleTiles.update(positions)
+        if self.mapVisibility.remember_explored_terrain:
+            self.exploredTiles.update(positions)

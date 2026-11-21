@@ -192,6 +192,8 @@ class MatchInfo:
 
     def clearVisuals(self):
         """Clear per-turn visibility and radar data from every map cell."""
+        for team in self.teamList:
+            team.clear_shared_vision()
         for y in self.map:
             for x in y:
                 x.canSee = False

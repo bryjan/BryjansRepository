@@ -227,7 +227,7 @@ def helpCommand(matchInfo):
     print("'rd' — view shared team radar contacts and fire at one.")
     print("'ab' or 'abilities' — open the active mech's hull abilities.")
     print("'look' or 'l' — inspect the tactical view around map coordinates.")
-    print("'m' — open the full debug map; it currently reveals every tile and entity.")
+    print("'m' — open the shared strategic map; unexplored terrain remains hidden.")
     print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")

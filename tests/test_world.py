@@ -104,17 +104,31 @@ class MapGeneratorTests(unittest.TestCase):
         player_team, enemy_team = match.teamList
 
         flags = player_team.mapVisibility
-        self.assertTrue(flags.debug_reveal_all)
-        self.assertTrue(flags.show_all_terrain)
-        self.assertTrue(flags.show_all_objectives)
-        self.assertFalse(flags.remember_explored_terrain)
+        self.assertFalse(flags.debug_reveal_all)
+        self.assertFalse(flags.show_all_terrain)
+        self.assertFalse(flags.show_all_objectives)
+        self.assertTrue(flags.remember_explored_terrain)
         self.assertTrue(flags.show_friendly_entities)
         self.assertTrue(flags.show_visual_enemies)
         self.assertTrue(flags.show_radar_contacts)
         self.assertTrue(flags.show_known_effects)
 
-        flags.debug_reveal_all = False
-        self.assertTrue(enemy_team.mapVisibility.debug_reveal_all)
+        flags.debug_reveal_all = True
+        self.assertFalse(enemy_team.mapVisibility.debug_reveal_all)
+
+    def test_share_capable_mechs_add_their_visual_cells_to_team_exploration(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        team = match.pov.team
+        scout = next(mech for mech in team.squadsList[0].mechList if mech is not match.pov)
+
+        team.exploredTiles.clear()
+        team.clear_shared_vision()
+        scout.getVis(match)
+
+        scout_tiles = {tuple(cell.pos) for cell in scout.visibleCells}
+        self.assertTrue(scout_tiles)
+        self.assertTrue(scout_tiles <= team.sharedVisibleTiles)
+        self.assertTrue(scout_tiles <= team.exploredTiles)
 
     def test_generator_creates_square_map_with_a_border(self):
         match = MatchInfo(12, 9, [], "")

@@ -24,7 +24,7 @@ def lookAt(matchInfo):
 
 
 def mapView(matchInfo):
-    """Open the scaled debug overview and its tactical-location overlay."""
+    """Open the scaled strategic map and its tactical-location overlay."""
     while True:
         pv.print_overview(matchInfo)
         choice = input("Map overview ('t' tactical locations; 'Enter' or 'x' return): ").strip().lower()

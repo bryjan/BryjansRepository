@@ -296,6 +296,7 @@ class Entity: #a character on the map
         # own sight calculation.
         self.visibleCells.extend(effects.scout_visible_cells(matchInfo, self.team))
         self.visibleCells = list(dict.fromkeys(self.visibleCells))
+        self.team.share_vision(self, self.visibleCells)
 
         self.directlyVisibleEnemies = [
             entity

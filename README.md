@@ -72,6 +72,10 @@ temporary fire/smoke effects, equipment selection, and a two-team turn cycle.
 Enemy AI, campaign flow, saves, and broader automated coverage remain in
 development.
 
+The strategic map (`m`) now uses fog of war. Any friendly mech with a
+data-sharing helm contributes its visual range to the team's map; explored
+terrain remains recorded, while enemies only appear while currently seen.
+
 ## Content catalog
 
 Use stable IDs when constructing content. Every catalog call returns a fresh
