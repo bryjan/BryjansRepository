@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from mechgame import effects
 from mechgame.match import MatchInfo
-from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module
+from mechgame.mechs import Helm, Hull, Legs, MechClass, MechPart, Module, WeaponLimb
 from mechgame.runner import Game
 from mechgame.catalog import create_mech
 from mechgame.terrain import TerrainType
@@ -693,6 +693,22 @@ class MapGeneratorTests(unittest.TestCase):
         self.assertTrue(lance.piercing)
         self.assertEqual(lance.energyCost, 0)
         self.assertEqual(lance.aim_ap_cost(lancer.helm), 0)
+
+    def test_rapid_low_damage_direct_area_weapon_adds_anti_swarm_role(self):
+        flak = WeaponLimb(
+            "Flak Projector", 1, 1, [], damage=8, accuracy=15, soundRep=12,
+            charges=30, apCost=1, blastRadius=1, instantArea=True,
+        )
+        swarm_mech = MechClass(
+            "Flak Test", "F", "white",
+            Hull("Hull", 1, 1, [], 10, 1, 1, 2),
+            Helm("Helm", 1, 1, [], 6, 10, 0),
+            Legs("Legs", 1, 1, [], 4),
+            [flak],
+        )
+
+        self.assertIn("anti_swarm", swarm_mech.roles)
+        self.assertEqual(swarm_mech.combatForceMultiplier, 1.1)
 
     def test_flying_legs_enable_flight_and_charge_flight_energy(self):
         flying_mech = MechClass(

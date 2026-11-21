@@ -229,27 +229,9 @@ class MechClass: #a constructed mech not a npc or player
         # These are intended roles, not hard restrictions. Later squad AI can
         # choose from this list and read the live Entity.roleReadiness values.
         self.roles = list(roles or ["combat"])
-        self.nonAttackingRoles = [
-            role for role in self.roles if role in NON_ATTACKING_ROLES
-        ]
-        # Dedicated combat chassis receive a modest specialist bonus. Every
-        # information/logistics role represents a design concession and lowers
-        # only strategic combat-force estimates, never weapon damage.
-        role_multiplier = (
-            COMBAT_SPECIALIST_BONUS
-            if not self.nonAttackingRoles
-            else max(
-                MIN_COMBAT_ROLE_MULTIPLIER,
-                1 - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles)),
-            )
-        )
-        role_multiplier += sum(
-            ROLE_COMBAT_FORCE_BONUSES.get(role, 0) for role in self.roles
-        )
-        self.combatForceMultiplier = (
-            role_multiplier
-            if combat_force_multiplier is None else combat_force_multiplier
-        )
+        self._combatForceMultiplierOverride = combat_force_multiplier
+        self.nonAttackingRoles = []
+        self.combatForceMultiplier = 1
         # Empty means "use the shared Entity defaults". A chassis can later
         # override only the thresholds that make sense for its doctrine.
         self.readinessProfile = dict(readiness_profile or {})
@@ -291,6 +273,8 @@ class MechClass: #a constructed mech not a npc or player
         self.passedStatsList = ["size","radarSig","apMax","mpMax","energyMax","energyGen","shareData","visPower","radarPower","radarEnergyCost","passiveRadar","canFly","canFloat","initFlying"]
 
         self.statUpdate()
+        self._assign_automatic_roles()
+        self._update_combat_force_multiplier()
 
         self.condition = sum(self.limbsConditionList) / len(self.limbsConditionList) * 100
         self.sizeStrList = ["flat", "tiny", "small", "medium", "large", "huge", "titanic"]
@@ -308,6 +292,40 @@ class MechClass: #a constructed mech not a npc or player
             for stat in self.passedStatsList:
                 if getattr(limb, stat, "No attribute of that Name") != "No attribute of that Name":
                     setattr(self, stat, getattr(limb, stat))
+
+    def _assign_automatic_roles(self):
+        """Add weapon-derived roles without making catalog authors duplicate data."""
+        anti_swarm_weapon = any(
+            weapon.instantArea
+            and not weapon.isLauncher
+            and weapon.dmg <= 10
+            and self.apMax // max(1, weapon.apCost) >= 3
+            for weapon in self.gunList
+        )
+        if anti_swarm_weapon and "anti_swarm" not in self.roles:
+            self.roles.append("anti_swarm")
+
+    def _update_combat_force_multiplier(self):
+        """Apply role tradeoffs to strategic force without changing combat math."""
+        self.nonAttackingRoles = [
+            role for role in self.roles if role in NON_ATTACKING_ROLES
+        ]
+        role_multiplier = (
+            COMBAT_SPECIALIST_BONUS
+            if not self.nonAttackingRoles
+            else max(
+                MIN_COMBAT_ROLE_MULTIPLIER,
+                1 - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles)),
+            )
+        )
+        role_multiplier += sum(
+            ROLE_COMBAT_FORCE_BONUSES.get(role, 0) for role in self.roles
+        )
+        self.combatForceMultiplier = (
+            role_multiplier
+            if self._combatForceMultiplierOverride is None
+            else self._combatForceMultiplierOverride
+        )
 
 class MechPart: # super class to mech limbs
     """Base component with armor, hit points, modules, and derived modifiers."""
@@ -560,7 +578,7 @@ class WeaponLimb(MechPart):
     ``maxRange``; this deliberately keeps its accuracy and armor rules the
     same as every other direct attack.
     """
-    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0, ammoTypes = None, melee = False):
+    def __init__ (self, name, armor, hp, moduleList, damage, accuracy, soundRep, charges, projectileCount = 1, apCost = 1, energyCost = 0, speedPenalty = 8, armorPiercing = False, armorDamage = 0, maxRange = None, desc = "", launcherRanges = None, blastRadius = 0, blastSize = 0, ammoTypes = None, melee = False, instantArea = False):
         super().__init__(name, armor, hp, moduleList, desc = "")
 
         self.desc = desc
@@ -606,6 +624,10 @@ class WeaponLimb(MechPart):
         self.accuracyMultiplier = 1
         self.maxRange = maxRange
         self.isMelee = melee
+        # Direct area weapons resolve immediately, unlike launcher shells.
+        # TODO(area weapons): teach direct-fire resolution to damage every
+        # entity in this radius when the first anti-swarm weapon is authored.
+        self.instantArea = instantArea
         self.blastRadius = blastRadius
         self.blastSize = blastSize
         self.ammoTypes = copy.deepcopy(ammoTypes) if ammoTypes else []
