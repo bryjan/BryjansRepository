@@ -392,6 +392,9 @@ class MechPart: # super class to mech limbs
                 matchInfo, "I was hit by a " + dmgSource + "!",
                 teamReport=False, critical=(damageSource == "fire"),
             )
+        # Damage can make a mech no longer combat-ready before its next turn,
+        # so squad force comparisons must update immediately.
+        self.mech.refreshReadiness(matchInfo)
         return True
 
     def critical (self, matchInfo):

@@ -302,6 +302,8 @@ class Entity: #a character on the map
             role: self._role_readiness(role, integrity, energy, mobility, weapon_readiness)
             for role in self.mechClass.roles
         }
+        if hasattr(self.squad, "refreshCombatForce"):
+            self.squad.refreshCombatForce()
 
 
 

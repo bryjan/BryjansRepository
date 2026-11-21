@@ -40,11 +40,16 @@ class Squad:
         self.supplies = 0
         self.effectiveness = 100
         self.reportLog = []
+        # Force values use the cross-class balance rule: a mech is worth
+        # roughly three combat-ready mechs one size class below it.
+        self.combatReadyCount = 0
+        self.combatForce = 0
         # Active-radar contacts are shared by every mech in this squad.
         self.radarTrackedEnemies = []
 
         for mech in self.mechList:
             mech.squad = self
+        self.refreshCombatForce()
 
     def roundRefresh(self, matchInfo):
         """Refresh every squad member at the beginning of its round."""
@@ -52,6 +57,22 @@ class Squad:
         self.radarTrackedEnemies = []
         for entity in self.mechList:
             entity.roundRefresh(matchInfo)
+        self.refreshCombatForce()
+
+    @staticmethod
+    def _combat_force_for_size(size):
+        """Convert a size class into the shared three-to-one force scale."""
+        return 3 ** (size - 2)
+
+    def refreshCombatForce(self):
+        """Recalculate the ready headcount and comparable combat-force value."""
+        ready_mechs = [mech for mech in self.mechList if mech.combatReady]
+        self.combatReadyCount = len(ready_mechs)
+        self.combatForce = round(
+            sum(self._combat_force_for_size(mech.size) for mech in ready_mechs),
+            2,
+        )
+        return self.combatForce
 
     def roleReadiness(self):
         """Return the best live readiness available for every role in the squad."""

@@ -49,6 +49,23 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(enemy_squad.currentGoal.kind, "eliminate_enemies")
         self.assertEqual(enemy_squad.currentGoal.team_goal_id, "eliminate_enemies")
 
+    def test_squad_combat_force_weights_ready_mechs_by_size_class(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        player_squad = match.teamList[0].squadsList[0]
+        enemy_squad = match.teamList[1].squadsList[0]
+
+        player_squad.refreshCombatForce()
+        enemy_squad.refreshCombatForce()
+
+        self.assertEqual(player_squad.combatReadyCount, 5)
+        self.assertEqual(player_squad.combatForce, 5)
+        self.assertEqual(enemy_squad.combatReadyCount, 3)
+        self.assertEqual(enemy_squad.combatForce, 9)
+
+        player_squad.mechList[0].combatReady = False
+        player_squad.refreshCombatForce()
+        self.assertEqual(player_squad.combatForce, 4)
+
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         match.mapFeatures.add_objective("relay", "Relay Station", "capture", [(12, 12)])
