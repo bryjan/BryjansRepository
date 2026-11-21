@@ -708,7 +708,7 @@ class MapGeneratorTests(unittest.TestCase):
         )
 
         self.assertIn("anti_swarm", swarm_mech.roles)
-        self.assertEqual(swarm_mech.combatForceMultiplier, 1.1)
+        self.assertEqual(swarm_mech.combatForceMultiplier, 1.2)
 
     def test_flying_legs_enable_flight_and_charge_flight_energy(self):
         flying_mech = MechClass(

@@ -14,14 +14,16 @@ NON_ATTACKING_ROLES = frozenset({
     "sustain",
 })
 NON_ATTACKING_ROLE_PENALTY = 0.10
-COMBAT_SPECIALIST_BONUS = 1.10
+COMBAT_ROLE_BONUS = 0.10
 MIN_COMBAT_ROLE_MULTIPLIER = 0.60
 # ``anti_heavy`` represents equipment specifically meant to threaten larger
 # classes, such as a Lancer's Plasma Lance. ``anti_swarm`` represents direct
 # area damage or exceptional repeated fire against many small targets. Both
 # remain force estimates only; positioning and weapon rules still decide an
 # actual engagement.
-ROLE_COMBAT_FORCE_BONUSES = {"anti_heavy": 0.20}
+# These are extra bonuses beyond the base +10% granted to every attacking
+# role. ``anti_heavy`` therefore contributes +20% total.
+ROLE_COMBAT_FORCE_BONUSES = {"anti_heavy": 0.10}
 
 __all__ = ["Ability", "Cockpit", "DashAbility", "FieldRepairAbility", "Helm", "Hull", "Legs", "MechClass", "MechPart", "Module", "SensorOverdriveAbility", "WeaponLimb"]
 
@@ -313,16 +315,17 @@ class MechClass: #a constructed mech not a npc or player
         self.nonAttackingRoles = [
             role for role in self.roles if role in NON_ATTACKING_ROLES
         ]
+        combat_role_count = len(self.roles) - len(self.nonAttackingRoles)
         role_multiplier = (
-            COMBAT_SPECIALIST_BONUS
-            if not self.nonAttackingRoles
-            else max(
-                MIN_COMBAT_ROLE_MULTIPLIER,
-                1 - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles)),
-            )
+            1
+            + (COMBAT_ROLE_BONUS * combat_role_count)
+            - (NON_ATTACKING_ROLE_PENALTY * len(self.nonAttackingRoles))
         )
         role_multiplier += sum(
             ROLE_COMBAT_FORCE_BONUSES.get(role, 0) for role in self.roles
+        )
+        role_multiplier = round(
+            max(MIN_COMBAT_ROLE_MULTIPLIER, role_multiplier), 2,
         )
         self.combatForceMultiplier = (
             role_multiplier

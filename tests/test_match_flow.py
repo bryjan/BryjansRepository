@@ -58,13 +58,13 @@ class MatchFlowTests(unittest.TestCase):
         enemy_squad.refreshCombatForce()
 
         self.assertEqual(player_squad.combatReadyCount, 5)
-        self.assertEqual(player_squad.combatForce, 5.8)
+        self.assertEqual(player_squad.combatForce, 6.3)
         self.assertEqual(enemy_squad.combatReadyCount, 3)
-        self.assertEqual(enemy_squad.combatForce, 8.1)
+        self.assertEqual(enemy_squad.combatForce, 10.2)
 
         player_squad.mechList[0].combatReady = False
         player_squad.refreshCombatForce()
-        self.assertEqual(player_squad.combatForce, 5.0)
+        self.assertEqual(player_squad.combatForce, 5.4)
 
     def test_non_attacking_roles_reduce_force_while_combat_specialists_gain_bonus(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
@@ -72,14 +72,14 @@ class MatchFlowTests(unittest.TestCase):
         standard_lancer = match.teamList[0].squadsList[0].mechList[1]
 
         self.assertEqual(pathfinder.mechClass.nonAttackingRoles, ["sensor", "scout"])
-        self.assertEqual(pathfinder.mechClass.combatForceMultiplier, 0.8)
+        self.assertEqual(pathfinder.mechClass.combatForceMultiplier, 0.9)
         self.assertIn("anti_heavy", standard_lancer.mechClass.roles)
-        self.assertEqual(standard_lancer.mechClass.combatForceMultiplier, 1.3)
+        self.assertEqual(standard_lancer.mechClass.combatForceMultiplier, 1.4)
 
         bastion = match.teamList[1].squadsList[0].mechList[0]
         self.assertIn("anti_swarm", bastion.mechClass.roles)
         self.assertIn("sustain", bastion.mechClass.roles)
-        self.assertEqual(bastion.mechClass.combatForceMultiplier, 0.9)
+        self.assertEqual(bastion.mechClass.combatForceMultiplier, 1.2)
 
     def test_match_goals_prefer_declared_scenario_objectives(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
