@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from types import SimpleNamespace
 
-from mechgame.campaign import MISSION_TEMPLATES, MercenaryCampaign
+from mechgame.campaign import CampaignMission, MISSION_TEMPLATES, MercenaryCampaign
 
 
 class MercenaryCampaignTests(unittest.TestCase):
@@ -32,6 +32,38 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(templates["locate_enemy_base"][5:7], ("visual_contact", 1))
         self.assertEqual(templates["sabotage"][5:7], ("hold_position", 1))
         self.assertEqual(templates["sabotage"][7], ("tactical_location", "suburbs"))
+
+    def test_diversion_scales_with_company_progress_and_pays_by_damage_ratio(self):
+        baseline = self.campaign.diversion_damage_requirement()
+        self.assertEqual(baseline, 120)
+
+        self.campaign.researchedMechs.add("lancer.pathfinder")
+        self.assertGreater(self.campaign.diversion_damage_requirement(), baseline)
+        self.campaign.hangarLimits[3] += 1
+        self.assertGreater(self.campaign.diversion_damage_requirement(), baseline)
+        self.assertGreater(
+            self.campaign.diversion_damage_requirement(enemy_presence=1.5),
+            self.campaign.diversion_damage_requirement(),
+        )
+
+        mission = CampaignMission(1, "diversion", "Diversion", 700, "", (), "deal_damage", 120)
+        self.assertEqual(mission.diversion_payout(60), 350)
+        self.assertEqual(mission.diversion_payout(120), 700)
+        self.assertEqual(mission.diversion_payout(180), 1_050)
+
+    def test_sabotage_contracts_generate_one_to_three_targets_with_per_target_rewards(self):
+        sabotage = next(template for template in MISSION_TEMPLATES if template[0] == "sabotage")
+        alternatives = [template for template in MISSION_TEMPLATES if template[0] != "sabotage"][:2]
+        self.campaign.rng = SimpleNamespace(
+            sample=lambda *_: [sabotage, *alternatives],
+            randint=lambda *_: 3,
+        )
+
+        offer = next(mission for mission in self.campaign._generate_mission_offers() if mission.kind == "sabotage")
+
+        self.assertEqual(offer.objective_value, 3)
+        self.assertEqual(offer.reward_per_target, 300)
+        self.assertEqual(offer.payout, 900)
 
     def test_deploying_requires_research_an_available_pilot_and_a_class_slot(self):
         pilot_names = [pilot.name for pilot in self.campaign.pilots]

@@ -199,8 +199,11 @@ def _campaign_lines(campaign):
     for offer in campaign.missionOffers:
         active = " (ACTIVE)" if offer is campaign.activeMission else ""
         role_text = ", ".join(offer.required_roles) or "general"
+        payout = f"{offer.payout:,} credits"
+        if offer.reward_per_target:
+            payout = f"{offer.reward_per_target:,}/target, {offer.payout:,} maximum"
         lines.extend([
-            f"'{offer.mission_id}' {offer.title} — {offer.payout:,} credits{active}",
+            f"'{offer.mission_id}' {offer.title} — {payout}{active}",
             f"    {offer.description} Needed: {role_text}.",
         ])
     lines.extend(["", "'d' Deploy roster", "'p' Pilot identities", "'x' Back"])

@@ -37,6 +37,19 @@ class CampaignMission:
     objective_type: str = ""
     objective_value: int = 0
     objective_targets: tuple[str, ...] = ()
+    reward_per_target: int = 0
+
+    def diversion_payout(self, damage_dealt):
+        """Return scaled Diversion payment from actual enemy damage dealt.
+
+        Meeting the requirement pays the listed contract value. Underperformance
+        applies an equal percentage penalty; exceeding it earns the same
+        percentage bonus, capped at 150 percent of the listed payout.
+        """
+        if self.objective_type != "deal_damage" or self.objective_value <= 0:
+            return self.payout
+        ratio = max(0, min(1.5, damage_dealt / self.objective_value))
+        return round(self.payout * ratio)
 
 
 @dataclass(frozen=True)
@@ -78,7 +91,7 @@ MISSION_TEMPLATES = (
      "Establish direct visual contact with an enemy military base.",
      ("scout", "sensor"), "visual_contact", 1, ("military_base",)),
     ("sabotage", "Sabotage", 800,
-     "Hold a sabotage point for one complete turn to complete the operation.",
+     "Hold each sabotage point for one complete turn to complete the operation.",
      ("skirmisher", "scout"), "hold_position", 1, ("tactical_location", "suburbs")),
 )
 
@@ -89,6 +102,9 @@ class MercenaryCampaign:
     STARTING_CASH = 1_000
     STARTING_HANGAR_LIMITS = {2: 5, 3: 1}
     STARTING_RESEARCH = {"lancer.type_a", "bastion"}
+    BASE_DIVERSION_DAMAGE = 120
+    BASE_COMPANY_FORCE = 8
+    DEFAULT_ENEMY_PRESENCE = 1.0
 
     def __init__(self, rng=None):
         self.rng = rng if rng is not None else random.Random()
@@ -101,6 +117,9 @@ class MercenaryCampaign:
         self.deployments = []
         self.recoveredMechs = []
         self.leftBehindMechs = []
+        # Future faction/map systems can raise or lower this before offers
+        # refresh. 1.0 represents ordinary hostile activity.
+        self.enemyPresence = self.DEFAULT_ENEMY_PRESENCE
         self.missionOffers = self._generate_mission_offers()
         self.activeMission = None
 
@@ -111,19 +130,64 @@ class MercenaryCampaign:
             pilots.append(Pilot(generate_pilot_name(self.rng, [pilot.name for pilot in pilots])))
         return pilots
 
+    @staticmethod
+    def _total_researchable_mechs():
+        """Count chassis catalogued in the current build for progression scaling."""
+        from .catalog import list_catalog
+
+        return sum(len(group["mechs"]) for group in list_catalog().values())
+
+    def research_progress(self):
+        """Return the fraction of currently known chassis research completed."""
+        return min(1, len(self.researchedMechs) / self._total_researchable_mechs())
+
+    def company_force(self):
+        """Estimate available company weight using the shared class-size scale."""
+        return sum((3 ** (size - 2)) * limit for size, limit in self.hangarLimits.items())
+
+    def diversion_damage_requirement(self, enemy_presence=None):
+        """Scale a Diversion target for research, company strength, and threats."""
+        enemy_presence = self.enemyPresence if enemy_presence is None else enemy_presence
+        baseline_research = len(self.STARTING_RESEARCH) / self._total_researchable_mechs()
+        research_multiplier = 1 + (self.research_progress() - baseline_research) * .5
+        company_multiplier = max(.75, min(1.5, self.company_force() / self.BASE_COMPANY_FORCE))
+        enemy_multiplier = max(.5, min(2, float(enemy_presence)))
+        requirement = self.BASE_DIVERSION_DAMAGE * research_multiplier * company_multiplier * enemy_multiplier
+        return max(20, round(requirement / 5) * 5)
+
     def _generate_mission_offers(self):
         """Offer three different contracts, selected reproducibly from templates."""
         templates = self.rng.sample(MISSION_TEMPLATES, 3)
-        return [
-            CampaignMission(
+        offers = []
+        for index, (
+            kind, title, payout, description, roles, objective_type,
+            objective_value, objective_targets,
+        ) in enumerate(templates, start=1):
+            reward_per_target = 0
+            if kind == "diversion":
+                objective_value = self.diversion_damage_requirement()
+                description = f"Inflict {objective_value} damage on enemy forces, then disengage."
+            elif kind == "sabotage":
+                objective_value = self.rng.randint(1, 3)
+                reward_per_target = 300
+                payout = objective_value * reward_per_target
+                description = (
+                    f"Hold {objective_value} sabotage point(s) for one complete turn each. "
+                    f"Payment: {reward_per_target:,} credits per target."
+                )
+            offers.append(CampaignMission(
                 index, kind, title, payout, description, roles,
-                objective_type, objective_value, objective_targets,
-            )
-            for index, (
-                kind, title, payout, description, roles, objective_type,
-                objective_value, objective_targets,
-            ) in enumerate(templates, start=1)
-        ]
+                objective_type, objective_value, objective_targets, reward_per_target,
+            ))
+        return offers
+
+    def refresh_mission_offers(self, enemy_presence=None):
+        """Create three fresh contracts after strategic threat data changes."""
+        if enemy_presence is not None:
+            self.enemyPresence = max(.5, min(2, float(enemy_presence)))
+        self.missionOffers = self._generate_mission_offers()
+        self.activeMission = None
+        return self.missionOffers
 
     @property
     def availablePilots(self):
@@ -284,6 +348,7 @@ class MercenaryCampaign:
             "deployments": [asdict(deployment) for deployment in self.deployments],
             "recovered_mechs": [asdict(mech) for mech in self.recoveredMechs],
             "left_behind_mechs": [asdict(mech) for mech in self.leftBehindMechs],
+            "enemy_presence": self.enemyPresence,
             "mission_offers": [asdict(mission) for mission in self.missionOffers],
             "active_mission_id": active_id,
         }
@@ -329,12 +394,16 @@ class MercenaryCampaign:
             )
             for item in data.get("left_behind_mechs", [])
         ]
+        campaign.enemyPresence = max(
+            .5,
+            min(2, float(data.get("enemy_presence", cls.DEFAULT_ENEMY_PRESENCE))),
+        )
         campaign.missionOffers = [
             CampaignMission(
                 item["mission_id"], item["kind"], item["title"], item["payout"],
                 item["description"], tuple(item.get("required_roles", ())),
                 item.get("objective_type", ""), int(item.get("objective_value", 0)),
-                tuple(item.get("objective_targets", ())),
+                tuple(item.get("objective_targets", ())), int(item.get("reward_per_target", 0)),
             )
             for item in data["mission_offers"]
         ]
