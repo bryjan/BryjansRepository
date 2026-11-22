@@ -18,6 +18,14 @@ PRESET_PILOT_NAMES = (
     "B", "MagikP", "Xactly", "115um6uy15", "Chiki", "Blastra", "UncLord", "Sybis",
 )
 
+# Nicknames are informal pilot identities. Callsigns remain deliberately
+# player-assigned; these are used when creating a new campaign roster.
+NICKNAMES = (
+    "Anchor", "Ash", "Bolt", "Cinder", "Dove", "Flint", "Grit", "Haze",
+    "Ivy", "Jinx", "Knack", "Lark", "Moss", "Nix", "Omen", "Patch",
+    "Quill", "Rook", "Sable", "Thorn", "Vale", "Wisp", "Yarrow", "Zinc",
+)
+
 
 def generate_random_name(rng, used_names=()):
     """Return an unused legal pilot name using the supplied RNG.
@@ -40,3 +48,12 @@ def generate_random_name(rng, used_names=()):
 def generate_pilot_name(rng, used_names=()):
     """Compatibility alias for the campaign's random legal-name generator."""
     return generate_random_name(rng, used_names)
+
+
+def generate_random_nickname(rng, used_nicknames=()):
+    """Return an unused generated nickname using the supplied RNG."""
+    used = set(used_nicknames)
+    candidates = [nickname for nickname in NICKNAMES if nickname not in used]
+    if not candidates:
+        raise ValueError("No unique generated nicknames remain.")
+    return rng.choice(candidates)

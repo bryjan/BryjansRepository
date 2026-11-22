@@ -14,7 +14,7 @@ import random
 
 from .catalog import create_mech
 from .entities import Pilot
-from .names import generate_pilot_name
+from .names import generate_pilot_name, generate_random_nickname
 
 __all__ = ["CampaignMission", "Deployment", "RecoveredMech", "MercenaryCampaign"]
 
@@ -94,7 +94,10 @@ class MercenaryCampaign:
         """Create the six distinct pilots available at the beginning of a run."""
         pilots = []
         for _ in range(6):
-            pilots.append(Pilot(generate_pilot_name(self.rng, [pilot.name for pilot in pilots])))
+            pilots.append(Pilot(
+                generate_pilot_name(self.rng, [pilot.name for pilot in pilots]),
+                generate_random_nickname(self.rng, [pilot.nickname for pilot in pilots]),
+            ))
         return pilots
 
     def _generate_mission_offers(self):

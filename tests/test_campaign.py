@@ -16,6 +16,7 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(self.campaign.hangarLimits, {2: 5, 3: 1})
         self.assertEqual(len(self.campaign.pilots), 6)
         self.assertEqual(len({pilot.name for pilot in self.campaign.pilots}), 6)
+        self.assertEqual(len({pilot.nickname for pilot in self.campaign.pilots}), 6)
         self.assertEqual(self.campaign.researchedMechs, {"lancer.type_a", "bastion"})
 
     def test_campaign_offers_three_distinct_missions(self):

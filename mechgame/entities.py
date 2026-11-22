@@ -613,6 +613,7 @@ class Entity: #a character on the map
 
 class Pilot: #TODO add pilot levels, skills, certs
     """Named crew member assigned to an entity."""
+    NICKNAME_DISPLAY_LIMIT = 16
     def __init__(self, name, nickname=None, callsign=None):
         self.name = self._clean_identity(name, "name")
         self.nickname = self._clean_identity(nickname, "nickname", allow_empty=True)
@@ -641,8 +642,14 @@ class Pilot: #TODO add pilot levels, skills, certs
 
     @property
     def display_name(self):
-        """Return the player-facing identity: callsign, nickname, then name."""
-        return self.callsign or self.nickname or self.name
+        """Return callsign or a length-aware nickname before the legal name."""
+        if self.callsign:
+            return self.callsign
+        if not self.nickname:
+            return self.name
+        first_name = self.name.split()[0]
+        combined = f'{first_name} "{self.nickname}"'
+        return combined if len(combined) <= self.NICKNAME_DISPLAY_LIMIT else f'"{self.nickname}"'
 
     def assign_name(self, name):
         """Set the pilot's permanent legal name used for campaign identity."""
