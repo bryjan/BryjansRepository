@@ -81,13 +81,22 @@ class AiCombatTests(unittest.TestCase):
         self.assertEqual(shooter.lastFiredAt, self.target.pos)
         self.assertLess(shooter.ap, starting_ap)
 
-    def test_artillery_only_launches_under_an_attack_order(self):
+    def test_artillery_launches_only_after_a_force_safe_leader_call(self):
         squad = self.player_squad
         squad.playerControlled = False
         mortar = next(
             mech for mech in squad.mechList
             if any(weapon.isLauncher for weapon in mech.mechClass.gunList)
         )
+        support = next(
+            mech for mech in squad.mechList if "anti_heavy" in mech.mechClass.roles
+        )
+        squad.mechList = [support, mortar]
+        squad.squadLead = support
+        support.squad = squad
+        mortar.squad = squad
+        squad.refreshCombatForce()
+        support.pos = [9, 10]
         mortar.pos = [10, 10]
         self.target = self.enemy_squad.squadLead
         self.target.pos = [15, 10]
@@ -95,11 +104,58 @@ class AiCombatTests(unittest.TestCase):
         mortar.trackedEnemies = [self.target]
 
         execute_squad_combat(self.match, squad)
-        self.assertEqual(self.match.pendingImpacts, [])
-
-        squad.setCombatPosture("attack")
-        execute_squad_combat(self.match, squad)
+        self.assertIs(squad.artilleryCallTarget, self.target)
         self.assertTrue(self.match.pendingImpacts)
+
+    def test_overwhelming_observed_force_orders_contact_avoidance(self):
+        squad = self.player_squad
+        squad.playerControlled = False
+        squad.squadLead.pos = [10, 10]
+        for index, enemy in enumerate(self.enemy_squad.mechList):
+            enemy.pos = [14 + index, 10]
+        squad.squadLead.directlyVisibleEnemies = list(self.enemy_squad.mechList)
+        squad.squadLead.trackedEnemies = list(self.enemy_squad.mechList)
+
+        execute_squad_combat(self.match, squad)
+
+        self.assertTrue(squad.avoidContact)
+        self.assertIsNotNone(squad.avoidanceTarget)
+
+    def test_anti_heavies_share_a_near_matching_combat_target(self):
+        squad = self.player_squad
+        squad.playerControlled = False
+        anti_heavies = [
+            mech for mech in squad.mechList if "anti_heavy" in mech.mechClass.roles
+        ]
+        target = next(mech for mech in self.enemy_squad.mechList if mech.size == 3)
+        target.pos = [14, 10]
+        for index, mech in enumerate(anti_heavies):
+            mech.pos = [10 - index * 3, 10]
+            mech.directlyVisibleEnemies = [target]
+            mech.trackedEnemies = [target]
+
+        execute_squad_combat(self.match, squad)
+
+        self.assertTrue(anti_heavies)
+        self.assertTrue(all(squad.assignedTargets.get(mech) is target for mech in anti_heavies))
+
+    def test_anti_swarm_mech_opportunistically_prioritizes_a_damaged_target(self):
+        swarm_mech = next(
+            mech for mech in self.enemy_squad.mechList if "anti_swarm" in mech.mechClass.roles
+        )
+        close_target = self.player_squad.mechList[1]
+        damaged_target = self.player_squad.mechList[2]
+        swarm_mech.pos = [10, 10]
+        close_target.pos = [11, 10]
+        damaged_target.pos = [14, 10]
+        close_target.mechClass.condition = 100
+        damaged_target.mechClass.condition = 20
+        swarm_mech.directlyVisibleEnemies = [close_target, damaged_target]
+        swarm_mech.trackedEnemies = [close_target, damaged_target]
+
+        execute_squad_combat(self.match, self.enemy_squad)
+
+        self.assertIs(self.enemy_squad.assignedTargets[swarm_mech], damaged_target)
 
     def test_attack_order_marks_a_low_accuracy_contact_for_approach(self):
         target = self.target

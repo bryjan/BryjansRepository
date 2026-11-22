@@ -30,6 +30,10 @@ ROAD_PATROL_WIGGLE_RADIUS = 1
 AI_FIRE_ACCURACY_THRESHOLD = 65
 AI_APPROACH_ACCURACY_THRESHOLD = 80
 AI_GOOD_AMMO_THRESHOLD = .50
+ANTI_HEAVY_FORCE_TOLERANCE = .35
+NEARBY_SQUAD_SUPPORT_RANGE = 20
+ARTILLERY_MIN_FORCE_RATIO = .80
+ARTILLERY_MAX_FORCE_RATIO = 1.50
 ENERGY_RESERVE_BANDS = {
     # A patrol may take a costly catch-up step, but it only begins a burst
     # near full charge and stops before falling below its sustainable reserve.
@@ -270,6 +274,8 @@ def _nearest_location(origin, locations):
 def _leader_destination(match_info, squad):
     """Choose a known, legal-information destination for the squad leader."""
     leader = squad.squadLead
+    if squad.avoidContact and squad.avoidanceTarget is not None:
+        return squad.avoidanceTarget
     patrol_destination = (
         _patrol_destination(match_info, squad, leader)
         if _road_patrol_active(squad) else None
@@ -449,6 +455,99 @@ def _patrol_interrupted(squad):
 # First-pass AI combat
 # ---------------------------------------------------------------------------
 
+def _entity_combat_force(entity):
+    """Estimate one observed mech's force without reading its hidden damage."""
+    return (3 ** (entity.size - 2)) * entity.mechClass.combatForceMultiplier
+
+
+def _nearby_friendly_squads(squad):
+    """Return friendly squads close enough to count as immediate support."""
+    if not getattr(squad, "team", None) or squad.squadLead is None:
+        return []
+    return [
+        other for other in squad.team.squadsList
+        if other.mechList and other.squadLead is not None
+        and math.dist(squad.squadLead.pos, other.squadLead.pos) <= NEARBY_SQUAD_SUPPORT_RANGE
+    ]
+
+
+def _combat_target(entity):
+    """Return whether an observed mech is a combat target, not pure support."""
+    combat_roles = {
+        "front_line", "anchor", "assault", "combat", "skirmisher",
+        "anti_heavy", "anti_swarm",
+    }
+    return bool(combat_roles & set(entity.mechClass.roles))
+
+
+def _avoidance_destination(match_info, squad, threat):
+    """Choose an in-bounds point directly away from an overwhelming contact."""
+    leader = squad.squadLead
+    delta_x = leader.pos[0] - threat.pos[0]
+    delta_y = leader.pos[1] - threat.pos[1]
+    distance = max(1, math.hypot(delta_x, delta_y))
+    retreat_distance = max(MIN_LEADER_VISUAL_RANGE, leader.visPower)
+    target_x = round(leader.pos[0] + (delta_x / distance) * retreat_distance)
+    target_y = round(leader.pos[1] + (delta_y / distance) * retreat_distance)
+    return (
+        min(max(1, target_x), match_info.mapWidth - 2),
+        min(max(1, target_y), match_info.mapHeight - 2),
+    )
+
+
+def _assess_enemy_force(match_info, squad, contacts):
+    """Store force balance and issue a conservative artillery/avoidance call."""
+    nearby_squads = _nearby_friendly_squads(squad)
+    squad.nearbyFriendlyForce = round(sum(other.combatForce for other in nearby_squads), 2)
+    squad.observedEnemyForce = round(sum(_entity_combat_force(contact) for contact in contacts), 2)
+    friendly_force = squad.nearbyFriendlyForce
+    if not contacts or friendly_force <= 0:
+        squad.artilleryCallTarget = None
+        squad.avoidContact = False
+        squad.avoidanceTarget = None
+        return
+
+    force_ratio = squad.observedEnemyForce / friendly_force
+    highest_threat = max(
+        contacts,
+        key=lambda contact: (_entity_combat_force(contact), -math.dist(squad.squadLead.pos, contact.pos)),
+    )
+    squad.avoidContact = force_ratio > ARTILLERY_MAX_FORCE_RATIO
+    squad.avoidanceTarget = (
+        _avoidance_destination(match_info, squad, highest_threat)
+        if squad.avoidContact else None
+    )
+    squad.artilleryCallTarget = (
+        highest_threat
+        if ARTILLERY_MIN_FORCE_RATIO <= force_ratio <= ARTILLERY_MAX_FORCE_RATIO
+        else None
+    )
+
+
+def _assign_anti_heavy_focus(squad, contacts):
+    """Concentrate a near-matching anti-heavy group on one combat mech."""
+    anti_heavies = [
+        mech for mech in squad.mechList
+        if "anti_heavy" in mech.mechClass.roles and mech.combatReady
+    ]
+    combat_targets = [target for target in contacts if _combat_target(target)]
+    if not anti_heavies or not combat_targets:
+        return
+
+    combined_force = sum(_entity_combat_force(mech) for mech in anti_heavies)
+    candidates = []
+    for target in combat_targets:
+        target_force = _entity_combat_force(target)
+        difference = abs(combined_force - target_force) / max(combined_force, target_force)
+        if difference <= ANTI_HEAVY_FORCE_TOLERANCE:
+            candidates.append((difference, -target_force, target))
+    if not candidates:
+        return
+    _, _, focus_target = min(candidates, key=lambda candidate: (candidate[0], candidate[1], candidate[2].name))
+    for mech in anti_heavies:
+        if focus_target in _known_targets(mech):
+            squad.assignedTargets[mech] = focus_target
+
 def _attack_ordered(squad):
     """Return whether the leader has issued a committed attack order."""
     goal_kind = getattr(squad.currentGoal, "kind", "")
@@ -520,6 +619,7 @@ def _choose_target(match_info, squad, mech):
     """Choose the best sensed target allowed by this mech's firing doctrine."""
     visible = set(mech.directlyVisibleEnemies)
     aggressive_fire = _attack_ordered(squad) or _direct_ammo_ratio(mech) >= AI_GOOD_AMMO_THRESHOLD
+    assigned_target = squad.assignedTargets.get(mech)
     choices = []
     for target in _known_targets(mech):
         weapon, chance, expected_damage = _best_direct_shot(match_info, mech, target)
@@ -534,12 +634,30 @@ def _choose_target(match_info, squad, mech):
         choices.append((target in visible, expected_damage, chance, target, weapon))
     if not choices:
         return None, None, 0
-    _, _, chance, target, weapon = max(
-        choices,
-        key=lambda choice: (
-            choice[0], choice[1], choice[2], -math.dist(mech.pos, choice[3].pos), choice[3].name,
-        ),
-    )
+    if assigned_target is not None:
+        assigned_choice = next(
+            (choice for choice in choices if choice[3] is assigned_target), None,
+        )
+        if assigned_choice is not None:
+            _, _, chance, target, weapon = assigned_choice
+            return target, weapon, chance
+    if "anti_swarm" in mech.mechClass.roles:
+        # Anti-swarm fire remains opportunistic. It does not consume a leader
+        # assignment: damaged, close threats are preferable targets.
+        _, _, chance, target, weapon = max(
+            choices,
+            key=lambda choice: (
+                choice[0], -choice[3].mechClass.condition,
+                -math.dist(mech.pos, choice[3].pos), choice[1], choice[2], choice[3].name,
+            ),
+        )
+    else:
+        _, _, chance, target, weapon = max(
+            choices,
+            key=lambda choice: (
+                choice[0], choice[1], choice[2], -math.dist(mech.pos, choice[3].pos), choice[3].name,
+            ),
+        )
     return target, weapon, chance
 
 
@@ -558,9 +676,10 @@ def _select_primary_target(squad):
     return squad.primaryTarget
 
 
-def _fire_artillery_if_ordered(match_info, squad, mech, target):
-    """Launch one round only under a committed attack command."""
-    if not _attack_ordered(squad) or target is None or target.destroyed:
+def _fire_artillery_if_ordered(match_info, squad, mech):
+    """Launch one round only after the leader makes a force-safe call."""
+    target = squad.artilleryCallTarget
+    if target is None or target.destroyed:
         return False
     for weapon in mech.mechClass.gunList:
         if not weapon.isLauncher:
@@ -584,10 +703,19 @@ def execute_squad_combat(match_info, squad=None):
     if squad.playerControlled or not squad.mechList or _fire_suppressed(squad):
         return []
 
+    contacts = list(dict.fromkeys(
+        target for mech in squad.mechList for target in _known_targets(mech)
+    ))
+    squad.assignedTargets = {}
+    _assess_enemy_force(match_info, squad, contacts)
+    if squad.avoidContact:
+        squad.primaryTarget = None
+        return []
+
+    _assign_anti_heavy_focus(squad, contacts)
     primary_target = _select_primary_target(squad)
     approach_targets = []
     fired = []
-    squad.assignedTargets = {}
     for mech in list(squad.mechList):
         target, weapon, _ = _choose_target(match_info, squad, mech)
         if _attack_ordered(squad):
@@ -596,10 +724,10 @@ def execute_squad_combat(match_info, squad=None):
                 if contact_chance < AI_APPROACH_ACCURACY_THRESHOLD:
                     approach_targets.append(contact)
         if target is not None:
-            squad.assignedTargets[mech] = target
+            squad.assignedTargets.setdefault(mech, target)
             if weapon.shootAt(match_info, target.pos, shooter=mech):
                 fired.append(mech)
-        _fire_artillery_if_ordered(match_info, squad, mech, target or primary_target)
+        _fire_artillery_if_ordered(match_info, squad, mech)
     if _attack_ordered(squad):
         squad.primaryTarget = min(
             dict.fromkeys(approach_targets),
@@ -822,8 +950,14 @@ def execute_squad_movement(match_info, squad=None):
     if roadway_only:
         _ensure_road_patrol(match_info, squad)
         if _patrol_interrupted(squad):
-            return []
-        roadway_only = bool(squad.patrolRoute)
+            # An overwhelmed patrol abandons the route and follows the
+            # leader's avoidance destination instead of freezing in place.
+            if squad.avoidContact:
+                roadway_only = False
+            else:
+                return []
+        else:
+            roadway_only = bool(squad.patrolRoute)
     moved = _move_leader(match_info, squad, leader_range, roadway_only)
     for mech in list(squad.mechList):
         if mech is squad.squadLead:
