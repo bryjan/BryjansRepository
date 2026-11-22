@@ -32,6 +32,11 @@ class CampaignMission:
     payout: int
     description: str
     required_roles: tuple[str, ...] = ()
+    # These values are evaluated when campaign missions gain tactical map
+    # construction. Keeping them structured avoids parsing player-facing text.
+    objective_type: str = ""
+    objective_value: int = 0
+    objective_targets: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,17 +60,26 @@ class RecoveredMech:
 
 MISSION_TEMPLATES = (
     ("pilot_recovery", "Pilot Recovery", 650,
-     "Locate and extract a missing pilot before hostile forces close in.", ("scout", "sensor")),
+     "Locate and extract a missing pilot before hostile forces close in.",
+     ("scout", "sensor"), "recover_pilot", 1, ("evading_pilot",)),
     ("attack_military_base", "Raid Military Base", 1_100,
-     "Strike an enemy military base and disrupt its defenders.", ("front_line", "fire_support")),
-    ("patrol_map", "Frontier Patrol", 500,
-     "Sweep a sector, reveal threats, and keep the roads open.", ("scout",)),
-    ("patrol_near_location", "Area Patrol", 550,
-     "Patrol an important location and deter nearby enemy activity.", ("skirmisher",)),
+     "Strike an enemy military base and disrupt its defenders.",
+     ("front_line", "fire_support"), "assault_base", 1, ("military_base",)),
     ("defend_location", "Defend Position", 750,
-     "Hold a designated location against an expected attack.", ("front_line",)),
+     "Hold a designated location against an expected attack.",
+     ("front_line",), "defend_position", 1, ("tactical_location",)),
     ("recover_or_steal_mech", "Recover Stranded Mech", 900,
-     "Retrieve or seize a disabled mech before another force claims it.", ("recovery", "front_line")),
+     "Retrieve or seize a disabled mech before another force claims it.",
+     ("recovery", "front_line"), "recover_mech", 1, ("abandoned_mech",)),
+    ("diversion", "Diversion", 700,
+     "Inflict 120 damage on enemy forces, then disengage.",
+     ("skirmisher", "front_line"), "deal_damage", 120, ("enemy_force",)),
+    ("locate_enemy_base", "Locate Enemy Base", 650,
+     "Establish direct visual contact with an enemy military base.",
+     ("scout", "sensor"), "visual_contact", 1, ("military_base",)),
+    ("sabotage", "Sabotage", 800,
+     "Hold a sabotage point for one complete turn to complete the operation.",
+     ("skirmisher", "scout"), "hold_position", 1, ("tactical_location", "suburbs")),
 )
 
 
@@ -101,8 +115,14 @@ class MercenaryCampaign:
         """Offer three different contracts, selected reproducibly from templates."""
         templates = self.rng.sample(MISSION_TEMPLATES, 3)
         return [
-            CampaignMission(index, kind, title, payout, description, roles)
-            for index, (kind, title, payout, description, roles) in enumerate(templates, start=1)
+            CampaignMission(
+                index, kind, title, payout, description, roles,
+                objective_type, objective_value, objective_targets,
+            )
+            for index, (
+                kind, title, payout, description, roles, objective_type,
+                objective_value, objective_targets,
+            ) in enumerate(templates, start=1)
         ]
 
     @property
@@ -313,6 +333,8 @@ class MercenaryCampaign:
             CampaignMission(
                 item["mission_id"], item["kind"], item["title"], item["payout"],
                 item["description"], tuple(item.get("required_roles", ())),
+                item.get("objective_type", ""), int(item.get("objective_value", 0)),
+                tuple(item.get("objective_targets", ())),
             )
             for item in data["mission_offers"]
         ]

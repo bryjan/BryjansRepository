@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from types import SimpleNamespace
 
-from mechgame.campaign import MercenaryCampaign
+from mechgame.campaign import MISSION_TEMPLATES, MercenaryCampaign
 
 
 class MercenaryCampaignTests(unittest.TestCase):
@@ -22,6 +22,16 @@ class MercenaryCampaignTests(unittest.TestCase):
     def test_campaign_offers_three_distinct_missions(self):
         self.assertEqual(len(self.campaign.missionOffers), 3)
         self.assertEqual(len({offer.kind for offer in self.campaign.missionOffers}), 3)
+
+    def test_player_contract_pool_excludes_patrols_and_defines_new_objectives(self):
+        templates = {template[0]: template for template in MISSION_TEMPLATES}
+
+        self.assertNotIn("patrol_map", templates)
+        self.assertNotIn("patrol_near_location", templates)
+        self.assertEqual(templates["diversion"][5:7], ("deal_damage", 120))
+        self.assertEqual(templates["locate_enemy_base"][5:7], ("visual_contact", 1))
+        self.assertEqual(templates["sabotage"][5:7], ("hold_position", 1))
+        self.assertEqual(templates["sabotage"][7], ("tactical_location", "suburbs"))
 
     def test_deploying_requires_research_an_available_pilot_and_a_class_slot(self):
         pilot_names = [pilot.name for pilot in self.campaign.pilots]
