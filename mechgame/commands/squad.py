@@ -75,7 +75,7 @@ def optionsMenu(matchInfo):
 def selectSquadMech(matchInfo, squad):
     """Switch the point of view to a mech in the current squad."""
     entries = [
-        f"'{index}' {mech.pilot.name} — {mech.mechClass.name} ({round(mech.mechClass.condition)}%)"
+        f"'{index}' {mech.pilot.display_name} — {mech.mechClass.name} ({round(mech.mechClass.condition)}%)"
         for index, mech in enumerate(squad.mechList, start=1)
     ]
     pv.printPOV(

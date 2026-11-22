@@ -39,8 +39,18 @@ class MercenaryCampaignTests(unittest.TestCase):
         mission = self.campaign.accept_mission(2)
         self.assertIs(self.campaign.activeMission, mission)
 
+    def test_campaign_displays_a_callsign_without_changing_legal_identity(self):
+        pilot = self.campaign.pilots[0]
+        deployment = self.campaign.deploy("lancer.type_a", pilot.name)
+        pilot.assign_callsign("Viper")
+
+        self.assertEqual(self.campaign.display_name_for(pilot.name), "Viper")
+        self.assertEqual(deployment.pilot_name, pilot.name)
+
     def test_save_load_preserves_pilots_traits_skills_and_campaign_state(self):
         pilot = self.campaign.pilots[0]
+        pilot.assign_nickname("Sparrow")
+        pilot.assign_callsign("Viper")
         pilot.traits = ["Steady"]
         pilot.skills = {"gunnery": 2, "scouting": 1}
         self.campaign.deploy("lancer.type_a", pilot.name)
@@ -54,6 +64,8 @@ class MercenaryCampaignTests(unittest.TestCase):
         loaded_pilot = next(item for item in loaded.pilots if item.name == pilot.name)
         self.assertEqual(loaded_pilot.traits, ["Steady"])
         self.assertEqual(loaded_pilot.skills, {"gunnery": 2, "scouting": 1})
+        self.assertEqual(loaded_pilot.nickname, "Sparrow")
+        self.assertEqual(loaded_pilot.callsign, "Viper")
         self.assertEqual(loaded.deployments, self.campaign.deployments)
         self.assertEqual(loaded.activeMission, self.campaign.activeMission)
 

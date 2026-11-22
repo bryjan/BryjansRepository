@@ -26,7 +26,7 @@ class Entity: #a character on the map
         self.cockpit.mech = self
         self.mechClass.helm.modsList.append(self.cockpit)
 
-        self.name = self.pilot.name
+        self.name = self.pilot.display_name
         self.squad = ""
         self.team = ""
 
@@ -97,7 +97,7 @@ class Entity: #a character on the map
 
 
     def __repr__(self):
-        return self.pilot.name
+        return self.pilot.display_name
 
     def roundRefresh(self, matchInfo):
         """Restore per-round state and refresh the mech's derived statistics."""
@@ -509,7 +509,7 @@ class Entity: #a character on the map
         critMessage = ""
         if critical == True:
             critMessage = "CRITICAL MESSAGE!| "
-        report = f"{critMessage}Round: {matchRound} |  {self.pilot.name}: {message}"
+        report = f"{critMessage}Round: {matchRound} |  {self.pilot.display_name}: {message}"
         for rep in self.squad.reportLog:
             if rep[0] == report:
                 return
@@ -613,8 +613,10 @@ class Entity: #a character on the map
 
 class Pilot: #TODO add pilot levels, skills, certs
     """Named crew member assigned to an entity."""
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, name, nickname=None, callsign=None):
+        self.name = self._clean_identity(name, "name")
+        self.nickname = self._clean_identity(nickname, "nickname", allow_empty=True)
+        self.callsign = self._clean_identity(callsign, "callsign", allow_empty=True)
         self.status = "Active"
         self.returned = False
         self.ejectionOutcome = None
@@ -624,6 +626,35 @@ class Pilot: #TODO add pilot levels, skills, certs
         # older saves can be upgraded without inventing a trait or skill.
         self.traits = []
         self.skills = {}
+
+    @staticmethod
+    def _clean_identity(value, label, allow_empty=False):
+        """Normalize an identity value and make accidental blank names clear."""
+        if value is None and allow_empty:
+            return None
+        cleaned = str(value).strip()
+        if not cleaned:
+            if allow_empty:
+                return None
+            raise ValueError(f"Pilot {label} cannot be blank.")
+        return cleaned
+
+    @property
+    def display_name(self):
+        """Return the player-facing identity: callsign, nickname, then name."""
+        return self.callsign or self.nickname or self.name
+
+    def assign_name(self, name):
+        """Set the pilot's permanent legal name used for campaign identity."""
+        self.name = self._clean_identity(name, "name")
+
+    def assign_nickname(self, nickname):
+        """Set or clear a secondary display name when no callsign is assigned."""
+        self.nickname = self._clean_identity(nickname, "nickname", allow_empty=True)
+
+    def assign_callsign(self, callsign):
+        """Set or clear the player-assigned callsign with display priority."""
+        self.callsign = self._clean_identity(callsign, "callsign", allow_empty=True)
 
     def kill(self, matchInfo):
         """Record a fatal cockpit loss without treating it as an ejection."""

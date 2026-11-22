@@ -182,7 +182,7 @@ def _own_mech_panel_lines(mech, height, width):
     ])
     # The upper block stays visually stable: silhouette, centered identity,
     # then a right-panel-only divider before live details.
-    identity = f"{mech.pilot.name} - {mech.mechClass.name}"[:width]
+    identity = f"{mech.pilot.display_name} - {mech.mechClass.name}"[:width]
     lines = [
         *_centered_mech_lines(mech, width),
         f"|{identity:^{width}}|",
@@ -245,7 +245,7 @@ def _hud_lines(matchInfo, width):
     condition = round(mech.mechClass.condition)
     terrain = matchInfo.map[mech.pos[1]][mech.pos[0]].terrain.name
     entries = [
-        f"HUD | {mech.pilot.name} | Pos: {mech.pos} | {condition}% | Tile: {terrain}",
+        f"HUD | {mech.pilot.display_name} | Pos: {mech.pos} | {condition}% | Tile: {terrain}",
         (
             f"AP {mech.ap}/{mech.mechClass.apMax} | MP {mech.mp}/{mech.mechClass.mpMax} | "
             f"EN {mech.energy}/{mech.mechClass.energyMax} +{mech.mechClass.energyGen} | "

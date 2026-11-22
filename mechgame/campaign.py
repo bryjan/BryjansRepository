@@ -149,6 +149,11 @@ class MercenaryCampaign:
                 return True
         return False
 
+    def display_name_for(self, pilot_name):
+        """Return a pilot's callsign-aware display name from their stable ID."""
+        pilot = next((pilot for pilot in self.pilots if pilot.name == pilot_name), None)
+        return pilot.display_name if pilot is not None else pilot_name
+
     def accept_mission(self, mission_id):
         """Select one offered contract; map construction is a later campaign step."""
         for mission in self.missionOffers:
@@ -233,6 +238,8 @@ class MercenaryCampaign:
         """Serialize pilot data explicitly so future fields stay intentional."""
         return {
             "name": pilot.name,
+            "nickname": pilot.nickname,
+            "callsign": pilot.callsign,
             "status": pilot.status,
             "returned": pilot.returned,
             "ejection_outcome": pilot.ejectionOutcome,
@@ -269,7 +276,11 @@ class MercenaryCampaign:
         campaign.researchedMechs = set(data["researched_mechs"])
         campaign.pilots = []
         for pilot_data in data["pilots"]:
-            pilot = Pilot(pilot_data["name"])
+            pilot = Pilot(
+                pilot_data["name"],
+                pilot_data.get("nickname"),
+                pilot_data.get("callsign"),
+            )
             pilot.status = pilot_data.get("status", "Active")
             pilot.returned = bool(pilot_data.get("returned", False))
             pilot.ejectionOutcome = pilot_data.get("ejection_outcome")

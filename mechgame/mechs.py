@@ -121,7 +121,7 @@ class DashAbility(Ability):
         # final landing tile can apply a persistent entry hazard such as fire.
         effects.apply_entry_effects(matchInfo, entity)
         matchInfo.advTurn = True
-        print(f"{entity.pilot.name} dashes {steps_taken} tile(s); melee damage +3 this turn.")
+        print(f"{entity.pilot.display_name} dashes {steps_taken} tile(s); melee damage +3 this turn.")
         return True
 
 
@@ -155,7 +155,7 @@ class SensorOverdriveAbility(Ability):
         matchInfo.clearVisuals()
         entity.getVisuals(matchInfo)
         matchInfo.advTurn = True
-        print(f"{entity.pilot.name} activates Sensor Overdrive.")
+        print(f"{entity.pilot.display_name} activates Sensor Overdrive.")
         return True
 
 
@@ -215,7 +215,7 @@ class FieldRepairAbility(Ability):
         self.charges -= 1
         matchInfo.advTurn = True
         print(
-            f"{entity.pilot.name} completes Field Repair: "
+            f"{entity.pilot.display_name} completes Field Repair: "
             f"{len(damaged_limbs)} limb(s), {len(damaged_modules)} module(s)."
         )
         return True

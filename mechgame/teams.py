@@ -160,14 +160,14 @@ class Squad:
                 elif weapon.maxCharges:
                     ammoPercentages.append(weapon.charges / weapon.maxCharges)
             averageAmmo = round((sum(ammoPercentages) / len(ammoPercentages)) * 100) if ammoPercentages else 100
-            ammoSummary.append(f"{mech.pilot.name} {averageAmmo}%")
+            ammoSummary.append(f"{mech.pilot.display_name} {averageAmmo}%")
         ammunition = " | ".join(ammoSummary) if ammoSummary else "none"
 
         return "\n".join([
             f"{self.name} squad status",
             f"Average integrity: {round(averageIntegrity)}% | Damaged modules: {damagedModules}/{totalModules}",
             f"Ammo readiness: {ammunition}",
-            f"Most damaged: {mostDamaged.pilot.name} — {mostDamaged.mechClass.name} ({round(mostDamaged.mechClass.condition)}%)",
+            f"Most damaged: {mostDamaged.pilot.display_name} — {mostDamaged.mechClass.name} ({round(mostDamaged.mechClass.condition)}%)",
         ])
 
     def rosterReport(self):
@@ -178,7 +178,7 @@ class Squad:
         entries = ["Squad roster:"]
         for index, mech in enumerate(self.mechList, start=1):
             entries.append(
-                f"'{index}' {mech.pilot.name} — {mech.mechClass.name} at {mech.pos}"
+                f"'{index}' {mech.pilot.display_name} — {mech.mechClass.name} at {mech.pos}"
             )
         return "\n".join(entries)
 

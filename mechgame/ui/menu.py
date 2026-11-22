@@ -203,7 +203,7 @@ def _campaign_lines(campaign):
             f"'{offer.mission_id}' {offer.title} — {offer.payout:,} credits{active}",
             f"    {offer.description} Needed: {role_text}.",
         ])
-    lines.extend(["", "'d' Deploy roster", "'x' Back"])
+    lines.extend(["", "'d' Deploy roster", "'p' Pilot identities", "'x' Back"])
     return lines
 
 
@@ -213,7 +213,8 @@ def deployment_menu(settings, campaign):
         lines = ["DEPLOYMENT", "Current roster:"]
         if campaign.deployments:
             lines.extend(
-                f"  {deployment.pilot_name}: {deployment.mech_id} (class {deployment.size})"
+                f"  {campaign.display_name_for(deployment.pilot_name)}: "
+                f"{deployment.mech_id} (class {deployment.size})"
                 for deployment in campaign.deployments
             )
         else:
@@ -230,7 +231,7 @@ def deployment_menu(settings, campaign):
                 print("No pilots are available.")
                 continue
             print("Chassis: " + ", ".join(f"{index + 1}) {mech_id}" for index, mech_id in enumerate(chassis)))
-            print("Pilots: " + ", ".join(f"{index + 1}) {pilot.name}" for index, pilot in enumerate(available)))
+            print("Pilots: " + ", ".join(f"{index + 1}) {pilot.display_name}" for index, pilot in enumerate(available)))
             mech_choice = input("Chassis number ('x' cancel): ").strip().lower()
             pilot_choice = input("Pilot number ('x' cancel): ").strip().lower()
             if mech_choice == "x" or pilot_choice == "x":
@@ -259,6 +260,46 @@ def deployment_menu(settings, campaign):
             print("Choose 'a', 'r', or 'x'.")
 
 
+def pilot_identity_menu(settings, campaign):
+    """Assign legal names, nicknames, and player-chosen callsigns to pilots."""
+    while True:
+        lines = ["PILOT IDENTITIES"]
+        for index, pilot in enumerate(campaign.pilots, start=1):
+            nickname = pilot.nickname or "—"
+            callsign = pilot.callsign or "—"
+            lines.append(
+                f"'{index}' {pilot.display_name} | name: {pilot.name} | "
+                f"nickname: {nickname} | callsign: {callsign}"
+            )
+        lines.extend(["", "Choose a pilot to edit.", "'x' Back"])
+        _frame(lines, settings)
+        choice = input("Pilot: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if not choice.isdigit() or not 1 <= int(choice) <= len(campaign.pilots):
+            print("Choose a numbered pilot or 'x'.")
+            continue
+        pilot = campaign.pilots[int(choice) - 1]
+        name = input(f"Name [{pilot.name}] ('Enter' keep): ").strip()
+        nickname = input(f"Nickname [{pilot.nickname or '—'}] ('Enter' keep, '-' clear): ").strip()
+        callsign = input(f"Callsign [{pilot.callsign or '—'}] ('Enter' keep, '-' clear): ").strip()
+        try:
+            if name:
+                pilot.assign_name(name)
+            if nickname == "-":
+                pilot.assign_nickname(None)
+            elif nickname:
+                pilot.assign_nickname(nickname)
+            if callsign == "-":
+                pilot.assign_callsign(None)
+            elif callsign:
+                pilot.assign_callsign(callsign)
+        except ValueError as error:
+            print(error)
+            continue
+        campaign.save()
+
+
 def mercenary_menu(settings, campaign):
     """Show the persistent company layer and allow contract selection."""
     while True:
@@ -269,6 +310,9 @@ def mercenary_menu(settings, campaign):
         if choice == "d":
             deployment_menu(settings, campaign)
             continue
+        if choice == "p":
+            pilot_identity_menu(settings, campaign)
+            continue
         if choice.isdigit():
             try:
                 offer = campaign.accept_mission(int(choice))
@@ -278,7 +322,7 @@ def mercenary_menu(settings, campaign):
                 campaign.save()
                 print(f"Contract accepted: {offer.title}. Build your roster before deployment.")
             continue
-        print("Choose a contract number, 'd', or 'x'.")
+        print("Choose a contract number, 'd', 'p', or 'x'.")
 
 
 def start_menu(settings=None, campaign=None):

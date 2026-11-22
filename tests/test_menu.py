@@ -111,4 +111,4 @@ class StartMenuTests(unittest.TestCase):
 
         self.assertIn("MERCENARY MODE", lines)
         self.assertIn("Cash: 1,000 credits", lines)
-        self.assertEqual(sum(line.startswith("'") for line in lines), 5)
+        self.assertEqual(sum(line.startswith("'") for line in lines), 6)
