@@ -679,9 +679,9 @@ class WeaponLimb(MechPart):
     def updateLauncherStats(self):
         """Reserve a dedicated update hook for future launcher-only modules."""
 
-    def emitSound(self, matchInfo):
+    def emitSound(self, matchInfo, shooter=None):
         """Send a launch or gunfire report to enemies within audible range."""
-        shooter = matchInfo.pov
+        shooter = shooter or matchInfo.pov
         for entity in matchInfo.entities:
             if entity.team is shooter.team:
                 continue
@@ -691,48 +691,46 @@ class WeaponLimb(MechPart):
                     teamReport=False, critical=False,
                 )
 
-    def shootAt(self, matchInfo, pos, aimedLimb=None):
+    def shootAt(self, matchInfo, pos, aimedLimb=None, shooter=None):
         """Spend resources and resolve every projectile fired at a map position."""
 
-        # TODO(ai-action-api): take the firing entity explicitly instead of
-        # reading matchInfo.pov. Menu commands can retain POV as a wrapper,
-        # while AI then uses this same validated combat resolution directly.
+        shooter = shooter or matchInfo.pov
 
         if self.isLauncher:
-            return self.launchAt(matchInfo, pos)
+            return self.launchAt(matchInfo, pos, shooter=shooter)
 
         #check if enough resources
         if self.charges is not None and self.charges - 1 < 0:
             print("Out of ammo!")
-            return
-        if self.maxRange is not None and math.dist(matchInfo.pov.pos, pos) > self.maxRange:
+            return False
+        if self.maxRange is not None and math.dist(shooter.pos, pos) > self.maxRange:
             print(f"Target is beyond this weapon's {self.maxRange}-tile range.")
-            return
+            return False
         aimApCost = self.aim_ap_cost(aimedLimb)
-        if matchInfo.pov.ap - (self.apCost + aimApCost) < 0:
+        if shooter.ap - (self.apCost + aimApCost) < 0:
             print("Out of action points!")
-            return
-        if matchInfo.pov.energy - self.energyCost < 0:
+            return False
+        if shooter.energy - self.energyCost < 0:
             print("Not enough energy to fire!")
-            return
+            return False
 
         if self.charges is not None:
             self.charges -= 1
-        matchInfo.pov.ap -= self.apCost + aimApCost
-        matchInfo.pov.energy -= self.energyCost
-        matchInfo.pov.refreshReadiness(matchInfo)
+        shooter.ap -= self.apCost + aimApCost
+        shooter.energy -= self.energyCost
+        shooter.refreshReadiness(matchInfo)
         # Store the attempted location even on a miss so a follow-up shot can
         # be ordered without re-entering coordinates.
-        matchInfo.pov.lastFiredAt = list(pos)
+        shooter.lastFiredAt = list(pos)
         # Direct weapons make the firing mech combat-aware even on a miss.
         # Launcher fire is intentionally excluded: delayed artillery alone
         # does not prove its crew is in immediate tactical contact.
-        matchInfo.pov.noteCombat("fired a direct weapon")
+        shooter.noteCombat("fired a direct weapon")
 
         #enemies will report noise
-        self.emitSound(matchInfo)
+        self.emitSound(matchInfo, shooter)
 
-        accuracyRequired = self.accuracy_required(matchInfo, matchInfo.pov, pos)
+        accuracyRequired = self.accuracy_required(matchInfo, shooter, pos)
 
         target = next((entity for entity in matchInfo.entities if entity.pos == pos), None)
 
@@ -740,12 +738,12 @@ class WeaponLimb(MechPart):
         while i <= self.projectileCount:
             i += 1
             movementMultiplier = 1
-            if matchInfo.pov.speed > 0:
-                movementMultiplier = 1 - ((matchInfo.rng.randint(0, self.speedPenalty) * matchInfo.pov.speed) / 100)
+            if shooter.speed > 0:
+                movementMultiplier = 1 - ((matchInfo.rng.randint(0, self.speedPenalty) * shooter.speed) / 100)
             effectiveAccuracy = self.effective_accuracy(
-                matchInfo, matchInfo.pov, target, movementMultiplier,
+                matchInfo, shooter, target, movementMultiplier,
             )
-            hitChance = self._hit_chance(matchInfo.pov, target, effectiveAccuracy, accuracyRequired)
+            hitChance = self._hit_chance(shooter, target, effectiveAccuracy, accuracyRequired)
 
             if matchInfo.rng.randint(1, 100) > hitChance:
                 print("Shot missed!")
@@ -756,33 +754,35 @@ class WeaponLimb(MechPart):
                     targetLimb.damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
 
         matchInfo.advTurn = True
+        return True
 
-    def launchAt(self, matchInfo, targetPosition):
+    def launchAt(self, matchInfo, targetPosition, shooter=None):
         """Fire a delayed shell that scatters and resolves on a future turn."""
+        shooter = shooter or matchInfo.pov
         ammo = self.selected_ammo
         if ammo.charges is not None and ammo.charges < 1:
             print("Out of ammo!")
-            return
-        distance = math.dist(matchInfo.pov.pos, targetPosition)
-        profile = self.launcher_profile(distance, matchInfo, matchInfo.pov)
+            return False
+        distance = math.dist(shooter.pos, targetPosition)
+        profile = self.launcher_profile(distance, matchInfo, shooter)
         if profile is None:
-            farRange = ammo.rangeBands["far"][0] + self.launcher_range_bonus(matchInfo, matchInfo.pov)
+            farRange = ammo.rangeBands["far"][0] + self.launcher_range_bonus(matchInfo, shooter)
             print(f"Target is beyond this launcher's {farRange}-tile far range.")
-            return
-        if matchInfo.pov.ap < self.apCost:
+            return False
+        if shooter.ap < self.apCost:
             print("Out of action points!")
-            return
-        if matchInfo.pov.energy < self.energyCost:
+            return False
+        if shooter.energy < self.energyCost:
             print("Not enough energy to fire!")
-            return
+            return False
 
         if ammo.charges is not None:
             ammo.charges -= 1
-        matchInfo.pov.ap -= self.apCost
-        matchInfo.pov.energy -= self.energyCost
-        matchInfo.pov.refreshReadiness(matchInfo)
-        matchInfo.pov.lastFiredAt = list(targetPosition)
-        self.emitSound(matchInfo)
+        shooter.ap -= self.apCost
+        shooter.energy -= self.energyCost
+        shooter.refreshReadiness(matchInfo)
+        shooter.lastFiredAt = list(targetPosition)
+        self.emitSound(matchInfo, shooter)
 
         impactPosition = artillery.scatter_position(
             matchInfo, targetPosition, profile["inaccuracy"],
@@ -802,7 +802,7 @@ class WeaponLimb(MechPart):
             ammo.effectRadius,
             ammo.effectTurns,
             ammo.scoutVision,
-            matchInfo.pov.team,
+            shooter.team,
             ammo.igniteChance,
             self.soundReport,
         )
@@ -819,6 +819,7 @@ class WeaponLimb(MechPart):
                 f"Impact expected after {profile['turns']} completed turn(s)."
             )
         matchInfo.advTurn = True
+        return True
 
     def launcher_range_bonus(self, matchInfo=None, shooter=None):
         """Return a terrain-based range bonus for a launcher firing uphill."""

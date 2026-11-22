@@ -10,7 +10,8 @@ import math
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
-    "execute_squad_movement", "issue_team_goal", "start_road_patrol",
+    "execute_squad_combat", "execute_squad_movement", "issue_team_goal",
+    "start_road_patrol",
 ]
 
 
@@ -26,6 +27,9 @@ PATROL_OVERLAP_PENALTY = 12
 # A one-tile shoulder lets opposing or converging patrols pass on a narrow
 # road without letting a patrol drift into ordinary off-road movement.
 ROAD_PATROL_WIGGLE_RADIUS = 1
+AI_FIRE_ACCURACY_THRESHOLD = 65
+AI_APPROACH_ACCURACY_THRESHOLD = 80
+AI_GOOD_AMMO_THRESHOLD = .50
 ENERGY_RESERVE_BANDS = {
     # A patrol may take a costly catch-up step, but it only begins a burst
     # near full charge and stops before falling below its sustainable reserve.
@@ -272,6 +276,9 @@ def _leader_destination(match_info, squad):
     )
     if patrol_destination is not None:
         return patrol_destination
+    target = squad.primaryTarget
+    if _attack_ordered(squad) and target in match_info.entities and not target.destroyed:
+        return target.pos
     if squad.currentGoal and squad.currentGoal.locations:
         return _nearest_location(leader.pos, squad.currentGoal.locations)
     # Direct sight and radar tracking are both already filtered by the normal
@@ -436,6 +443,175 @@ def _patrol_interrupted(squad):
         mech.directlyVisibleEnemies or mech.trackedEnemies
         for mech in squad.mechList
     )
+
+
+# ---------------------------------------------------------------------------
+# First-pass AI combat
+# ---------------------------------------------------------------------------
+
+def _attack_ordered(squad):
+    """Return whether the leader has issued a committed attack order."""
+    goal_kind = getattr(squad.currentGoal, "kind", "")
+    return squad.combatPosture == "attack" or goal_kind in {
+        "attack", "attack_military_base", "eliminate_enemies",
+    }
+
+
+def _fire_suppressed(squad):
+    """Return whether this squad's movement or posture forbids firing."""
+    return squad.movementMode == "double_time" or squad.combatPosture in {
+        "hold_fire", "stealth", "retreat",
+    }
+
+
+def _direct_ammo_ratio(mech):
+    """Measure reusable direct-fire reserves without charging artillery ammo."""
+    reserves = []
+    for weapon in mech.mechClass.gunList:
+        # Melee remains usable without ammunition, but it must not make a
+        # nearly empty rifle loadout look well supplied at ranged contact.
+        if weapon.isLauncher or weapon.isMelee:
+            continue
+        if weapon.charges is None:
+            reserves.append(1)
+        elif weapon.maxCharges:
+            reserves.append(weapon.charges / weapon.maxCharges)
+    return sum(reserves) / len(reserves) if reserves else 0
+
+
+def _known_targets(mech):
+    """Return only contacts the mech has received through normal sensing."""
+    return [
+        target
+        for target in dict.fromkeys([*mech.directlyVisibleEnemies, *mech.trackedEnemies])
+        if not target.destroyed and target.team is not mech.team
+    ]
+
+
+def _weapon_can_fire(mech, weapon, target):
+    """Check shared resource and reach limits before considering a direct shot."""
+    if weapon.isLauncher or weapon.hp <= 0:
+        return False
+    if weapon.charges is not None and weapon.charges <= 0:
+        return False
+    if weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
+        return False
+    return weapon.maxRange is None or math.dist(mech.pos, target.pos) <= weapon.maxRange
+
+
+def _best_direct_shot(match_info, mech, target):
+    """Return a direct weapon, chance, and expected-damage score for target."""
+    choices = []
+    for weapon in mech.mechClass.gunList:
+        if not _weapon_can_fire(mech, weapon, target):
+            continue
+        chance, _ = weapon.hit_chance_range(match_info, mech, target, target.pos)
+        expected_damage = chance * weapon.dmg * weapon.projectileCount
+        choices.append((expected_damage, chance, weapon))
+    if not choices:
+        return None, 0, 0
+    expected_damage, chance, weapon = max(
+        choices, key=lambda choice: (choice[0], choice[1], choice[2].name),
+    )
+    return weapon, chance, expected_damage
+
+
+def _choose_target(match_info, squad, mech):
+    """Choose the best sensed target allowed by this mech's firing doctrine."""
+    visible = set(mech.directlyVisibleEnemies)
+    aggressive_fire = _attack_ordered(squad) or _direct_ammo_ratio(mech) >= AI_GOOD_AMMO_THRESHOLD
+    choices = []
+    for target in _known_targets(mech):
+        weapon, chance, expected_damage = _best_direct_shot(match_info, mech, target)
+        if weapon is None:
+            continue
+        # A visually observed threat always merits a shot if one is possible.
+        # Broader target engagement spends reserves only at a credible chance.
+        if target not in visible and (not aggressive_fire or chance < AI_FIRE_ACCURACY_THRESHOLD):
+            continue
+        if target in visible and chance <= 0:
+            continue
+        choices.append((target in visible, expected_damage, chance, target, weapon))
+    if not choices:
+        return None, None, 0
+    _, _, chance, target, weapon = max(
+        choices,
+        key=lambda choice: (
+            choice[0], choice[1], choice[2], -math.dist(mech.pos, choice[3].pos), choice[3].name,
+        ),
+    )
+    return target, weapon, chance
+
+
+def _select_primary_target(squad):
+    """Give the formation one known target to approach when it is attacking."""
+    leader = squad.squadLead
+    contacts = [target for mech in squad.mechList for target in _known_targets(mech)]
+    contacts = list(dict.fromkeys(contacts))
+    if not contacts:
+        squad.primaryTarget = None
+        return None
+    squad.primaryTarget = min(
+        contacts,
+        key=lambda target: (math.dist(leader.pos, target.pos), target.mechClass.condition, target.name),
+    )
+    return squad.primaryTarget
+
+
+def _fire_artillery_if_ordered(match_info, squad, mech, target):
+    """Launch one round only under a committed attack command."""
+    if not _attack_ordered(squad) or target is None or target.destroyed:
+        return False
+    for weapon in mech.mechClass.gunList:
+        if not weapon.isLauncher:
+            continue
+        if weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
+            continue
+        if weapon.launchAt(match_info, target.pos, shooter=mech):
+            return True
+    return False
+
+
+def execute_squad_combat(match_info, squad=None):
+    """Run one bounded, visibility-limited combat pass for a non-player squad.
+
+    Direct weapons fire at visual threats whenever a shot can land. Mechs with
+    healthy direct-ammo reserves, or an explicit attack order, may also engage
+    sensed contacts at 65% or better. Attack orders retain a primary target so
+    movement can close toward an 80% chance; artillery remains command-only.
+    """
+    squad = squad or match_info.pov.squad
+    if squad.playerControlled or not squad.mechList or _fire_suppressed(squad):
+        return []
+
+    primary_target = _select_primary_target(squad)
+    approach_targets = []
+    fired = []
+    squad.assignedTargets = {}
+    for mech in list(squad.mechList):
+        target, weapon, _ = _choose_target(match_info, squad, mech)
+        if _attack_ordered(squad):
+            for contact in _known_targets(mech):
+                _, contact_chance, _ = _best_direct_shot(match_info, mech, contact)
+                if contact_chance < AI_APPROACH_ACCURACY_THRESHOLD:
+                    approach_targets.append(contact)
+        if target is not None:
+            squad.assignedTargets[mech] = target
+            if weapon.shootAt(match_info, target.pos, shooter=mech):
+                fired.append(mech)
+        _fire_artillery_if_ordered(match_info, squad, mech, target or primary_target)
+    if _attack_ordered(squad):
+        squad.primaryTarget = min(
+            dict.fromkeys(approach_targets),
+            key=lambda target: (
+                math.dist(squad.squadLead.pos, target.pos),
+                target.mechClass.condition, target.name,
+            ),
+            default=None,
+        )
+    else:
+        squad.primaryTarget = None
+    return fired
 
 
 def _energy_floor(mech, movement_mode):

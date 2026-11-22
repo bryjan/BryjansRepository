@@ -8,6 +8,7 @@ __all__ = ["MapVisibilityFlags", "Squad", "Team"]
 
 MOVEMENT_MODES = {"patrol", "move", "double_time"}
 MOVEMENT_BEHAVIORS = {"formation", "road_patrol"}
+COMBAT_POSTURES = {"engage", "attack", "hold_fire", "stealth", "retreat"}
 
 
 @dataclass
@@ -42,6 +43,11 @@ class Squad:
         # speed or double time without changing the squad's assigned mission.
         self.movementMode = "move"
         self.movementBehavior = "formation"
+        # The leader's initial combat order. ``attack`` permits committed
+        # fire and artillery; stealth/hold-fire/retreat suppress firing.
+        self.combatPosture = "engage"
+        self.primaryTarget = None
+        self.assignedTargets = {}
         # Road patrols keep an ordered copy of the selected generated route.
         # The cursor and direction make a route repeat by walking back along
         # it when it reaches an end, without needing to regenerate the map.
@@ -156,6 +162,12 @@ class Squad:
             if behavior not in MOVEMENT_BEHAVIORS:
                 raise ValueError(f"Unknown movement behavior '{behavior}'.")
             self.movementBehavior = behavior
+
+    def setCombatPosture(self, posture):
+        """Set the leader's validated squad-wide firing posture."""
+        if posture not in COMBAT_POSTURES:
+            raise ValueError(f"Unknown combat posture '{posture}'.")
+        self.combatPosture = posture
 
     def beginRoadPatrol(self, route_id, route_tiles):
         """Assign one recorded road route to this squad's leader.
