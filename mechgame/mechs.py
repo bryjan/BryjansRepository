@@ -475,6 +475,7 @@ class MechPart: # super class to mech limbs
             )
         # Damage can make a mech no longer combat-ready before its next turn,
         # so squad force comparisons must update immediately.
+        self.mech.noteCombat("took damage")
         self.mech.refreshReadiness(matchInfo)
         return True
 
@@ -723,6 +724,10 @@ class WeaponLimb(MechPart):
         # Store the attempted location even on a miss so a follow-up shot can
         # be ordered without re-entering coordinates.
         matchInfo.pov.lastFiredAt = list(pos)
+        # Direct weapons make the firing mech combat-aware even on a miss.
+        # Launcher fire is intentionally excluded: delayed artillery alone
+        # does not prove its crew is in immediate tactical contact.
+        matchInfo.pov.noteCombat("fired a direct weapon")
 
         #enemies will report noise
         self.emitSound(matchInfo)

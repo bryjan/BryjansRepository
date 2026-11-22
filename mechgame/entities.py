@@ -14,6 +14,8 @@ __all__ = ["Entity", "Pilot"]
 
 class Entity: #a character on the map
     """A pilot-controlled instance of a mech class placed in a match."""
+    COMBAT_MEMORY_TURNS = 2
+
     def __init__(self, mechClass, pilot):
         self.mechClass = copy.deepcopy(mechClass)
         self.mechClass.mech = self
@@ -47,9 +49,12 @@ class Entity: #a character on the map
         self.radarOn = False
         self.radarPulseActive = False
         # TODO(ai-threat): replace this temporary switch with a shared,
-        # visibility-limited threat assessment. Ejection already consumes it
-        # so survival odds can model combat risk without reading hidden units.
+        # visibility-limited threat assessment. It retains concrete signals
+        # for two of this mech's turns so ejection and patrols model recent
+        # combat without reading hidden units.
         self.inCombat = False
+        self.combatQuietTurns = 0
+        self.lastCombatSignal = ""
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
@@ -103,10 +108,29 @@ class Entity: #a character on the map
     def __repr__(self):
         return self.pilot.display_name
 
+    def noteCombat(self, signal):
+        """Record one observed or experienced combat signal for this mech."""
+        if self.destroyed or self.ejected:
+            return
+        self.inCombat = True
+        self.combatQuietTurns = 0
+        self.lastCombatSignal = signal
+
+    def _advanceCombatMemory(self):
+        """Expire combat state after two of this mech's quiet turns."""
+        if not self.inCombat:
+            return
+        self.combatQuietTurns += 1
+        if self.combatQuietTurns >= self.COMBAT_MEMORY_TURNS:
+            self.inCombat = False
+            self.combatQuietTurns = 0
+            self.lastCombatSignal = ""
+
     def roundRefresh(self, matchInfo):
         """Restore per-round state and refresh the mech's derived statistics."""
 
         #basic stats
+        self._advanceCombatMemory()
         self.clearTurnAbilities()
         self.turnStartPos = list(self.pos)
         self.speed = 0
@@ -483,6 +507,8 @@ class Entity: #a character on the map
             if entity.team != self.team
             and matchInfo.map[entity.pos[1]][entity.pos[0]] in self.visibleCells
         ]
+        if self.directlyVisibleEnemies:
+            self.noteCombat("enemy in visual range")
         radar.refresh_tracked_enemies(self)
 
     def getVisuals(self, matchInfo):
