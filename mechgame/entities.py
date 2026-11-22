@@ -315,83 +315,54 @@ class Entity: #a character on the map
 
 
 
-    def moveMech(self, matchInfo, input):
-        """Attempt one keyboard-directed move and charge the required movement points."""
-        # TODO(ai-action-api): extract the validated one-step movement core
-        # into a coordinate-based action returning structured results. The AI
-        # executor must not synthesize keyboard input or parse printed errors.
-        map = matchInfo.map
+    _DIRECTION_OFFSETS = {
+        "q": (-1, 1), "w": (0, 1), "e": (1, 1), "a": (-1, 0),
+        "s": (0, -1), "d": (1, 0), "z": (-1, -1), "c": (1, -1),
+    }
 
-        if self.ap == 0 or self.mp == 0 or self.energy == 0:
-            print("You don't have the ability to move anymore this turn.")
-            matchInfo.advTurn = False
-            return
+    def moveCostTo(self, matchInfo, targetPos):
+        """Return a legal adjacent step's energy cost, or its failure reason.
 
-        match input:
-
-            case "q":
-                targetPos = [self.pos[0]-1, self.pos[1]+1]
-
-            case "w":
-                targetPos = [self.pos[0], self.pos[1]+1]
-
-            case "e":
-                targetPos = [self.pos[0]+1, self.pos[1]+1]
-
-            case "a":
-                targetPos = [self.pos[0]-1, self.pos[1]]
-
-            case "s":
-                targetPos = [self.pos[0], self.pos[1]-1]
-
-            case "d":
-                targetPos = [self.pos[0] + 1, self.pos[1]]
-
-            case "z":
-                targetPos = [self.pos[0] - 1, self.pos[1]-1]
-
-            case "c":
-                targetPos = [self.pos[0] + 1, self.pos[1]-1]
-
-            case _:
-                print("Not a valid movement input.")
-                return
-
+        Both player input and the AI call this validation path. A string reason
+        makes callers free to present an error or silently consider another
+        route without duplicating terrain and occupancy rules.
+        """
         targetX, targetY = targetPos
+        if self.ap <= 0 or self.mp <= 0:
+            return None, "No action or movement points remain."
+        if max(abs(targetX - self.pos[0]), abs(targetY - self.pos[1])) != 1:
+            return None, "Movement must be one adjacent tile."
         if not (0 <= targetX < matchInfo.mapWidth and 0 <= targetY < matchInfo.mapHeight):
-            print("That move would leave the map.")
-            return
+            return None, "That move would leave the map."
 
-        # Rows are indexed by Y, then columns by X. Keeping this lookup in one
-        # place prevents valid X positions on rectangular maps from being read
-        # as row numbers.
-        targetCell = map[targetY][targetX]
-        moveCost = targetCell.terrain.moveCost[self.size]
-
-        #checks for viability
-        if targetCell.terrain.passable == False: #checks if it's passable terrain
-            print("This cell's terrain is impassable.")
-            return
-
-        for obj in matchInfo.entities: #checks for other objects
-            if obj.pos == targetPos:
-                print("Something is in your way.")
-                return
-
-        if self.energy < moveCost: #checks energy cost
-            name = targetCell.terrain.name
-            print(f"You don't have enough energy to travel over {name}, you need {moveCost}.")
-            return
-
-        if self.flying:
-            # Flight ignores terrain movement penalties but always costs at
-            # least the mech's size in energy.
-            moveCost = max(moveCost, self.size)
+        targetCell = matchInfo.map[targetY][targetX]
+        if not targetCell.terrain.passable:
+            return None, "This cell's terrain is impassable."
+        if any(entity is not self and entity.pos == [targetX, targetY] for entity in matchInfo.entities):
+            return None, "Something is in your way."
 
         can_cross_water = self.mechClass.canFloat or self.flying or self.size == 6
         if targetCell.terrain.requireFloat and not can_cross_water:
-            print("Your mech can't travel over water.")
-            return
+            return None, "Your mech can't travel over water."
+
+        moveCost = targetCell.terrain.moveCost[self.size]
+        if self.flying:
+            # Flight ignores terrain penalties but retains a size-based cost.
+            moveCost = max(moveCost, self.size)
+        if self.energy < moveCost:
+            return None, (
+                f"You don't have enough energy to travel over {targetCell.terrain.name}; "
+                f"you need {moveCost}."
+            )
+        return moveCost, None
+
+    def moveTo(self, matchInfo, targetPos, announce=True):
+        """Move one legal step to a coordinate and return whether it succeeded."""
+        moveCost, reason = self.moveCostTo(matchInfo, targetPos)
+        if reason is not None:
+            if announce:
+                print(reason)
+            return False
 
         self.energy = int(self.energy - moveCost)
         self.ap -= 1
@@ -401,6 +372,16 @@ class Entity: #a character on the map
         effects.apply_entry_effects(matchInfo, self)
         self.refreshReadiness(matchInfo)
         matchInfo.advTurn = True
+        return True
+
+    def moveMech(self, matchInfo, direction):
+        """Translate a player direction key into the shared one-step action."""
+        offset = self._DIRECTION_OFFSETS.get(direction)
+        if offset is None:
+            print("Not a valid movement input.")
+            return False
+        targetPos = [self.pos[0] + offset[0], self.pos[1] + offset[1]]
+        return self.moveTo(matchInfo, targetPos)
 
     def _spend_radar_energy(self):
         """Spend the configured radar scan cost when the reserve can cover it."""

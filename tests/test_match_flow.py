@@ -2,6 +2,7 @@ import random
 import unittest
 from unittest.mock import patch
 
+from mechgame.ai import execute_squad_movement
 from mechgame.catalog import create_mech
 from mechgame.entities import Entity, Pilot
 from mechgame.missions import MissionGenerator
@@ -164,6 +165,47 @@ class MatchFlowTests(unittest.TestCase):
 
         self.assertNotIn(original_leader, squad.mechList)
         self.assertIs(squad.squadLead, squad.mechList[0])
+
+    def test_ai_squad_leader_advances_once_then_followers_hold_valid_formation(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        enemy_team = match.teamList[1]
+        squad = enemy_team.squadsList[0]
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [30 + (index % 2), 30 + (index // 2)]
+
+        leader, first_follower, second_follower = squad.mechList
+        leader.pos = [10, 10]
+        first_follower.pos = [7, 10]
+        second_follower.pos = [7, 13]
+        match.issueTeamObjective(enemy_team, "defend", 80, (20, 10), "Hold position.")
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertEqual(leader.pos, [11, 10])
+        self.assertEqual(moved, [leader])
+        self.assertLessEqual(((first_follower.pos[0] - leader.pos[0]) ** 2 + (first_follower.pos[1] - leader.pos[1]) ** 2) ** .5, 10)
+        self.assertLessEqual(((second_follower.pos[0] - leader.pos[0]) ** 2 + (second_follower.pos[1] - leader.pos[1]) ** 2) ** .5, 10)
+        self.assertEqual(leader.ap, leader.mechClass.apMax - 1)
+
+    def test_ai_elimination_squad_searches_toward_map_center_without_a_contact(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader = squad.squadLead
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        leader.pos = [30, 30]
+        for index, follower in enumerate(squad.mechList[1:], start=1):
+            follower.pos = [30 - index * 3, 30]
+        leader.directlyVisibleEnemies = []
+        leader.trackedEnemies = []
+
+        execute_squad_movement(match, squad)
+
+        self.assertEqual(leader.pos, [29, 29])
 
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

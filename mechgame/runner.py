@@ -96,6 +96,7 @@ class Game:
     def run(self):
         # Terminal interaction belongs at the application boundary. Keeping
         # these imports here lets domain objects load without UI dependencies.
+        from .ai import execute_squad_movement
         from .ui import tactical
         from .commands import receive_input
 
@@ -103,11 +104,15 @@ class Game:
         match.pov.squad.roundRefresh(match)
         while not match.matchOver and not match.quitRequested:
             match.pov.getVisuals(match)
-            tactical.printPOV(match, *match.pov.pos)
-            # TODO(ai-turn-executor): dispatch a non-player squad to the AI
-            # planner/executor here. It must end its own squad turn after
-            # bounded actions and never call interactive input functions.
-            receive_input(match)
+            if match.pov.squad.playerControlled:
+                tactical.printPOV(match, *match.pov.pos)
+                receive_input(match)
+            else:
+                # The first AI pass handles formation movement only. It ends
+                # promptly so future combat/radar actions can be added without
+                # creating an unbounded non-player turn.
+                execute_squad_movement(match)
+                match.turnEnded = True
             if not match.quitRequested:
                 self.advance_turn_if_requested(match)
         if match.matchOver:

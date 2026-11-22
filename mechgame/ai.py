@@ -7,11 +7,20 @@ turn visible state into orders without coupling AI decisions to terminal UI.
 """
 
 from dataclasses import dataclass
+import math
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
-    "issue_team_goal",
+    "execute_squad_movement", "issue_team_goal",
 ]
+
+
+FORMATION_SPACING = 3
+MIN_LEADER_VISUAL_RANGE = 10
+_ADJACENT_OFFSETS = (
+    (-1, -1), (0, -1), (1, -1), (-1, 0),
+    (1, 0), (-1, 1), (0, 1), (1, 1),
+)
 
 
 @dataclass(frozen=True)
@@ -229,8 +238,146 @@ def assign_team_goals(match_info):
         assign_team_goals_to_squads(team)
 
 
-# TODO(ai-execution): add a planner that consumes only team-shared vision,
-# radar contacts, squad readiness, and current goals. It should emit typed
-# squad orders (advance, hold, scout, engage, support, withdraw) that a
-# separate action executor can validate through the normal movement/combat
-# rules. Do not call player command menus or inspect enemy-only state here.
+# ---------------------------------------------------------------------------
+# First-pass AI movement
+# ---------------------------------------------------------------------------
+
+def _nearest_location(origin, locations):
+    """Return the closest location, retaining deterministic coordinate ties."""
+    return min(locations, key=lambda location: (math.dist(origin, location), location))
+
+
+def _leader_destination(match_info, squad):
+    """Choose a known, legal-information destination for the squad leader."""
+    leader = squad.squadLead
+    if squad.currentGoal and squad.currentGoal.locations:
+        return _nearest_location(leader.pos, squad.currentGoal.locations)
+    # Direct sight and radar tracking are both already filtered by the normal
+    # sensing system. Do not inspect arbitrary enemies in the match here.
+    contacts = [*leader.directlyVisibleEnemies, *leader.trackedEnemies]
+    if contacts:
+        return _nearest_location(leader.pos, [contact.pos for contact in contacts])
+    if squad.currentGoal and squad.currentGoal.kind == "eliminate_enemies":
+        # This neutral search point is map knowledge, not hidden enemy data.
+        # TODO(ai-search): replace it with leader-selected patrol routes and
+        # unexplored-frontier scouting once the planner owns search behavior.
+        return (match_info.mapWidth // 2, match_info.mapHeight // 2)
+    return None
+
+
+def _legal_steps(match_info, mech):
+    """Yield legal one-tile steps with their energy cost from shared movement rules."""
+    for offset_x, offset_y in _ADJACENT_OFFSETS:
+        position = [mech.pos[0] + offset_x, mech.pos[1] + offset_y]
+        energy_cost, reason = mech.moveCostTo(match_info, position)
+        if reason is None:
+            yield position, energy_cost
+
+
+def _move_leader(match_info, squad):
+    """Advance the leader one efficient step toward its current known goal."""
+    leader = squad.squadLead
+    destination = _leader_destination(match_info, squad)
+    if destination is None:
+        return False
+    current_distance = math.dist(leader.pos, destination)
+    steps = [
+        (math.dist(position, destination), energy_cost, position)
+        for position, energy_cost in _legal_steps(match_info, leader)
+    ]
+    if not steps:
+        return False
+    _, _, position = min(steps, key=lambda option: (option[0], option[1], option[2]))
+    if math.dist(position, destination) >= current_distance:
+        return False
+    return leader.moveTo(match_info, position, announce=False)
+
+
+def _formation_status(position, leader_position, teammate_positions, leader_range):
+    """Return whether one position meets leader-range and spacing constraints."""
+    leader_distance = math.dist(position, leader_position)
+    nearest_teammate = min(
+        (math.dist(position, teammate_position) for teammate_position in teammate_positions),
+        default=float("inf"),
+    )
+    return (
+        leader_distance <= leader_range,
+        nearest_teammate >= FORMATION_SPACING,
+        leader_distance,
+        nearest_teammate,
+    )
+
+
+def _move_follower(match_info, squad, mech, leader_range):
+    """Move one clustered or separated follower toward a valid formation tile."""
+    leader = squad.squadLead
+    teammate_positions = [
+        teammate.pos for teammate in squad.mechList if teammate is not mech
+    ]
+    current = _formation_status(mech.pos, leader.pos, teammate_positions, leader_range)
+    if current[0] and current[1]:
+        # Holding a valid position costs no energy and is therefore preferred.
+        return False
+
+    candidates = []
+    for position, energy_cost in _legal_steps(match_info, mech):
+        status = _formation_status(position, leader.pos, teammate_positions, leader_range)
+        candidates.append((status, energy_cost, position))
+    if not candidates:
+        return False
+
+    # First satisfy both formation rules. When several tiles are valid, take
+    # the least expensive route; only then prefer additional teammate spacing.
+    valid = [candidate for candidate in candidates if candidate[0][0] and candidate[0][1]]
+    if valid:
+        _, _, position = min(
+            valid,
+            key=lambda candidate: (
+                candidate[1], -candidate[0][3], candidate[0][2], candidate[2],
+            ),
+        )
+    else:
+        # Constrained terrain can make perfect spacing impossible. Favor a
+        # tile inside leader range, then the greatest available separation.
+        _, _, position = max(
+            candidates,
+            key=lambda candidate: (
+                candidate[0][0], candidate[0][1], candidate[0][3],
+                -candidate[1], -candidate[0][2],
+            ),
+        )
+    return mech.moveTo(match_info, position, announce=False)
+
+
+def execute_squad_movement(match_info, squad=None):
+    """Perform one bounded, visibility-limited AI formation movement pass.
+
+    The leader moves first toward its goal or a known contact. Each follower
+    then takes at most one shared-rules step to remain within the leader's
+    plains visual range (at least 10 tiles) while seeking three-tile spacing.
+    Movement is intentionally limited to one step per mech so the later
+    combat planner retains AP/MP budget for sensing, firing, or retreating.
+    """
+    squad = squad or match_info.pov.squad
+    if squad.playerControlled or not squad.mechList or squad.squadLead is None:
+        return []
+
+    moved = []
+    if _move_leader(match_info, squad):
+        moved.append(squad.squadLead)
+
+    leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
+    for mech in list(squad.mechList):
+        if mech is squad.squadLead:
+            continue
+        if _move_follower(match_info, squad, mech, leader_range):
+            moved.append(mech)
+    return moved
+
+
+# TODO(ai-execution): extend this bounded movement pass into a planner that
+# consumes only team-shared vision, radar contacts, squad readiness, and
+# current goals. It should emit typed orders (advance, hold, scout, engage,
+# support, withdraw) that a separate action executor can validate through the
+# normal movement/combat rules. Do not call player command menus or inspect
+# enemy-only state here.
