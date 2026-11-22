@@ -256,6 +256,58 @@ class MatchFlowTests(unittest.TestCase):
         self.assertNotIn(leader, moved)
         self.assertLess(first_follower.pos[0], 26)
 
+    def test_ai_followers_inside_leader_tether_do_not_reposition(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader, first_follower, second_follower = squad.mechList
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
+        leader.pos = [10, 10]
+        # The followers are closer together than the former spacing preference,
+        # but both are safely inside the leader's formation tether.
+        first_follower.pos = [8, 10]
+        second_follower.pos = [8, 11]
+        match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertTrue(moved)
+        self.assertTrue(all(mech is leader for mech in moved))
+        self.assertEqual(first_follower.pos, [8, 10])
+        self.assertEqual(second_follower.pos, [8, 11])
+
+    def test_ai_leader_waits_after_regroup_for_reserves_to_recover(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader, first_follower, second_follower = squad.mechList
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
+        leader.pos = [10, 10]
+        first_follower.pos = [26, 10]
+        second_follower.pos = [7, 13]
+        match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
+        first_follower.energy = math.ceil(first_follower.mechClass.energyMax * .90)
+
+        execute_squad_movement(match, squad)
+        self.assertLessEqual(
+            math.dist(first_follower.pos, leader.pos), max(10, leader.visPower),
+        )
+        self.assertLess(first_follower.energy, math.ceil(first_follower.mechClass.energyMax * .90))
+
+        moved = execute_squad_movement(match, squad)
+        self.assertEqual(leader.pos, [10, 10])
+        self.assertNotIn(leader, moved)
+
+        first_follower.energy = math.ceil(first_follower.mechClass.energyMax * .90)
+        moved = execute_squad_movement(match, squad)
+        self.assertIn(leader, moved)
+
     def test_ai_regroup_waits_for_follower_to_reach_its_movement_ceiling(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         squad = match.teamList[1].squadsList[0]

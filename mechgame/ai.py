@@ -15,7 +15,6 @@ __all__ = [
 ]
 
 
-FORMATION_SPACING = 3
 MIN_LEADER_VISUAL_RANGE = 10
 ENERGY_RESERVE_BANDS = {
     # A patrol may take a costly catch-up step, but it only begins a burst
@@ -335,6 +334,20 @@ def _leader_needs_regroup(squad, leader_range):
     )
 
 
+def _squad_ready_to_advance(squad):
+    """Return whether every squad member has recharged for its next movement burst.
+
+    Formation units only reposition when they have fallen outside the leader's
+    tether.  Once they have caught up, the leader holds until everyone has
+    recovered to the selected movement mode's ceiling.  This avoids paying
+    energy merely to refine a formation that is already operational.
+    """
+    return all(
+        _can_begin_movement(mech, squad.movementMode)
+        for mech in squad.mechList
+    )
+
+
 def _move_leader(match_info, squad, leader_range, roadway_only):
     """Advance the leader until it reaches its reserve, goal, or regroup hold."""
     leader = squad.squadLead
@@ -343,7 +356,7 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
         destination = _nearest_roadway(match_info, leader.pos)
     if destination is None:
         return []
-    if not _can_begin_movement(leader, squad.movementMode):
+    if not _squad_ready_to_advance(squad):
         return []
     moved = []
     while not _leader_needs_regroup(squad, leader_range):
@@ -365,70 +378,39 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
     return moved
 
 
-def _formation_status(position, leader_position, teammate_positions, leader_range):
-    """Return whether one position meets leader-range and spacing constraints."""
-    leader_distance = math.dist(position, leader_position)
-    nearest_teammate = min(
-        (math.dist(position, teammate_position) for teammate_position in teammate_positions),
-        default=float("inf"),
-    )
-    return (
-        leader_distance <= leader_range,
-        nearest_teammate >= FORMATION_SPACING,
-        leader_distance,
-        nearest_teammate,
-    )
-
-
 def _move_follower(match_info, squad, mech, leader_range, roadway_only):
-    """Move a follower until it reaches a valid formation or reserve floor."""
+    """Move only an out-of-tether follower back into the leader's formation."""
     leader = squad.squadLead
     moved = []
+    # Keep a tactically usable formation cheap: units already inside the
+    # leader's visual tether hold their positions, even when their preferred
+    # spacing is imperfect.  They will recharge while the squad regroups.
+    if math.dist(mech.pos, leader.pos) <= leader_range:
+        return moved
     # A leader already holds while this mech is outside the visual tether.
     # Waiting here lets the follower recharge to its mode's ceiling before it
     # attempts an expensive catch-up route.
     if not _can_begin_movement(mech, squad.movementMode):
         return moved
     while True:
-        teammate_positions = [
-            teammate.pos for teammate in squad.mechList if teammate is not mech
-        ]
-        current = _formation_status(mech.pos, leader.pos, teammate_positions, leader_range)
-        spacing_valid = roadway_only or current[1]
-        if current[0] and spacing_valid:
-            # Holding a valid position costs no energy and is therefore preferred.
+        if math.dist(mech.pos, leader.pos) <= leader_range:
             break
 
         candidates = []
         for position, energy_cost in _legal_steps(
             match_info, mech, squad.movementMode, roadway_only,
         ):
-            status = _formation_status(position, leader.pos, teammate_positions, leader_range)
-            candidates.append((status, energy_cost, position))
+            distance = math.dist(position, leader.pos)
+            candidates.append((distance, energy_cost, position))
         if not candidates:
             break
 
-        valid = [
-            candidate for candidate in candidates
-            if candidate[0][0] and (roadway_only or candidate[0][1])
-        ]
-        if valid:
-            _, _, position = min(
-                valid,
-                key=lambda candidate: (
-                    candidate[1], -candidate[0][3], candidate[0][2], candidate[2],
-                ),
-            )
-        else:
-            # Constrained terrain can make perfect spacing impossible. Favor a
-            # tile inside leader range, then the greatest available separation.
-            _, _, position = max(
-                candidates,
-                key=lambda candidate: (
-                    candidate[0][0], roadway_only or candidate[0][1], candidate[0][3],
-                    -candidate[1], -candidate[0][2],
-                ),
-            )
+        distance, _, position = min(
+            candidates,
+            key=lambda candidate: (candidate[0], candidate[1], candidate[2]),
+        )
+        if distance >= math.dist(mech.pos, leader.pos):
+            break
         if not mech.moveTo(match_info, position, announce=False):
             break
         moved.append(mech)
@@ -439,12 +421,12 @@ def execute_squad_movement(match_info, squad=None):
     """Perform visibility-limited AI movement under squad reserve policies.
 
     Leaders hold to regroup any follower outside their plains visual range
-    (at least 10 tiles). Otherwise they advance first. Formation followers
-    seek three-tile spacing; road patrols stay on roads/tunnels and deliberately
-    ignore that spacing so a column can travel together. Patrol bursts run from
-    95 to 85 percent energy, normal movement from 90 to 70, and double time
-    from 50 to 20. Out-of-range followers wait to reach their burst ceiling
-    while the leader holds position for regrouping.
+    (at least 10 tiles). Followers already inside that tether hold position;
+    they do not spend energy refining their spacing.  After regrouping, the
+    leader waits for every squad member to reach the mode's burst ceiling
+    before advancing. Road patrols stay on roads/tunnels. Patrol bursts run
+    from 95 to 85 percent energy, normal movement from 90 to 70, and double
+    time from 50 to 20.
     """
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
