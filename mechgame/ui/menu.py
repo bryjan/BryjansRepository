@@ -246,10 +246,15 @@ def deployment_menu(settings, campaign):
                 campaign.deploy(chassis[mech_index], available[pilot_index].name)
             except ValueError as error:
                 print(error)
+            else:
+                campaign.save()
         elif choice == "r":
             name = input("Pilot name to recall ('x' cancel): ").strip()
-            if name.lower() != "x" and not campaign.recall(name):
-                print("That pilot has no assigned mech.")
+            if name.lower() != "x":
+                if campaign.recall(name):
+                    campaign.save()
+                else:
+                    print("That pilot has no assigned mech.")
         else:
             print("Choose 'a', 'r', or 'x'.")
 
@@ -270,6 +275,7 @@ def mercenary_menu(settings, campaign):
             except ValueError:
                 print("Choose one of the listed contracts, 'd', or 'x'.")
             else:
+                campaign.save()
                 print(f"Contract accepted: {offer.title}. Build your roster before deployment.")
             continue
         print("Choose a contract number, 'd', or 'x'.")

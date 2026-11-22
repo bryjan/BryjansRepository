@@ -508,7 +508,11 @@ def create_mech(mech_id):
     """Build a fresh mech by its stable catalog ID."""
     for mechs in MECH_FACTORIES.values():
         if mech_id in mechs:
-            return mechs[mech_id]()
+            mech = mechs[mech_id]()
+            # This survives Entity's deepcopy and lets campaign recovery
+            # identify a chassis without reverse-matching its display name.
+            mech.catalogId = mech_id
+            return mech
     raise ValueError(f"Unknown mech '{mech_id}'.")
 
 

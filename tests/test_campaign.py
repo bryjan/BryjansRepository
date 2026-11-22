@@ -1,5 +1,8 @@
 import random
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
+from types import SimpleNamespace
 
 from mechgame.campaign import MercenaryCampaign
 
@@ -35,3 +38,64 @@ class MercenaryCampaignTests(unittest.TestCase):
     def test_accepting_an_offer_sets_the_active_contract(self):
         mission = self.campaign.accept_mission(2)
         self.assertIs(self.campaign.activeMission, mission)
+
+    def test_save_load_preserves_pilots_traits_skills_and_campaign_state(self):
+        pilot = self.campaign.pilots[0]
+        pilot.traits = ["Steady"]
+        pilot.skills = {"gunnery": 2, "scouting": 1}
+        self.campaign.deploy("lancer.type_a", pilot.name)
+        self.campaign.accept_mission(1)
+
+        with TemporaryDirectory() as temporary_directory:
+            save_path = Path(temporary_directory) / "campaign.json"
+            self.campaign.save(save_path)
+            loaded = MercenaryCampaign.load(save_path)
+
+        loaded_pilot = next(item for item in loaded.pilots if item.name == pilot.name)
+        self.assertEqual(loaded_pilot.traits, ["Steady"])
+        self.assertEqual(loaded_pilot.skills, {"gunnery": 2, "scouting": 1})
+        self.assertEqual(loaded.deployments, self.campaign.deployments)
+        self.assertEqual(loaded.activeMission, self.campaign.activeMission)
+
+    def test_clear_field_returns_evading_pilot_and_recovers_any_abandoned_mech(self):
+        pilot = self.campaign.pilots[0]
+        pilot.status = "Evading"
+        pilot.ejectionLocation = (6, 7)
+        abandoned_enemy = SimpleNamespace(
+            mechClass=SimpleNamespace(catalogId="kestrel", size=3),
+            pos=[6, 7],
+        )
+        match = SimpleNamespace(
+            ejectedPilots=[pilot],
+            killedPilots=[],
+            abandonedMechs=[abandoned_enemy],
+            operational_teams=lambda: [],
+        )
+
+        result = self.campaign.resolve_match_recovery(match)
+
+        self.assertTrue(result["field_clear"])
+        self.assertEqual(pilot.status, "RTB")
+        self.assertEqual(self.campaign.recoveredMechs[0].mech_id, "kestrel")
+        self.assertFalse(self.campaign.leftBehindMechs)
+
+    def test_contested_field_can_leave_pilots_and_mechs_for_recovery(self):
+        pilot = self.campaign.pilots[0]
+        pilot.status = "Evading"
+        abandoned_mech = SimpleNamespace(
+            mechClass=SimpleNamespace(catalogId="lancer.type_a", size=2),
+            pos=[4, 5],
+        )
+        match = SimpleNamespace(
+            ejectedPilots=[pilot],
+            killedPilots=[],
+            abandonedMechs=[abandoned_mech],
+            operational_teams=lambda: [object(), object()],
+        )
+        self.campaign.rng = SimpleNamespace(randint=lambda *_: 100)
+
+        result = self.campaign.resolve_match_recovery(match)
+
+        self.assertFalse(result["field_clear"])
+        self.assertEqual(pilot.status, "Evading")
+        self.assertEqual(len(self.campaign.leftBehindMechs), 1)

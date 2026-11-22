@@ -619,6 +619,11 @@ class Pilot: #TODO add pilot levels, skills, certs
         self.returned = False
         self.ejectionOutcome = None
         self.ejectionLocation = None
+        # Persistent campaigns can safely begin recording progression now.
+        # Empty defaults keep ordinary skirmish pilots lightweight and ensure
+        # older saves can be upgraded without inventing a trait or skill.
+        self.traits = []
+        self.skills = {}
 
     def kill(self, matchInfo):
         """Record a fatal cockpit loss without treating it as an ejection."""

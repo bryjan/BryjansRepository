@@ -9,7 +9,7 @@ def main():
     # These objects live for the application session, so returning from a
     # skirmish never silently replaces campaign pilots or contracts.
     settings = DisplaySettings()
-    campaign = MercenaryCampaign()
+    campaign = MercenaryCampaign.load_or_create()
     while True:
         selected_settings = start_menu(settings, campaign)
         if selected_settings is None:

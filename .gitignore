@@ -6,3 +6,5 @@ __pycache__/
 build/
 dist/
 *.spec
+# Player campaign state is local, mutable game data rather than source content.
+savegames/
