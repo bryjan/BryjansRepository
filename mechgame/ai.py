@@ -91,6 +91,7 @@ def _install_squad_goals(squad, goals, replace=False):
     )
     squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
     squad.goalHistory.extend(goals)
+    squad._refreshOperationalFlags()
 
 
 def _next_goal_id(match_info):
@@ -145,11 +146,12 @@ def assign_team_goals_to_squads(team):
             if goal.team_goal_id in team_goal_ids
         ]
         squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
+        squad._refreshOperationalFlags()
 
     for team_goal in team.currentGoals:
         candidates = [
             squad for squad in ai_squads
-            if _squad_role_readiness(squad, team_goal.required_roles) >= 60
+            if squad.canFillRoles(team_goal.required_roles)
         ]
         if not candidates:
             continue

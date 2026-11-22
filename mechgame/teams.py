@@ -23,6 +23,9 @@ class MapVisibilityFlags:
 
 class Squad:
     """Ordered group of mechs that acts together and shares intelligence."""
+    ROLE_CAPABILITY_THRESHOLD = 60
+    COMBAT_EFFECTIVE_FORCE_RATIO = 0.40
+
     def __init__(self, squadName, squadList, squadRole, playerControlled = False):
         self.name = squadName
         self.mechList = squadList #in order of command
@@ -44,6 +47,12 @@ class Squad:
         # roughly three combat-ready mechs one size class below it.
         self.combatReadyCount = 0
         self.combatForce = 0
+        self.baselineCombatForce = 0
+        self.combatEffectiveness = 0
+        self.combatEffective = False
+        self.shouldLeaveBattlefield = False
+        self.roleCapabilityFlags = {}
+        self.canFulfillCurrentGoal = True
         # Active-radar contacts are shared by every mech in this squad.
         self.radarTrackedEnemies = []
 
@@ -65,7 +74,7 @@ class Squad:
         return 3 ** (size - 2)
 
     def refreshCombatForce(self):
-        """Recalculate the ready headcount and comparable combat-force value."""
+        """Refresh force, role capability, and battlefield-withdrawal flags."""
         ready_mechs = [mech for mech in self.mechList if mech.combatReady]
         self.combatReadyCount = len(ready_mechs)
         self.combatForce = round(
@@ -76,6 +85,9 @@ class Squad:
             ),
             2,
         )
+        if self.baselineCombatForce == 0 and self.combatForce > 0:
+            self.baselineCombatForce = self.combatForce
+        self._refreshOperationalFlags()
         return self.combatForce
 
     def roleReadiness(self):
@@ -85,6 +97,31 @@ class Squad:
             for role, score in mech.roleReadiness.items():
                 readiness[role] = max(readiness.get(role, 0), score)
         return readiness
+
+    def _refreshOperationalFlags(self):
+        """Turn mech readiness into squad-level capability and retreat signals."""
+        readiness = self.roleReadiness()
+        self.roleCapabilityFlags = {
+            role: score >= self.ROLE_CAPABILITY_THRESHOLD
+            for role, score in readiness.items()
+        }
+        required_roles = getattr(self.currentGoal, "required_roles", ())
+        self.canFulfillCurrentGoal = self.canFillRoles(required_roles)
+        self.combatEffectiveness = round(
+            (self.combatForce / self.baselineCombatForce) * 100,
+            1,
+        ) if self.baselineCombatForce else 0
+        self.combatEffective = (
+            self.combatReadyCount > 0
+            and self.combatForce >= self.baselineCombatForce * self.COMBAT_EFFECTIVE_FORCE_RATIO
+        )
+        # This is advice for a future squad-leader action planner. It does not
+        # remove units or move the squad until that planner is implemented.
+        self.shouldLeaveBattlefield = not self.combatEffective
+
+    def canFillRoles(self, required_roles):
+        """Return whether the squad currently supplies every requested role."""
+        return all(self.roleCapabilityFlags.get(role, False) for role in required_roles)
 
     def statusReport(self):
         """Return a squad readiness summary for the player or future AI."""

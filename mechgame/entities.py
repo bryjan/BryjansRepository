@@ -528,6 +528,7 @@ class Entity: #a character on the map
             matchInfo.entities.remove(self)
         if self.squad and self in self.squad.mechList:
             self.squad.mechList.remove(self)
+            self.squad.refreshCombatForce()
         if self not in matchInfo.destroyedMechs:
             matchInfo.destroyedMechs.append(self)
 

@@ -66,6 +66,25 @@ class MatchFlowTests(unittest.TestCase):
         player_squad.refreshCombatForce()
         self.assertEqual(player_squad.combatForce, 5.5)
 
+    def test_squad_operational_flags_track_capabilities_and_combat_effectiveness(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        player_squad = match.teamList[0].squadsList[0]
+
+        self.assertTrue(player_squad.roleCapabilityFlags["sensor"])
+        self.assertTrue(player_squad.roleCapabilityFlags["artillery"])
+        self.assertTrue(player_squad.combatEffective)
+        self.assertFalse(player_squad.shouldLeaveBattlefield)
+        self.assertEqual(player_squad.combatEffectiveness, 100)
+
+        for mech in player_squad.mechList:
+            mech.combatReady = False
+        player_squad.refreshCombatForce()
+
+        self.assertEqual(player_squad.combatForce, 0)
+        self.assertEqual(player_squad.combatEffectiveness, 0)
+        self.assertFalse(player_squad.combatEffective)
+        self.assertTrue(player_squad.shouldLeaveBattlefield)
+
     def test_non_attacking_roles_reduce_force_while_combat_specialists_gain_bonus(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         pathfinder = match.teamList[0].squadsList[0].mechList[0]
@@ -116,6 +135,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertEqual(patrol.required_roles, ("sensor", "skirmisher"))
         enemy_squad = team.squadsList[0]
         self.assertEqual(enemy_squad.currentGoal.kind, "defend")
+        self.assertTrue(enemy_squad.canFulfillCurrentGoal)
         self.assertEqual(
             [goal.kind for goal in enemy_squad.currentGoals],
             ["defend", "patrol", "eliminate_enemies"],
