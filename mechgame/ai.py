@@ -17,6 +17,13 @@ __all__ = [
 
 FORMATION_SPACING = 3
 MIN_LEADER_VISUAL_RANGE = 10
+ENERGY_RESERVE_BANDS = {
+    # A patrol may take a costly catch-up step, but it only begins a burst
+    # near full charge and stops before falling below its sustainable reserve.
+    "patrol": (.85, .95),
+    "move": (.70, .90),
+    "double_time": (.20, .50),
+}
 _ADJACENT_OFFSETS = (
     (-1, -1), (0, -1), (1, -1), (-1, 0),
     (1, 0), (-1, 1), (0, 1), (1, 1),
@@ -281,13 +288,19 @@ def _road_patrol_active(squad):
 
 def _energy_floor(mech, movement_mode):
     """Return the reserve a movement mode must leave after every step."""
-    if movement_mode == "patrol":
-        # A sustainable patrol spends no more than its next-turn generation,
-        # allowing the reserve to refill fully before its next action.
-        return max(0, mech.mechClass.energyMax - mech.mechClass.energyGen)
-    if movement_mode == "double_time":
-        return math.ceil(mech.mechClass.energyMax * .20)
-    return math.ceil(mech.mechClass.energyMax * .70)
+    floor, _ = ENERGY_RESERVE_BANDS[movement_mode]
+    return math.ceil(mech.mechClass.energyMax * floor)
+
+
+def _energy_ceiling(mech, movement_mode):
+    """Return the charge required to begin a new movement burst."""
+    _, ceiling = ENERGY_RESERVE_BANDS[movement_mode]
+    return math.ceil(mech.mechClass.energyMax * ceiling)
+
+
+def _can_begin_movement(mech, movement_mode):
+    """Require recharge to the policy ceiling before a new burst starts."""
+    return mech.energy >= _energy_ceiling(mech, movement_mode)
 
 
 def _legal_steps(match_info, mech, movement_mode, roadway_only=False):
@@ -330,6 +343,8 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
         destination = _nearest_roadway(match_info, leader.pos)
     if destination is None:
         return []
+    if not _can_begin_movement(leader, squad.movementMode):
+        return []
     moved = []
     while not _leader_needs_regroup(squad, leader_range):
         current_distance = math.dist(leader.pos, destination)
@@ -369,6 +384,11 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
     """Move a follower until it reaches a valid formation or reserve floor."""
     leader = squad.squadLead
     moved = []
+    # A leader already holds while this mech is outside the visual tether.
+    # Waiting here lets the follower recharge to its mode's ceiling before it
+    # attempts an expensive catch-up route.
+    if not _can_begin_movement(mech, squad.movementMode):
+        return moved
     while True:
         teammate_positions = [
             teammate.pos for teammate in squad.mechList if teammate is not mech
@@ -421,9 +441,10 @@ def execute_squad_movement(match_info, squad=None):
     Leaders hold to regroup any follower outside their plains visual range
     (at least 10 tiles). Otherwise they advance first. Formation followers
     seek three-tile spacing; road patrols stay on roads/tunnels and deliberately
-    ignore that spacing so a column can travel together. Patrol movement only
-    spends sustainable regeneration, normal movement preserves 70 percent of
-    energy, and double time stops at 20 percent.
+    ignore that spacing so a column can travel together. Patrol bursts run from
+    95 to 85 percent energy, normal movement from 90 to 70, and double time
+    from 50 to 20. Out-of-range followers wait to reach their burst ceiling
+    while the leader holds position for regrouping.
     """
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:

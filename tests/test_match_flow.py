@@ -256,6 +256,29 @@ class MatchFlowTests(unittest.TestCase):
         self.assertNotIn(leader, moved)
         self.assertLess(first_follower.pos[0], 26)
 
+    def test_ai_regroup_waits_for_follower_to_reach_its_movement_ceiling(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader, first_follower, second_follower = squad.mechList
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
+        leader.pos = [10, 10]
+        first_follower.pos = [26, 10]
+        second_follower.pos = [7, 13]
+        match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
+        first_follower.energy = math.ceil(first_follower.mechClass.energyMax * .90) - 1
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertEqual(leader.pos, [10, 10])
+        self.assertNotIn(first_follower, moved)
+        first_follower.energy = math.ceil(first_follower.mechClass.energyMax * .90)
+        moved = execute_squad_movement(match, squad)
+        self.assertIn(first_follower, moved)
+
     def test_road_patrol_moves_a_column_on_roads_without_spacing_requirement(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         squad = match.teamList[1].squadsList[0]
