@@ -51,6 +51,23 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(mission.diversion_payout(120), 700)
         self.assertEqual(mission.diversion_payout(180), 1_050)
 
+    def test_enemy_presence_applies_a_nonlinear_multiplier_to_all_contract_payouts(self):
+        self.assertLess(self.campaign.enemy_payout_multiplier(.5), .6)
+        self.assertAlmostEqual(self.campaign.enemy_payout_multiplier(1), 1)
+        self.assertGreater(self.campaign.enemy_payout_multiplier(1.5), 1.4)
+        self.assertNotAlmostEqual(self.campaign.enemy_payout_multiplier(1.5), 1.5)
+
+        templates = list(MISSION_TEMPLATES)
+        self.campaign.rng = SimpleNamespace(
+            sample=lambda *_: templates[:3],
+            randint=lambda *_: 2,
+        )
+        self.campaign.enemyPresence = 1.5
+        offers = self.campaign._generate_mission_offers()
+
+        self.assertEqual(offers[0].payout, round(650 * self.campaign.enemy_payout_multiplier()))
+        self.assertEqual(offers[1].payout, round(1_100 * self.campaign.enemy_payout_multiplier()))
+
     def test_sabotage_contracts_generate_one_to_three_targets_with_per_target_rewards(self):
         sabotage = next(template for template in MISSION_TEMPLATES if template[0] == "sabotage")
         alternatives = [template for template in MISSION_TEMPLATES if template[0] != "sabotage"][:2]
@@ -58,12 +75,13 @@ class MercenaryCampaignTests(unittest.TestCase):
             sample=lambda *_: [sabotage, *alternatives],
             randint=lambda *_: 3,
         )
+        self.campaign.enemyPresence = 1.5
 
         offer = next(mission for mission in self.campaign._generate_mission_offers() if mission.kind == "sabotage")
 
         self.assertEqual(offer.objective_value, 3)
-        self.assertEqual(offer.reward_per_target, 300)
-        self.assertEqual(offer.payout, 900)
+        self.assertEqual(offer.reward_per_target, round(300 * self.campaign.enemy_payout_multiplier()))
+        self.assertEqual(offer.payout, 3 * offer.reward_per_target)
 
     def test_deploying_requires_research_an_available_pilot_and_a_class_slot(self):
         pilot_names = [pilot.name for pilot in self.campaign.pilots]

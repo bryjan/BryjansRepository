@@ -155,6 +155,21 @@ class MercenaryCampaign:
         requirement = self.BASE_DIVERSION_DAMAGE * research_multiplier * company_multiplier * enemy_multiplier
         return max(20, round(requirement / 5) * 5)
 
+    def enemy_payout_multiplier(self, enemy_presence=None):
+        """Return a curved reward multiplier for the current hostile activity.
+
+        Presence is centered on 1.0. The 1.25 exponent means low activity
+        lowers pay gently (0.5 becomes about 0.58×), while heavy activity
+        raises it faster than a linear rate (1.5 becomes about 1.42×).
+        """
+        presence = self.enemyPresence if enemy_presence is None else enemy_presence
+        difference = max(.5, min(2, float(presence))) - 1
+        return 1 + (abs(difference) ** 1.25) * (1 if difference >= 0 else -1)
+
+    def _scaled_payout(self, payout):
+        """Apply the current enemy-presence reward curve to a credit value."""
+        return round(payout * self.enemy_payout_multiplier())
+
     def _generate_mission_offers(self):
         """Offer three different contracts, selected reproducibly from templates."""
         templates = self.rng.sample(MISSION_TEMPLATES, 3)
@@ -164,12 +179,13 @@ class MercenaryCampaign:
             objective_value, objective_targets,
         ) in enumerate(templates, start=1):
             reward_per_target = 0
+            payout = self._scaled_payout(payout)
             if kind == "diversion":
                 objective_value = self.diversion_damage_requirement()
                 description = f"Inflict {objective_value} damage on enemy forces, then disengage."
             elif kind == "sabotage":
                 objective_value = self.rng.randint(1, 3)
-                reward_per_target = 300
+                reward_per_target = self._scaled_payout(300)
                 payout = objective_value * reward_per_target
                 description = (
                     f"Hold {objective_value} sabotage point(s) for one complete turn each. "
