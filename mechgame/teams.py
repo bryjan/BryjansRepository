@@ -42,6 +42,13 @@ class Squad:
         # speed or double time without changing the squad's assigned mission.
         self.movementMode = "move"
         self.movementBehavior = "formation"
+        # Road patrols keep an ordered copy of the selected generated route.
+        # The cursor and direction make a route repeat by walking back along
+        # it when it reaches an end, without needing to regenerate the map.
+        self.patrolRoute = ()
+        self.patrolRouteId = None
+        self.patrolRouteIndex = 0
+        self.patrolRouteDirection = 1
         # Teams hand down matching objective records to AI squads only.
         self.currentGoal = None
         self.currentGoals = []
@@ -148,6 +155,45 @@ class Squad:
             if behavior not in MOVEMENT_BEHAVIORS:
                 raise ValueError(f"Unknown movement behavior '{behavior}'.")
             self.movementBehavior = behavior
+
+    def beginRoadPatrol(self, route_id, route_tiles):
+        """Assign one recorded road route to this squad's leader.
+
+        The supplied tiles are immutable map coordinates from ``MapFeatures``.
+        A patrol starts at the route tile nearest the leader, then reverses at
+        either endpoint so it can repeat even on a non-circuit road.
+        """
+        if len(route_tiles) < 2:
+            raise ValueError("A road patrol needs at least two roadway tiles.")
+        self.patrolRoute = tuple(tuple(tile) for tile in route_tiles)
+        self.patrolRouteId = route_id
+        self.patrolRouteIndex = min(
+            range(len(self.patrolRoute)),
+            key=lambda index: (
+                (self.patrolRoute[index][0] - self.squadLead.pos[0]) ** 2
+                + (self.patrolRoute[index][1] - self.squadLead.pos[1]) ** 2,
+                index,
+            ),
+        ) if self.squadLead else 0
+        self.patrolRouteDirection = -1 if self.patrolRouteIndex == len(self.patrolRoute) - 1 else 1
+        self.setMovementPolicy(mode="patrol", behavior="road_patrol")
+
+    def stopRoadPatrol(self):
+        """Clear the active route while leaving ordinary formation movement on."""
+        self.patrolRoute = ()
+        self.patrolRouteId = None
+        self.patrolRouteIndex = 0
+        self.patrolRouteDirection = 1
+        if self.movementBehavior == "road_patrol":
+            self.movementBehavior = "formation"
+
+    @property
+    def in_combat(self):
+        """Expose a snake-case squad combat flag derived from its members."""
+        return any(
+            getattr(mech, "in_combat", getattr(mech, "inCombat", False))
+            for mech in self.mechList
+        )
 
     def statusReport(self):
         """Return a squad readiness summary for the player or future AI."""

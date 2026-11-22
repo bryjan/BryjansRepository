@@ -3,7 +3,7 @@ import random
 import unittest
 from unittest.mock import patch
 
-from mechgame.ai import execute_squad_movement
+from mechgame.ai import execute_squad_movement, start_road_patrol
 from mechgame.catalog import create_mech
 from mechgame.entities import Entity, Pilot
 from mechgame.missions import MissionGenerator
@@ -256,7 +256,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertNotIn(leader, moved)
         self.assertLess(first_follower.pos[0], 26)
 
-    def test_ai_followers_inside_leader_tether_do_not_reposition(self):
+    def test_ai_followers_correct_tight_spacing_inside_leader_tether(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         squad = match.teamList[1].squadsList[0]
         leader, first_follower, second_follower = squad.mechList
@@ -266,8 +266,8 @@ class MatchFlowTests(unittest.TestCase):
         for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
             entity.pos = [35 + (index % 2), 35 + (index // 2)]
         leader.pos = [10, 10]
-        # The followers are closer together than the former spacing preference,
-        # but both are safely inside the leader's formation tether.
+        # Both followers are inside the leader tether, but too close together.
+        # The squad should still repair that spacing during regrouping.
         first_follower.pos = [8, 10]
         second_follower.pos = [8, 11]
         match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
@@ -275,9 +275,8 @@ class MatchFlowTests(unittest.TestCase):
         moved = execute_squad_movement(match, squad)
 
         self.assertTrue(moved)
-        self.assertTrue(all(mech is leader for mech in moved))
-        self.assertEqual(first_follower.pos, [8, 10])
-        self.assertEqual(second_follower.pos, [8, 11])
+        self.assertTrue(any(mech is not leader for mech in moved))
+        self.assertGreaterEqual(math.dist(first_follower.pos, second_follower.pos), 3)
 
     def test_ai_leader_waits_after_regroup_for_reserves_to_recover(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
@@ -331,7 +330,7 @@ class MatchFlowTests(unittest.TestCase):
         moved = execute_squad_movement(match, squad)
         self.assertIn(first_follower, moved)
 
-    def test_road_patrol_moves_a_column_on_roads_without_spacing_requirement(self):
+    def test_road_patrol_uses_a_recorded_route_and_repeats_at_its_end(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         squad = match.teamList[1].squadsList[0]
         leader, first_follower, second_follower = squad.mechList
@@ -342,6 +341,8 @@ class MatchFlowTests(unittest.TestCase):
             entity.pos = [35 + (index % 2), 35 + (index // 2)]
         for x in range(1, match.mapWidth - 1):
             match.map[10][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
         leader.pos = [10, 10]
         first_follower.pos = [1, 10]
         second_follower.pos = [4, 10]
@@ -350,7 +351,52 @@ class MatchFlowTests(unittest.TestCase):
         moved = execute_squad_movement(match, squad)
 
         self.assertTrue(moved)
+        self.assertEqual(squad.patrolRouteId, "road_1")
+        self.assertTrue(squad.patrolRoute)
         self.assertTrue(all(match.map[mech.pos[1]][mech.pos[0]].terrain is match.road for mech in squad.mechList))
+
+    def test_road_patrol_pauses_when_a_squad_member_enters_combat(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader = squad.squadLead
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
+        for index, mech in enumerate(squad.mechList):
+            mech.pos = [10 - index * 3, 10]
+        match.issueTeamObjective(match.teamList[1], "patrol_map", 80, (30, 10), "Patrol road.")
+        leader.in_combat = True
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertEqual(moved, [])
+        self.assertEqual(squad.patrolRouteId, "road_1")
+
+    def test_road_patrol_reverses_when_its_leader_reaches_an_endpoint(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
+        leader, first_follower, second_follower = squad.mechList
+        leader.pos = [match.mapWidth - 2, 10]
+        first_follower.pos = [match.mapWidth - 5, 10]
+        second_follower.pos = [match.mapWidth - 8, 10]
+
+        self.assertTrue(start_road_patrol(match, squad, "road_1"))
+        moved = execute_squad_movement(match, squad)
+
+        self.assertTrue(moved)
+        self.assertEqual(squad.patrolRouteDirection, -1)
+        self.assertLess(squad.patrolRouteIndex, len(squad.patrolRoute) - 1)
 
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

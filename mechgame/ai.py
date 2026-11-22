@@ -11,10 +11,11 @@ import math
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
-    "execute_squad_movement", "issue_team_goal",
+    "execute_squad_movement", "issue_team_goal", "start_road_patrol",
 ]
 
 
+FORMATION_SPACING = 3
 MIN_LEADER_VISUAL_RANGE = 10
 ENERGY_RESERVE_BANDS = {
     # A patrol may take a costly catch-up step, but it only begins a burst
@@ -256,6 +257,11 @@ def _nearest_location(origin, locations):
 def _leader_destination(match_info, squad):
     """Choose a known, legal-information destination for the squad leader."""
     leader = squad.squadLead
+    patrol_destination = (
+        _patrol_destination(squad, leader) if _road_patrol_active(squad) else None
+    )
+    if patrol_destination is not None:
+        return patrol_destination
     if squad.currentGoal and squad.currentGoal.locations:
         return _nearest_location(leader.pos, squad.currentGoal.locations)
     # Direct sight and radar tracking are both already filtered by the normal
@@ -283,6 +289,88 @@ def _road_patrol_active(squad):
     return squad.movementBehavior == "road_patrol" or goal_kind in {
         "patrol", "patrol_map", "patrol_location",
     }
+
+
+def _recorded_road_tiles(match_info, route):
+    """Keep only still-usable tiles from one generated and recorded route."""
+    tiles = []
+    for tile in route.tiles:
+        if _is_roadway(match_info, tile) and (not tiles or tiles[-1] != tile):
+            tiles.append(tile)
+    return tuple(tiles)
+
+
+def start_road_patrol(match_info, squad, route_id=None):
+    """Give a squad leader a repeatable patrol order from recorded map roads.
+
+    A selected route is stored on the squad rather than reconstructed from raw
+    terrain each turn.  Patrol and defense AI may call this helper because
+    map features are neutral scenario knowledge, not hidden enemy data.
+    """
+    routes = getattr(match_info.mapFeatures, "roads", ())
+    candidates = [
+        route for route in routes
+        if route_id is None or route.route_id == route_id
+    ]
+    if not candidates:
+        return False
+
+    origin = squad.squadLead.pos
+    if squad.currentGoal and squad.currentGoal.kind == "defend" and squad.currentGoal.locations:
+        origin = _nearest_location(squad.squadLead.pos, squad.currentGoal.locations)
+    route = min(
+        candidates,
+        key=lambda candidate: (
+            math.dist(origin, _nearest_location(origin, candidate.tiles)),
+            candidate.route_id,
+        ),
+    )
+    tiles = _recorded_road_tiles(match_info, route)
+    if len(tiles) < 2:
+        return False
+    squad.beginRoadPatrol(route.route_id, tiles)
+    return True
+
+
+def _ensure_road_patrol(match_info, squad):
+    """Create a default route for patrol/defense orders only when needed."""
+    if squad.patrolRoute:
+        return True
+    goal_kind = getattr(squad.currentGoal, "kind", "")
+    if squad.movementBehavior == "road_patrol" or goal_kind in {
+        "patrol", "patrol_map", "patrol_location", "defend",
+    }:
+        return start_road_patrol(match_info, squad)
+    return False
+
+
+def _patrol_destination(squad, leader):
+    """Return and advance toward the next ordered road waypoint.
+
+    Non-circuit routes reverse at their endpoints.  This makes a simple road
+    repeat indefinitely without fabricating a route through unknown terrain.
+    """
+    route = squad.patrolRoute
+    if not route:
+        return None
+    index = squad.patrolRouteIndex
+    if tuple(leader.pos) == route[index]:
+        next_index = index + squad.patrolRouteDirection
+        if not 0 <= next_index < len(route):
+            squad.patrolRouteDirection *= -1
+            next_index = index + squad.patrolRouteDirection
+        squad.patrolRouteIndex = next_index
+    return squad.patrolRoute[squad.patrolRouteIndex]
+
+
+def _patrol_interrupted(squad):
+    """Stop route-following as soon as the squad enters or detects combat."""
+    if squad.in_combat:
+        return True
+    return any(
+        mech.directlyVisibleEnemies or mech.trackedEnemies
+        for mech in squad.mechList
+    )
 
 
 def _energy_floor(mech, movement_mode):
@@ -325,22 +413,42 @@ def _nearest_roadway(match_info, position):
     return _nearest_location(position, roads) if roads else None
 
 
-def _leader_needs_regroup(squad, leader_range):
-    """Return whether any follower has fallen outside the leader's sight range."""
-    return any(
-        math.dist(mech.pos, squad.squadLead.pos) > leader_range
-        for mech in squad.mechList
-        if mech is not squad.squadLead
+def _formation_status(position, leader_position, teammate_positions, leader_range):
+    """Return leader-tether and teammate-spacing results for one position."""
+    leader_distance = math.dist(position, leader_position)
+    nearest_teammate = min(
+        (math.dist(position, teammate_position) for teammate_position in teammate_positions),
+        default=float("inf"),
     )
+    return (
+        leader_distance <= leader_range,
+        nearest_teammate >= FORMATION_SPACING,
+        leader_distance,
+        nearest_teammate,
+    )
+
+
+def _leader_needs_regroup(squad, leader_range):
+    """Return whether any follower needs range or spacing correction."""
+    leader = squad.squadLead
+    for mech in squad.mechList:
+        if mech is leader:
+            continue
+        teammates = [other.pos for other in squad.mechList if other is not mech]
+        within_range, spaced, _, _ = _formation_status(
+            mech.pos, leader.pos, teammates, leader_range,
+        )
+        if not within_range or not spaced:
+            return True
+    return False
 
 
 def _squad_ready_to_advance(squad):
     """Return whether every squad member has recharged for its next movement burst.
 
-    Formation units only reposition when they have fallen outside the leader's
-    tether.  Once they have caught up, the leader holds until everyone has
-    recovered to the selected movement mode's ceiling.  This avoids paying
-    energy merely to refine a formation that is already operational.
+    Once the squad is both regrouped and spaced, the leader holds until every
+    member has recovered to the selected movement mode's ceiling.  This lets
+    catch-up movement use costly terrain without splitting the formation.
     """
     return all(
         _can_begin_movement(mech, squad.movementMode)
@@ -351,15 +459,15 @@ def _squad_ready_to_advance(squad):
 def _move_leader(match_info, squad, leader_range, roadway_only):
     """Advance the leader until it reaches its reserve, goal, or regroup hold."""
     leader = squad.squadLead
-    destination = _leader_destination(match_info, squad)
-    if roadway_only and not _is_roadway(match_info, leader.pos):
-        destination = _nearest_roadway(match_info, leader.pos)
-    if destination is None:
-        return []
     if not _squad_ready_to_advance(squad):
         return []
     moved = []
     while not _leader_needs_regroup(squad, leader_range):
+        destination = _leader_destination(match_info, squad)
+        if roadway_only and not _is_roadway(match_info, leader.pos):
+            destination = _nearest_roadway(match_info, leader.pos)
+        if destination is None:
+            break
         current_distance = math.dist(leader.pos, destination)
         steps = [
             (math.dist(position, destination), energy_cost, position)
@@ -379,38 +487,47 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
 
 
 def _move_follower(match_info, squad, mech, leader_range, roadway_only):
-    """Move only an out-of-tether follower back into the leader's formation."""
+    """Correct a follower's leader tether and spacing during any regroup."""
     leader = squad.squadLead
     moved = []
-    # Keep a tactically usable formation cheap: units already inside the
-    # leader's visual tether hold their positions, even when their preferred
-    # spacing is imperfect.  They will recharge while the squad regroups.
-    if math.dist(mech.pos, leader.pos) <= leader_range:
-        return moved
-    # A leader already holds while this mech is outside the visual tether.
-    # Waiting here lets the follower recharge to its mode's ceiling before it
-    # attempts an expensive catch-up route.
+    # This includes close-together units: spacing is kept even while another
+    # follower is catching up, so the formation does not pile up at the lead.
     if not _can_begin_movement(mech, squad.movementMode):
         return moved
     while True:
-        if math.dist(mech.pos, leader.pos) <= leader_range:
+        teammate_positions = [
+            teammate.pos for teammate in squad.mechList if teammate is not mech
+        ]
+        current = _formation_status(mech.pos, leader.pos, teammate_positions, leader_range)
+        if current[0] and current[1]:
             break
 
         candidates = []
         for position, energy_cost in _legal_steps(
             match_info, mech, squad.movementMode, roadway_only,
         ):
-            distance = math.dist(position, leader.pos)
-            candidates.append((distance, energy_cost, position))
+            status = _formation_status(position, leader.pos, teammate_positions, leader_range)
+            candidates.append((status, energy_cost, position))
         if not candidates:
             break
 
-        distance, _, position = min(
-            candidates,
-            key=lambda candidate: (candidate[0], candidate[1], candidate[2]),
-        )
-        if distance >= math.dist(mech.pos, leader.pos):
-            break
+        valid = [candidate for candidate in candidates if candidate[0][0] and candidate[0][1]]
+        if valid:
+            _, _, position = min(
+                valid,
+                key=lambda candidate: (
+                    candidate[1], -candidate[0][3], candidate[0][2], candidate[2],
+                ),
+            )
+        else:
+            # Constrained ground may make perfect spacing impossible. Favor a
+            # position inside leader range, then the best available separation.
+            _, _, position = max(
+                candidates,
+                key=lambda candidate: (
+                    candidate[0][0], candidate[0][3], -candidate[1], -candidate[0][2],
+                ),
+            )
         if not mech.moveTo(match_info, position, announce=False):
             break
         moved.append(mech)
@@ -420,13 +537,13 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
 def execute_squad_movement(match_info, squad=None):
     """Perform visibility-limited AI movement under squad reserve policies.
 
-    Leaders hold to regroup any follower outside their plains visual range
-    (at least 10 tiles). Followers already inside that tether hold position;
-    they do not spend energy refining their spacing.  After regrouping, the
-    leader waits for every squad member to reach the mode's burst ceiling
-    before advancing. Road patrols stay on roads/tunnels. Patrol bursts run
-    from 95 to 85 percent energy, normal movement from 90 to 70, and double
-    time from 50 to 20.
+    Leaders hold to correct both the visual tether (at least 10 tiles) and
+    three-tile unit spacing. Followers keep spacing even while another unit
+    is regrouping. After regrouping, the leader waits for every member to
+    reach the mode's burst ceiling before advancing. Patrol/defense squads
+    follow a recorded road route, reversing at its endpoint, until combat or
+    a contact interrupts them. Patrol bursts run from 95 to 85 percent energy,
+    normal movement from 90 to 70, and double time from 50 to 20.
     """
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
@@ -434,6 +551,11 @@ def execute_squad_movement(match_info, squad=None):
 
     leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
     roadway_only = _road_patrol_active(squad)
+    if roadway_only:
+        _ensure_road_patrol(match_info, squad)
+        if _patrol_interrupted(squad):
+            return []
+        roadway_only = bool(squad.patrolRoute)
     moved = _move_leader(match_info, squad, leader_range, roadway_only)
     for mech in list(squad.mechList):
         if mech is squad.squadLead:

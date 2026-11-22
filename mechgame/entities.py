@@ -49,7 +49,7 @@ class Entity: #a character on the map
         # TODO(ai-threat): replace this temporary switch with a shared,
         # visibility-limited threat assessment. Ejection already consumes it
         # so survival odds can model combat risk without reading hidden units.
-        self.inCombat = False
+        self.in_combat = False
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
@@ -102,6 +102,15 @@ class Entity: #a character on the map
 
     def __repr__(self):
         return self.pilot.display_name
+
+    @property
+    def inCombat(self):
+        """Compatibility alias for older callers using camel-case combat state."""
+        return self.in_combat
+
+    @inCombat.setter
+    def inCombat(self, value):
+        self.in_combat = bool(value)
 
     def roundRefresh(self, matchInfo):
         """Restore per-round state and refresh the mech's derived statistics."""
