@@ -5,6 +5,7 @@ import unittest
 
 from mechgame.ai import execute_squad_combat, execute_squad_movement, request_reinforcement
 from mechgame.runner import Game
+from mechgame.teams import Squad
 
 
 class AiCombatTests(unittest.TestCase):
@@ -44,6 +45,33 @@ class AiCombatTests(unittest.TestCase):
         self.enemy_squad.setCombatPosture("retreat")
         self.assertEqual(execute_squad_combat(self.match, self.enemy_squad), [])
         self.assertEqual([mech.ap for mech in self.enemy_squad.mechList], starting_ap)
+
+    def test_retreating_squad_calls_in_range_smoke_support(self):
+        """A squad in contact asks a separate artillery squad to screen it."""
+        retreating_squad = self.player_squad
+        retreating_squad.playerControlled = False
+        mortar = next(
+            mech for mech in retreating_squad.mechList
+            if any(weapon.isLauncher for weapon in mech.mechClass.gunList)
+        )
+        retreating_squad.mechList.remove(mortar)
+        support_squad = Squad("Support", [mortar], "Artillery")
+        self.match.teamList[0].squadsList.append(support_squad)
+        support_squad.team = self.match.teamList[0]
+        retreating_squad.squadLead.pos = [15, 10]
+        mortar.pos = [10, 10]
+        retreating_squad.squadLead.noteCombat("enemy in visual range")
+        retreating_squad.setCombatPosture("retreat")
+
+        self.assertEqual(execute_squad_combat(self.match, retreating_squad), [])
+        self.assertEqual(support_squad.smokeCallPosition, (15, 10))
+        self.assertEqual(support_squad.smokeCallTurns, 1)
+
+        execute_squad_combat(self.match, support_squad)
+
+        launcher = next(weapon for weapon in mortar.mechClass.gunList if weapon.isLauncher)
+        self.assertEqual(launcher.selected_ammo.payload, "smoke")
+        self.assertTrue(self.match.pendingImpacts)
 
     def test_low_ammo_mech_needs_attack_order_to_fire_on_radar_contact(self):
         shooter = self.enemy_squad.mechList[-1]

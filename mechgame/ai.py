@@ -617,6 +617,44 @@ def _issue_artillery_call(match_info, squad):
         )
 
 
+def _can_smoke_position(match_info, mech, weapon, position):
+    """Return whether one launcher has a loaded smoke shell that can reach."""
+    for index, ammo in enumerate(weapon.ammoTypes):
+        if ammo.payload != "smoke" or ammo.charges == 0:
+            continue
+        distance = math.dist(mech.pos, position)
+        if weapon.launcher_profile(distance, match_info, mech) is not None:
+            return index
+    return None
+
+
+def _issue_retreat_smoke_call(match_info, squad):
+    """Ask any in-range friendly artillery to screen a retreating squad."""
+    if not squad.inCombat or squad.squadLead is None:
+        return
+    position = tuple(squad.squadLead.pos)
+    for artillery_squad in squad.team.squadsList:
+        # A retreating formation has its own fire suppressed, so it cannot
+        # provide the screening fire it is requesting.
+        if artillery_squad is squad or _fire_suppressed(artillery_squad):
+            continue
+        for mech in artillery_squad.mechList:
+            for weapon in mech.mechClass.gunList:
+                if not weapon.isLauncher or _can_smoke_position(match_info, mech, weapon, position) is None:
+                    continue
+                artillery_squad.smokeCallPosition = position
+                artillery_squad.smokeCallTurns = 1
+                _notify_player_support_request(
+                    match_info, artillery_squad,
+                    f"Smoke request from {squad.name} squad at {list(position)}.",
+                )
+                # One screen is enough; preserve the rest of the team's
+                # scarce smoke rounds for later withdrawals.
+                return
+            else:
+                continue
+
+
 def _assign_anti_heavy_focus(squad, contacts):
     """Concentrate a near-matching anti-heavy group on one combat mech."""
     anti_heavies = [
@@ -798,14 +836,29 @@ def _artillery_target_position(match_info, shooter, weapon, target):
 
 
 def _fire_artillery_if_ordered(match_info, squad, mech):
-    """Launch one round after a leader call while avoiding friendly blast risk."""
-    target = squad.artilleryCallTarget
-    if target is None or target.destroyed:
-        return False
+    """Launch one requested smoke shell or a safe offensive artillery round."""
+    smoke_position = (
+        squad.smokeCallPosition if squad.smokeCallTurns > 0 else None
+    )
     for weapon in mech.mechClass.gunList:
         if not weapon.isLauncher:
             continue
         if weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
+            continue
+
+        # Smoke has priority: the requesting squad is actively withdrawing,
+        # whereas an offensive call can wait for the next artillery pass.
+        if smoke_position is not None:
+            smoke_index = _can_smoke_position(
+                match_info, mech, weapon, smoke_position,
+            )
+            if smoke_index is not None:
+                weapon.select_ammo(smoke_index)
+                if weapon.launchAt(match_info, smoke_position, shooter=mech):
+                    return True
+
+        target = squad.artilleryCallTarget
+        if target is None or target.destroyed:
             continue
         position = _artillery_target_position(match_info, mech, weapon, target)
         if position is not None and weapon.launchAt(match_info, position, shooter=mech):
@@ -822,7 +875,11 @@ def execute_squad_combat(match_info, squad=None):
     movement can close toward an 80% chance; artillery remains command-only.
     """
     squad = squad or match_info.pov.squad
-    if squad.playerControlled or not squad.mechList or _fire_suppressed(squad):
+    if not squad.mechList:
+        return []
+    if squad.combatPosture == "retreat" and squad.inCombat:
+        _issue_retreat_smoke_call(match_info, squad)
+    if squad.playerControlled or _fire_suppressed(squad):
         return []
 
     contacts = list(dict.fromkeys(
@@ -877,6 +934,10 @@ def execute_squad_combat(match_info, squad=None):
         squad.artilleryCallTurns -= 1
         if squad.artilleryCallTurns == 0:
             squad.artilleryCallTarget = None
+    if squad.smokeCallTurns:
+        squad.smokeCallTurns -= 1
+        if squad.smokeCallTurns == 0:
+            squad.smokeCallPosition = None
     return fired
 
 
