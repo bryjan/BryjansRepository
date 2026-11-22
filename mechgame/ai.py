@@ -283,7 +283,10 @@ def _leader_destination(match_info, squad):
     if patrol_destination is not None:
         return patrol_destination
     target = squad.primaryTarget
-    if _attack_ordered(squad) and target in match_info.entities and not target.destroyed:
+    if (
+        (_attack_ordered(squad) or squad.engagementAssessment == "favorable")
+        and target in match_info.entities and not target.destroyed
+    ):
         return target.pos
     if squad.currentGoal and squad.currentGoal.locations:
         return _nearest_location(leader.pos, squad.currentGoal.locations)
@@ -496,13 +499,12 @@ def _avoidance_destination(match_info, squad, threat):
 
 
 def _assess_enemy_force(match_info, squad, contacts):
-    """Store force balance and issue a conservative artillery/avoidance call."""
+    """Store observed force balance; damage review decides commitment later."""
     nearby_squads = _nearby_friendly_squads(squad)
     squad.nearbyFriendlyForce = round(sum(other.combatForce for other in nearby_squads), 2)
     squad.observedEnemyForce = round(sum(_entity_combat_force(contact) for contact in contacts), 2)
     friendly_force = squad.nearbyFriendlyForce
     if not contacts or friendly_force <= 0:
-        squad.artilleryCallTarget = None
         squad.avoidContact = False
         squad.avoidanceTarget = None
         return
@@ -512,16 +514,85 @@ def _assess_enemy_force(match_info, squad, contacts):
         contacts,
         key=lambda contact: (_entity_combat_force(contact), -math.dist(squad.squadLead.pos, contact.pos)),
     )
-    squad.avoidContact = force_ratio > ARTILLERY_MAX_FORCE_RATIO
+    # Force alone is recorded immediately, but the leader waits for two
+    # combat turns of confirmed damage before committing or disengaging.
+    squad.forceRatio = force_ratio
+    squad.strongestObservedThreat = highest_threat
+
+
+def _squad_resources_high(squad):
+    """Return whether the squad can safely continue an unclear exchange."""
+    if not squad.mechList:
+        return False
+    average_integrity = sum(mech.mechClass.condition for mech in squad.mechList) / len(squad.mechList)
+    average_ammo = sum(mech.readinessMetrics.get("ammo", 100) for mech in squad.mechList) / len(squad.mechList)
+    return average_integrity >= 60 and average_ammo >= 50
+
+
+def _squad_has_artillery_reserves(squad):
+    """Return whether an artillery squad has at least half its shell pool."""
+    reserves = [
+        ammo.charges / ammo.maxCharges
+        for mech in squad.mechList
+        for weapon in mech.mechClass.gunList if weapon.isLauncher
+        for ammo in weapon.ammoTypes
+        if ammo.charges is not None and ammo.maxCharges
+    ]
+    return bool(reserves) and sum(reserves) / len(reserves) >= .50
+
+
+def _review_engagement(match_info, squad, contacts):
+    """Review two turns of damage with intentional leader uncertainty."""
+    if not contacts or not squad.inCombat:
+        squad.combatTurns = 0
+        squad.damageGiven = 0
+        squad.damageReceived = 0
+        squad.engagementAssessment = "unassessed"
+        return
+    squad.combatTurns += 1
+    if squad.combatTurns < 2:
+        squad.engagementAssessment = "unassessed"
+        return
+
+    error = max(0, getattr(squad.squadLead, "combatAssessmentError", .25))
+    squad.estimatedDamageGiven = round(squad.damageGiven * match_info.rng.uniform(1 - error, 1 + error), 1)
+    squad.estimatedDamageReceived = round(squad.damageReceived * match_info.rng.uniform(1 - error, 1 + error), 1)
+    given = squad.estimatedDamageGiven
+    received = squad.estimatedDamageReceived
+    if given > received * 1.20:
+        squad.engagementAssessment = "favorable"
+    elif received > given * 1.20 or getattr(squad, "forceRatio", 0) > ARTILLERY_MAX_FORCE_RATIO:
+        squad.engagementAssessment = "unfavorable"
+    else:
+        squad.engagementAssessment = "unclear"
+
+    squad.avoidContact = squad.engagementAssessment == "unfavorable"
+    threat = getattr(squad, "strongestObservedThreat", None)
     squad.avoidanceTarget = (
-        _avoidance_destination(match_info, squad, highest_threat)
-        if squad.avoidContact else None
+        _avoidance_destination(match_info, squad, threat)
+        if squad.avoidContact and threat is not None else None
     )
-    squad.artilleryCallTarget = (
-        highest_threat
-        if ARTILLERY_MIN_FORCE_RATIO <= force_ratio <= ARTILLERY_MAX_FORCE_RATIO
-        else None
-    )
+
+
+def _issue_artillery_call(squad, contacts):
+    """Call local or nearby artillery only after a favorable-safe review."""
+    squad.artilleryCallTarget = None
+    squad.artilleryCallTurns = 0
+    ratio = getattr(squad, "forceRatio", 0)
+    if squad.engagementAssessment not in {"favorable", "unclear"}:
+        return
+    if not ARTILLERY_MIN_FORCE_RATIO <= ratio <= ARTILLERY_MAX_FORCE_RATIO:
+        return
+    target = getattr(squad, "strongestObservedThreat", None)
+    if target is None:
+        return
+    nearby = _nearby_friendly_squads(squad)
+    eligible = [candidate for candidate in nearby if _squad_has_artillery_reserves(candidate)]
+    if not eligible:
+        return
+    for artillery_squad in eligible:
+        artillery_squad.artilleryCallTarget = target
+        artillery_squad.artilleryCallTurns = 1
 
 
 def _assign_anti_heavy_focus(squad, contacts):
@@ -706,11 +777,21 @@ def execute_squad_combat(match_info, squad=None):
     contacts = list(dict.fromkeys(
         target for mech in squad.mechList for target in _known_targets(mech)
     ))
+    incoming_artillery_call = (
+        squad.artilleryCallTarget if squad.artilleryCallTurns > 0 else None
+    )
     squad.assignedTargets = {}
     _assess_enemy_force(match_info, squad, contacts)
+    _review_engagement(match_info, squad, contacts)
     if squad.avoidContact:
         squad.primaryTarget = None
         return []
+
+    if incoming_artillery_call is not None:
+        squad.artilleryCallTarget = incoming_artillery_call
+        squad.artilleryCallTurns = 1
+    else:
+        _issue_artillery_call(squad, contacts)
 
     _assign_anti_heavy_focus(squad, contacts)
     primary_target = _select_primary_target(squad)
@@ -728,7 +809,9 @@ def execute_squad_combat(match_info, squad=None):
             if weapon.shootAt(match_info, target.pos, shooter=mech):
                 fired.append(mech)
         _fire_artillery_if_ordered(match_info, squad, mech)
-    if _attack_ordered(squad):
+    if squad.engagementAssessment == "favorable":
+        squad.primaryTarget = getattr(squad, "strongestObservedThreat", None)
+    elif _attack_ordered(squad):
         squad.primaryTarget = min(
             dict.fromkeys(approach_targets),
             key=lambda target: (
@@ -739,6 +822,10 @@ def execute_squad_combat(match_info, squad=None):
         )
     else:
         squad.primaryTarget = None
+    if squad.artilleryCallTurns:
+        squad.artilleryCallTurns -= 1
+        if squad.artilleryCallTurns == 0:
+            squad.artilleryCallTarget = None
     return fired
 
 

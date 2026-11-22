@@ -51,10 +51,17 @@ class Squad:
         # The leader refreshes these from observed contacts before each AI
         # combat pass. They are tactical memory, not hidden enemy knowledge.
         self.artilleryCallTarget = None
+        self.artilleryCallTurns = 0
         self.observedEnemyForce = 0
         self.nearbyFriendlyForce = 0
         self.avoidContact = False
         self.avoidanceTarget = None
+        self.combatTurns = 0
+        self.damageGiven = 0
+        self.damageReceived = 0
+        self.estimatedDamageGiven = 0
+        self.estimatedDamageReceived = 0
+        self.engagementAssessment = "unassessed"
         # Road patrols keep an ordered copy of the selected generated route.
         # The cursor and direction make a route repeat by walking back along
         # it when it reaches an end, without needing to regenerate the map.

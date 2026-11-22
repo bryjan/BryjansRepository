@@ -418,7 +418,8 @@ class MechPart: # super class to mech limbs
 
 
 
-    def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0, ):
+    def damage(self, matchInfo, dmgAmount, damageSource, armorPiercing = False, armorDamage = 0,
+               attacker=None):
         """Resolve damage and return whether it penetrated armor into hit points."""
 
         #no negative damage values
@@ -476,6 +477,8 @@ class MechPart: # super class to mech limbs
         # Damage can make a mech no longer combat-ready before its next turn,
         # so squad force comparisons must update immediately.
         self.mech.noteCombat("took damage")
+        if hasattr(matchInfo, "recordCombatDamage"):
+            matchInfo.recordCombatDamage(attacker, self.mech, dmg)
         self.mech.refreshReadiness(matchInfo)
         return True
 
@@ -751,7 +754,11 @@ class WeaponLimb(MechPart):
                 print("Shot hit!")
                 if target is not None:
                     targetLimb = aimedLimb if aimedLimb in target.mechClass.limbList else matchInfo.rng.choice(target.mechClass.limbList)
-                    targetLimb.damage(matchInfo, self.dmg, self.name, armorPiercing = self.piercing, armorDamage = self.armorDamage)
+                    targetLimb.damage(
+                        matchInfo, self.dmg, self.name,
+                        armorPiercing=self.piercing, armorDamage=self.armorDamage,
+                        attacker=shooter,
+                    )
 
         matchInfo.advTurn = True
         return True

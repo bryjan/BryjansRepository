@@ -102,9 +102,12 @@ class AiCombatTests(unittest.TestCase):
         self.target.pos = [15, 10]
         mortar.directlyVisibleEnemies = [self.target]
         mortar.trackedEnemies = [self.target]
+        support.noteCombat("enemy in visual range")
+        mortar.noteCombat("enemy in visual range")
 
         execute_squad_combat(self.match, squad)
-        self.assertIs(squad.artilleryCallTarget, self.target)
+        self.assertEqual(self.match.pendingImpacts, [])
+        execute_squad_combat(self.match, squad)
         self.assertTrue(self.match.pendingImpacts)
 
     def test_overwhelming_observed_force_orders_contact_avoidance(self):
@@ -115,7 +118,9 @@ class AiCombatTests(unittest.TestCase):
             enemy.pos = [14 + index, 10]
         squad.squadLead.directlyVisibleEnemies = list(self.enemy_squad.mechList)
         squad.squadLead.trackedEnemies = list(self.enemy_squad.mechList)
+        squad.squadLead.noteCombat("enemy in visual range")
 
+        execute_squad_combat(self.match, squad)
         execute_squad_combat(self.match, squad)
 
         self.assertTrue(squad.avoidContact)
@@ -156,6 +161,25 @@ class AiCombatTests(unittest.TestCase):
         execute_squad_combat(self.match, self.enemy_squad)
 
         self.assertIs(self.enemy_squad.assignedTargets[swarm_mech], damaged_target)
+
+    def test_leader_waits_two_combat_turns_before_damage_assessment(self):
+        squad = self.enemy_squad
+        leader = squad.squadLead
+        leader.noteCombat("enemy in visual range")
+        leader.directlyVisibleEnemies = [self.target]
+        leader.trackedEnemies = [self.target]
+        squad.damageGiven = 20
+        squad.damageReceived = 5
+
+        execute_squad_combat(self.match, squad)
+        self.assertEqual(squad.engagementAssessment, "unassessed")
+        self.assertEqual(squad.combatTurns, 1)
+
+        execute_squad_combat(self.match, squad)
+
+        self.assertEqual(squad.engagementAssessment, "favorable")
+        self.assertGreater(squad.estimatedDamageGiven, squad.estimatedDamageReceived)
+        self.assertIs(squad.primaryTarget, self.target)
 
     def test_attack_order_marks_a_low_accuracy_contact_for_approach(self):
         target = self.target

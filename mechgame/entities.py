@@ -55,6 +55,8 @@ class Entity: #a character on the map
         self.inCombat = False
         self.combatQuietTurns = 0
         self.lastCombatSignal = ""
+        # Traits and skills can later alter this leader-facing uncertainty.
+        self.combatAssessmentError = .25
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying

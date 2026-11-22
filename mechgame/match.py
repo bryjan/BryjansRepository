@@ -247,6 +247,15 @@ class MatchInfo:
         """Rebuild active radar only after a detectable source-state change."""
         radar.refresh(self)
 
+    def recordCombatDamage(self, attacker, defender, damage):
+        """Accumulate confirmed penetrating damage for squad leader reviews."""
+        if damage <= 0:
+            return
+        if attacker is not None and getattr(attacker, "squad", None):
+            attacker.squad.damageGiven += damage
+        if defender is not None and getattr(defender, "squad", None):
+            defender.squad.damageReceived += damage
+
     def explosion(self, location, radius, size, damage, soundRange=0):
         """Apply blast damage to several random parts of each mech in range."""
         affected_entities = [
