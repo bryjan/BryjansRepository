@@ -14,7 +14,7 @@ import random
 
 from .catalog import create_mech
 from .entities import Pilot
-from .names import generate_pilot_name, generate_random_nickname
+from .names import generate_pilot_name
 
 __all__ = ["CampaignMission", "Deployment", "RecoveredMech", "MercenaryCampaign"]
 
@@ -94,10 +94,7 @@ class MercenaryCampaign:
         """Create the six distinct pilots available at the beginning of a run."""
         pilots = []
         for _ in range(6):
-            pilots.append(Pilot(
-                generate_pilot_name(self.rng, [pilot.name for pilot in pilots]),
-                generate_random_nickname(self.rng, [pilot.nickname for pilot in pilots]),
-            ))
+            pilots.append(Pilot(generate_pilot_name(self.rng, [pilot.name for pilot in pilots])))
         return pilots
 
     def _generate_mission_offers(self):
@@ -188,6 +185,9 @@ class MercenaryCampaign:
             pilot.returned = mission_pilot.returned
             pilot.ejectionOutcome = mission_pilot.ejectionOutcome
             pilot.ejectionLocation = mission_pilot.ejectionLocation
+            pilot.nickname = getattr(mission_pilot, "nickname", None)
+            pilot.nicknameVisible = getattr(mission_pilot, "nicknameVisible", True)
+            pilot.callsign = getattr(mission_pilot, "callsign", None)
             pilot.traits = list(getattr(mission_pilot, "traits", []))
             pilot.skills = dict(getattr(mission_pilot, "skills", {}))
 
@@ -242,6 +242,7 @@ class MercenaryCampaign:
         return {
             "name": pilot.name,
             "nickname": pilot.nickname,
+            "nickname_visible": pilot.nicknameVisible,
             "callsign": pilot.callsign,
             "status": pilot.status,
             "returned": pilot.returned,
@@ -291,6 +292,7 @@ class MercenaryCampaign:
             pilot.ejectionLocation = tuple(location) if location is not None else None
             pilot.traits = list(pilot_data.get("traits", []))
             pilot.skills = dict(pilot_data.get("skills", {}))
+            pilot.nicknameVisible = bool(pilot_data.get("nickname_visible", True))
             campaign.pilots.append(pilot)
         campaign.deployments = [Deployment(**deployment) for deployment in data.get("deployments", [])]
         campaign.recoveredMechs = [

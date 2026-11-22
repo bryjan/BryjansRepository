@@ -617,6 +617,7 @@ class Pilot: #TODO add pilot levels, skills, certs
     def __init__(self, name, nickname=None, callsign=None):
         self.name = self._clean_identity(name, "name")
         self.nickname = self._clean_identity(nickname, "nickname", allow_empty=True)
+        self.nicknameVisible = True
         self.callsign = self._clean_identity(callsign, "callsign", allow_empty=True)
         self.status = "Active"
         self.returned = False
@@ -645,7 +646,7 @@ class Pilot: #TODO add pilot levels, skills, certs
         """Return callsign or a length-aware nickname before the legal name."""
         if self.callsign:
             return self.callsign
-        if not self.nickname:
+        if not self.nickname or not self.nicknameVisible:
             return self.name
         first_name = self.name.split()[0]
         combined = f'{first_name} "{self.nickname}"'
@@ -656,8 +657,13 @@ class Pilot: #TODO add pilot levels, skills, certs
         self.name = self._clean_identity(name, "name")
 
     def assign_nickname(self, nickname):
-        """Set or clear a secondary display name when no callsign is assigned."""
+        """Set or clear an earned secondary display name for future progression."""
         self.nickname = self._clean_identity(nickname, "nickname", allow_empty=True)
+
+    def toggle_nickname_visibility(self):
+        """Show or hide an earned nickname without changing the stored reward."""
+        self.nicknameVisible = not self.nicknameVisible
+        return self.nicknameVisible
 
     def assign_callsign(self, callsign):
         """Set or clear the player-assigned callsign with display priority."""

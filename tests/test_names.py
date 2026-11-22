@@ -27,6 +27,13 @@ class PilotNamingTests(unittest.TestCase):
 
         self.assertEqual(pilot.display_name, '"LongNickname"')
 
+    def test_nickname_visibility_can_be_toggled_without_removing_an_earned_nickname(self):
+        pilot = Pilot("Avery Archer", nickname="Ash")
+
+        self.assertFalse(pilot.toggle_nickname_visibility())
+        self.assertEqual(pilot.nickname, "Ash")
+        self.assertEqual(pilot.display_name, "Avery Archer")
+
     def test_name_assigners_normalize_input_and_reject_blank_legal_names(self):
         pilot = Pilot("Avery Archer")
         pilot.assign_name("  Dara Dawson  ")

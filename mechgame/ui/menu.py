@@ -261,15 +261,16 @@ def deployment_menu(settings, campaign):
 
 
 def pilot_identity_menu(settings, campaign):
-    """Assign legal names, nicknames, and player-chosen callsigns to pilots."""
+    """Assign legal names/callsigns and toggle display of earned nicknames."""
     while True:
         lines = ["PILOT IDENTITIES"]
         for index, pilot in enumerate(campaign.pilots, start=1):
             nickname = pilot.nickname or "—"
+            nickname_state = "shown" if pilot.nicknameVisible else "hidden"
             callsign = pilot.callsign or "—"
             lines.append(
                 f"'{index}' {pilot.display_name} | name: {pilot.name} | "
-                f"nickname: {nickname} | callsign: {callsign}"
+                f"nickname: {nickname} ({nickname_state}) | callsign: {callsign}"
             )
         lines.extend(["", "Choose a pilot to edit.", "'x' Back"])
         _frame(lines, settings)
@@ -280,20 +281,28 @@ def pilot_identity_menu(settings, campaign):
             print("Choose a numbered pilot or 'x'.")
             continue
         pilot = campaign.pilots[int(choice) - 1]
-        name = input(f"Name [{pilot.name}] ('Enter' keep): ").strip()
-        nickname = input(f"Nickname [{pilot.nickname or '—'}] ('Enter' keep, '-' clear): ").strip()
-        callsign = input(f"Callsign [{pilot.callsign or '—'}] ('Enter' keep, '-' clear): ").strip()
+        action = input("Edit: 'n' name | 'c' callsign | 't' nickname display | 'x' cancel: ").strip().lower()
+        if action in ("", "x"):
+            continue
         try:
-            if name:
-                pilot.assign_name(name)
-            if nickname == "-":
-                pilot.assign_nickname(None)
-            elif nickname:
-                pilot.assign_nickname(nickname)
-            if callsign == "-":
-                pilot.assign_callsign(None)
-            elif callsign:
-                pilot.assign_callsign(callsign)
+            if action == "n":
+                name = input(f"Name [{pilot.name}] ('Enter' keep): ").strip()
+                if name:
+                    pilot.assign_name(name)
+            elif action == "c":
+                callsign = input(f"Callsign [{pilot.callsign or '—'}] ('Enter' keep, '-' clear): ").strip()
+                if callsign == "-":
+                    pilot.assign_callsign(None)
+                elif callsign:
+                    pilot.assign_callsign(callsign)
+            elif action == "t":
+                if pilot.nickname is None:
+                    print("This pilot has not earned a nickname yet.")
+                    continue
+                pilot.toggle_nickname_visibility()
+            else:
+                print("Choose 'n', 'c', 't', or 'x'.")
+                continue
         except ValueError as error:
             print(error)
             continue

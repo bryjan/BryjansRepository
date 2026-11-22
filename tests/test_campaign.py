@@ -16,7 +16,7 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(self.campaign.hangarLimits, {2: 5, 3: 1})
         self.assertEqual(len(self.campaign.pilots), 6)
         self.assertEqual(len({pilot.name for pilot in self.campaign.pilots}), 6)
-        self.assertEqual(len({pilot.nickname for pilot in self.campaign.pilots}), 6)
+        self.assertTrue(all(pilot.nickname is None for pilot in self.campaign.pilots))
         self.assertEqual(self.campaign.researchedMechs, {"lancer.type_a", "bastion"})
 
     def test_campaign_offers_three_distinct_missions(self):
@@ -52,6 +52,7 @@ class MercenaryCampaignTests(unittest.TestCase):
         pilot = self.campaign.pilots[0]
         pilot.assign_nickname("Sparrow")
         pilot.assign_callsign("Viper")
+        pilot.toggle_nickname_visibility()
         pilot.traits = ["Steady"]
         pilot.skills = {"gunnery": 2, "scouting": 1}
         self.campaign.deploy("lancer.type_a", pilot.name)
@@ -66,6 +67,7 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(loaded_pilot.traits, ["Steady"])
         self.assertEqual(loaded_pilot.skills, {"gunnery": 2, "scouting": 1})
         self.assertEqual(loaded_pilot.nickname, "Sparrow")
+        self.assertFalse(loaded_pilot.nicknameVisible)
         self.assertEqual(loaded_pilot.callsign, "Viper")
         self.assertEqual(loaded.deployments, self.campaign.deployments)
         self.assertEqual(loaded.activeMission, self.campaign.activeMission)
