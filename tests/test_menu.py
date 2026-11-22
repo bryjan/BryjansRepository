@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 import main as application
 from mechgame.runner import Game
-from mechgame.ui.menu import DisplaySettings, _frame_lines, start_menu
+from mechgame.campaign import MercenaryCampaign
+from mechgame.ui.menu import DisplaySettings, _campaign_lines, _frame_lines, start_menu
 from mechgame.ui.tactical import (
     DEFAULT_DISPLAY_HEIGHT,
     DEFAULT_DISPLAY_WIDTH,
@@ -104,3 +105,10 @@ class StartMenuTests(unittest.TestCase):
         self.assertEqual(len(options_frame), 50)
         self.assertTrue(all(len(line) == 119 for line in main_frame))
         self.assertTrue(all(len(line) == 119 for line in options_frame))
+
+    def test_mercenary_mode_shows_three_contracts_and_company_resources(self):
+        lines = _campaign_lines(MercenaryCampaign())
+
+        self.assertIn("MERCENARY MODE", lines)
+        self.assertIn("Cash: 1,000 credits", lines)
+        self.assertEqual(sum(line.startswith("'") for line in lines), 5)

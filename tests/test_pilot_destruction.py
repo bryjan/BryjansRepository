@@ -33,12 +33,12 @@ class PilotDestructionTests(unittest.TestCase):
         match.map[mech.pos[1]][mech.pos[0]].terrain = match.plains
         mech.inCombat = True
 
-        self.assertEqual(mech.ejectionOdds(match), {"RTB": 25, "Lost": 50, "Captured": 25})
+        self.assertEqual(mech.ejectionOdds(match), {"RTB": 25, "Evading": 50, "Captured": 25})
 
-    def test_lost_pilots_return_after_the_last_enemy_force_is_removed(self):
+    def test_evading_pilots_return_after_the_last_enemy_force_is_removed(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         pilot = match.pov.pilot
-        pilot.status = "Lost"
+        pilot.status = "Evading"
         match.ejectedPilots.append(pilot)
 
         for enemy in list(match.teamList[1].squadsList[0].mechList):

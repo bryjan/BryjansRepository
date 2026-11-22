@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 import textwrap
 
+from ..campaign import MercenaryCampaign
 from ..world import (
     CUSTOM_MAP_PRESET,
     DEFAULT_MAP_PRESET,
@@ -181,23 +182,120 @@ def terrain_options_menu(settings):
             print(f"Choose a number from 1 to {len(GENERATABLE_TERRAINS)}, or 'x'.")
 
 
-def start_menu(settings=None):
+def _campaign_lines(campaign):
+    """Build the concise company status and contract view for Mercenary Mode."""
+    lines = [
+        "MERCENARY MODE",
+        f"Cash: {campaign.cash:,} credits",
+        "Hangar: " + ", ".join(
+            f"Class {size}: {campaign.deployed_count(size)}/{limit} deployed"
+            for size, limit in sorted(campaign.hangarLimits.items())
+        ),
+        f"Pilots available: {len(campaign.availablePilots)}/{len(campaign.pilots)}",
+        "Research: " + ", ".join(sorted(campaign.researchedMechs)),
+        "",
+        "CONTRACTS",
+    ]
+    for offer in campaign.missionOffers:
+        active = " (ACTIVE)" if offer is campaign.activeMission else ""
+        role_text = ", ".join(offer.required_roles) or "general"
+        lines.extend([
+            f"'{offer.mission_id}' {offer.title} — {offer.payout:,} credits{active}",
+            f"    {offer.description} Needed: {role_text}.",
+        ])
+    lines.extend(["", "'d' Deploy roster", "'x' Back"])
+    return lines
+
+
+def deployment_menu(settings, campaign):
+    """Let the player assign researched chassis and available pilots to slots."""
+    while True:
+        lines = ["DEPLOYMENT", "Current roster:"]
+        if campaign.deployments:
+            lines.extend(
+                f"  {deployment.pilot_name}: {deployment.mech_id} (class {deployment.size})"
+                for deployment in campaign.deployments
+            )
+        else:
+            lines.append("  No mechs assigned.")
+        lines.extend(["", "'a' Assign a mech", "'r' Recall a pilot", "'x' Back"])
+        _frame(lines, settings)
+        choice = input("Deployment: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice == "a":
+            available = campaign.availablePilots
+            chassis = sorted(campaign.researchedMechs)
+            if not available:
+                print("No pilots are available.")
+                continue
+            print("Chassis: " + ", ".join(f"{index + 1}) {mech_id}" for index, mech_id in enumerate(chassis)))
+            print("Pilots: " + ", ".join(f"{index + 1}) {pilot.name}" for index, pilot in enumerate(available)))
+            mech_choice = input("Chassis number ('x' cancel): ").strip().lower()
+            pilot_choice = input("Pilot number ('x' cancel): ").strip().lower()
+            if mech_choice == "x" or pilot_choice == "x":
+                continue
+            if not mech_choice.isdigit() or not pilot_choice.isdigit():
+                print("Choose numbered chassis and pilot entries.")
+                continue
+            mech_index, pilot_index = int(mech_choice) - 1, int(pilot_choice) - 1
+            if not (0 <= mech_index < len(chassis) and 0 <= pilot_index < len(available)):
+                print("Choose numbered chassis and pilot entries.")
+                continue
+            try:
+                campaign.deploy(chassis[mech_index], available[pilot_index].name)
+            except ValueError as error:
+                print(error)
+        elif choice == "r":
+            name = input("Pilot name to recall ('x' cancel): ").strip()
+            if name.lower() != "x" and not campaign.recall(name):
+                print("That pilot has no assigned mech.")
+        else:
+            print("Choose 'a', 'r', or 'x'.")
+
+
+def mercenary_menu(settings, campaign):
+    """Show the persistent company layer and allow contract selection."""
+    while True:
+        _frame(_campaign_lines(campaign), settings)
+        choice = input("Mercenary Mode: ").strip().lower()
+        if choice in ("", "x"):
+            return
+        if choice == "d":
+            deployment_menu(settings, campaign)
+            continue
+        if choice.isdigit():
+            try:
+                offer = campaign.accept_mission(int(choice))
+            except ValueError:
+                print("Choose one of the listed contracts, 'd', or 'x'.")
+            else:
+                print(f"Contract accepted: {offer.title}. Build your roster before deployment.")
+            continue
+        print("Choose a contract number, 'd', or 'x'.")
+
+
+def start_menu(settings=None, campaign=None):
     """Return chosen settings when Skirmish starts, or ``None`` when quitting."""
     settings = settings or DisplaySettings()
+    campaign = campaign or MercenaryCampaign()
     while True:
         _frame([
             "ASCII MECH GAME",
             "",
             "'s' Skirmish",
+            "'m' Mercenary Mode",
             "'o' Options",
             "'q' Quit",
         ], settings)
         choice = input("Select: ").strip().lower()
         if choice == "s":
             return settings
-        if choice == "o":
+        elif choice == "m":
+            mercenary_menu(settings, campaign)
+        elif choice == "o":
             options_menu(settings)
         elif choice in ("", "q", "x"):
             return None
         else:
-            print("Choose 's', 'o', or 'q'.")
+            print("Choose 's', 'm', 'o', or 'q'.")

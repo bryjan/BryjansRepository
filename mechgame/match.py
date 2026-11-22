@@ -123,7 +123,7 @@ class MatchInfo:
         return True
 
     def resolvePilotSurvival(self):
-        """Return lost ejectees once no opposing force remains on the map.
+        """Return evading ejectees once no opposing force remains on the map.
 
         Captured pilots are stored as MIA and intentionally remain unavailable
         for this match. Campaign rescue/capture systems can revisit them later.
@@ -131,7 +131,7 @@ class MatchInfo:
         if len(self.operational_teams()) > 1:
             return
         for pilot in self.ejectedPilots:
-            if pilot.status == "Lost":
+            if pilot.status == "Evading":
                 pilot.status = "RTB"
                 pilot.returned = True
 

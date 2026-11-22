@@ -167,7 +167,18 @@ class InputTests(unittest.TestCase):
 
     def test_overview_hides_undiscovered_chunks_and_uses_shared_exploration(self):
         match = Game(map_size=40, window_size=9).create_match()
-        cell = match.map[2][2]
+        base_tiles = {
+            tile
+            for base in match.mapFeatures.military_bases
+            for tile in base.tiles
+        }
+        cell = next(
+            cell
+            for row in match.map
+            for cell in row
+            if tuple(cell.pos) not in base_tiles
+            and all(entity.pos != cell.pos for entity in match.entities)
+        )
         chunk = [[cell]]
 
         with patch("mechgame.ui.tactical.termcolor.colored", return_value="fog"), patch(

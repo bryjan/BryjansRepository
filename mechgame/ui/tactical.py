@@ -170,7 +170,7 @@ def _own_mech_panel_lines(mech, height, width):
         f"Most damaged: {weakest_limb.name} ({weakest_condition}%)",
     ]
     if mech.cockpit.status < 2:
-        pilot_condition = "Injured" if mech.cockpit.status == 1 else "Lost"
+        pilot_condition = "Injured" if mech.cockpit.status == 1 else "Cockpit destroyed"
         entries.append(f"Pilot: {pilot_condition} (cockpit damaged)")
     entries.extend([
         f"AP: {mech.ap}/{mech.mechClass.apMax} | MP: {mech.mp}/{mech.mechClass.mpMax}",

@@ -541,9 +541,9 @@ class Entity: #a character on the map
             matchInfo.turnEnded = True
 
     def ejectionOdds(self, matchInfo):
-        """Return current RTB/Lost/Captured odds before pilot skills apply."""
-        odds = {"RTB": 25, "Lost": 50, "Captured": 25} if self.inCombat else {
-            "RTB": 55, "Lost": 40, "Captured": 5,
+        """Return current RTB/Evading/Captured odds before pilot skills apply."""
+        odds = {"RTB": 25, "Evading": 50, "Captured": 25} if self.inCombat else {
+            "RTB": 55, "Evading": 40, "Captured": 5,
         }
         friendly_nearby = any(
             entity is not self
@@ -559,17 +559,17 @@ class Entity: #a character on the map
         terrain_name = matchInfo.map[self.pos[1]][self.pos[0]].terrain.name
         if friendly_nearby:
             odds["RTB"] += 15
-            odds["Lost"] -= 10
+            odds["Evading"] -= 10
             odds["Captured"] -= 5
         if enemy_nearby:
             odds["RTB"] -= 10
             odds["Captured"] += 10
         if terrain_name in {"road", "tunnel", "urban center", "suburbs"}:
             odds["RTB"] += 5
-            odds["Lost"] -= 5
+            odds["Evading"] -= 5
         elif terrain_name in {"forest", "mountain"}:
             odds["RTB"] -= 5
-            odds["Lost"] += 5
+            odds["Evading"] += 5
         return odds
 
     def eject(self, matchInfo):
@@ -584,9 +584,9 @@ class Entity: #a character on the map
             outcome = "RTB"
             self.pilot.status = "RTB"
             self.pilot.returned = True
-        elif roll <= odds["RTB"] + odds["Lost"]:
-            outcome = "Lost"
-            self.pilot.status = "Lost"
+        elif roll <= odds["RTB"] + odds["Evading"]:
+            outcome = "Evading"
+            self.pilot.status = "Evading"
         else:
             outcome = "Captured"
             self.pilot.status = "MIA"
