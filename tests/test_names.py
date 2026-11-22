@@ -2,7 +2,7 @@ import random
 import unittest
 
 from mechgame.entities import Pilot
-from mechgame.names import generate_random_name
+from mechgame.names import FIRST_NAMES, LAST_NAMES, PRESET_PILOT_NAMES, generate_random_name
 
 
 class PilotNamingTests(unittest.TestCase):
@@ -35,3 +35,11 @@ class PilotNamingTests(unittest.TestCase):
         second = generate_random_name(rng, [first])
 
         self.assertNotEqual(first, second)
+
+    def test_preset_skirmish_pilots_are_part_of_the_random_name_pool(self):
+        # Using every generated name as already-used leaves presets as the
+        # only candidates, proving they are available to future campaigns.
+        generated_names = {f"{first} {last}" for first in FIRST_NAMES for last in LAST_NAMES}
+        name = generate_random_name(random.Random(0), generated_names)
+
+        self.assertIn(name, PRESET_PILOT_NAMES)

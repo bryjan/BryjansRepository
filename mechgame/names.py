@@ -12,6 +12,12 @@ LAST_NAMES = (
     "Quade", "Rowan", "Sato", "Tanner", "Underwood", "Voss", "Wilder", "York",
 )
 
+# Familiar skirmish pilots may also appear in a Mercenary Mode roster. These
+# are complete preset names, so they do not need to follow first/last format.
+PRESET_PILOT_NAMES = (
+    "B", "MagikP", "Xactly", "115um6uy15", "Chiki", "Blastra", "UncLord", "Sybis",
+)
+
 
 def generate_random_name(rng, used_names=()):
     """Return an unused legal pilot name using the supplied RNG.
@@ -20,12 +26,12 @@ def generate_random_name(rng, used_names=()):
     reproducible when the game is started with a seed.
     """
     used = set(used_names)
-    candidates = [
+    generated_names = [
         f"{first} {last}"
         for first in FIRST_NAMES
         for last in LAST_NAMES
-        if f"{first} {last}" not in used
     ]
+    candidates = [name for name in (*generated_names, *PRESET_PILOT_NAMES) if name not in used]
     if not candidates:
         raise ValueError("No unique pilot names remain.")
     return rng.choice(candidates)
