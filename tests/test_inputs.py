@@ -38,6 +38,21 @@ class InputTests(unittest.TestCase):
         self.assertFalse(match.advTurn)
         self.assertFalse(match.turnEnded)
 
+    def test_eject_command_abandons_the_mech_and_tracks_the_pilot(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        mech = match.pov
+        match.entities = [mech]
+        mech.inCombat = True
+
+        with patch.object(match.rng, "randint", return_value=1), patch("builtins.input", return_value="eject"):
+            dispatch.receive_input(match)
+
+        self.assertTrue(mech.ejected)
+        self.assertNotIn(mech, match.entities)
+        self.assertIn(mech, match.abandonedMechs)
+        self.assertEqual(mech.pilot.status, "RTB")
+        self.assertIn(mech.pilot, match.ejectedPilots)
+
     def test_weapon_menu_cancel_keeps_the_existing_default(self):
         match = Game(map_size=40, window_size=9).create_match()
         lancer = match.teamList[0].squadsList[0].mechList[1]

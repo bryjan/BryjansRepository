@@ -172,6 +172,7 @@ def helpCommand(matchInfo):
     print("'r' or 'radar' — toggle continuous active radar; it has an energy cost each turn.")
     print("'p' — send a one-turn active-radar pulse.")
     print("'ab' or 'abilities' — open the active mech's hull abilities.")
+    print("'eject' — abandon the active mech and resolve pilot survival odds.")
     print("'look' or 'l' — inspect the tactical view around map coordinates.")
     print("'m' — open the strategic map for radar contacts and map display controls.")
     print("'st' or 'status' — reopen the default tactical status panel.")

@@ -970,4 +970,5 @@ class Cockpit(Module):
                 "Cockpit destroyed! Mech is no longer operational.",
                 critical=True,
             )
+            self.mech.pilot.kill(matchInfo)
             self.mech.destroy(matchInfo)

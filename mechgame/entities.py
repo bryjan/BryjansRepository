@@ -46,6 +46,9 @@ class Entity: #a character on the map
         # spend energy on a single-turn pulse.
         self.radarOn = False
         self.radarPulseActive = False
+        # TODO(combat-state): a future threat evaluator owns this live tag.
+        # Ejection already consumes it so survival odds can model combat risk.
+        self.inCombat = False
 
         self.turnStartPos = list(self.pos)
         self.flying = self.mechClass.initFlying
@@ -87,6 +90,7 @@ class Entity: #a character on the map
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
+        self.ejected = False
         self.refreshReadiness()
         self.baseOffRoadPatrolSpeed = self.offRoadPatrolSpeed
         self.baseRoadPatrolSpeed = self.roadPatrolSpeed
@@ -536,8 +540,89 @@ class Entity: #a character on the map
         if matchInfo.pov is self:
             matchInfo.turnEnded = True
 
+    def ejectionOdds(self, matchInfo):
+        """Return current RTB/Lost/Captured odds before pilot skills apply."""
+        odds = {"RTB": 25, "Lost": 50, "Captured": 25} if self.inCombat else {
+            "RTB": 55, "Lost": 40, "Captured": 5,
+        }
+        friendly_nearby = any(
+            entity is not self
+            and entity.team is self.team
+            and math.dist(entity.pos, self.pos) <= 6
+            for entity in matchInfo.entities
+        )
+        enemy_nearby = any(
+            entity.team is not self.team
+            and math.dist(entity.pos, self.pos) <= 8
+            for entity in matchInfo.entities
+        )
+        terrain_name = matchInfo.map[self.pos[1]][self.pos[0]].terrain.name
+        if friendly_nearby:
+            odds["RTB"] += 15
+            odds["Lost"] -= 10
+            odds["Captured"] -= 5
+        if enemy_nearby:
+            odds["RTB"] -= 10
+            odds["Captured"] += 10
+        if terrain_name in {"road", "tunnel", "urban center", "suburbs"}:
+            odds["RTB"] += 5
+            odds["Lost"] -= 5
+        elif terrain_name in {"forest", "mountain"}:
+            odds["RTB"] -= 5
+            odds["Lost"] += 5
+        return odds
+
+    def eject(self, matchInfo):
+        """Abandon this mech and resolve its pilot's immediate survival state."""
+        if self.destroyed or self.ejected:
+            print("This mech can no longer eject.")
+            return False
+
+        odds = self.ejectionOdds(matchInfo)
+        roll = matchInfo.rng.randint(1, 100)
+        if roll <= odds["RTB"]:
+            outcome = "RTB"
+            self.pilot.status = "RTB"
+            self.pilot.returned = True
+        elif roll <= odds["RTB"] + odds["Lost"]:
+            outcome = "Lost"
+            self.pilot.status = "Lost"
+        else:
+            outcome = "Captured"
+            self.pilot.status = "MIA"
+
+        self.ejected = True
+        self.pilot.ejectionOutcome = outcome
+        self.pilot.ejectionLocation = tuple(self.pos)
+        self.report(matchInfo, f"Ejected from mech: {outcome}.", critical=True)
+        if self in matchInfo.entities:
+            matchInfo.entities.remove(self)
+        if self.squad and self in self.squad.mechList:
+            self.squad.mechList.remove(self)
+            if self.squad.squadLead is self and self.squad.mechList:
+                self.squad.squadLead = self.squad.mechList[0]
+            self.squad.refreshCombatForce()
+        if self not in matchInfo.abandonedMechs:
+            matchInfo.abandonedMechs.append(self)
+        if self.pilot not in matchInfo.ejectedPilots:
+            matchInfo.ejectedPilots.append(self.pilot)
+        if matchInfo.pov is self:
+            matchInfo.turnEnded = True
+        return True
+
 
 class Pilot: #TODO add pilot levels, skills, certs
     """Named crew member assigned to an entity."""
     def __init__(self, name):
-         self.name = name
+        self.name = name
+        self.status = "Active"
+        self.returned = False
+        self.ejectionOutcome = None
+        self.ejectionLocation = None
+
+    def kill(self, matchInfo):
+        """Record a fatal cockpit loss without treating it as an ejection."""
+        self.status = "KIA"
+        self.returned = False
+        if self not in matchInfo.killedPilots:
+            matchInfo.killedPilots.append(self)

@@ -35,6 +35,8 @@ def receive_input(matchInfo):
             return matchInfo.pov.pulseRadar(matchInfo)
         case "ab" | "abilities":
             return abilityMenu(matchInfo)
+        case "eject":
+            return matchInfo.pov.eject(matchInfo)
         case "end":
             # This is the sole command that hands control to the next squad.
             matchInfo.turnEnded = True

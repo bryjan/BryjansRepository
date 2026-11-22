@@ -31,6 +31,8 @@ class MatchInfo:
         self.entities = []
         self.abandonedMechs = []
         self.destroyedMechs = []
+        self.ejectedPilots = []
+        self.killedPilots = []
         # Fired launcher shells resolve only after future squad-turn handoffs.
         self.pendingImpacts = []
         self.matchRound = 0
@@ -109,6 +111,7 @@ class MatchInfo:
             return False
 
         self.matchOver = True
+        self.resolvePilotSurvival()
         self.winner = survivors[0] if survivors else None
         self.resultMessage = (
             f"Match complete: {self.winner.name} wins."
@@ -118,6 +121,19 @@ class MatchInfo:
         self.advTurn = False
         self.turnEnded = False
         return True
+
+    def resolvePilotSurvival(self):
+        """Return lost ejectees once no opposing force remains on the map.
+
+        Captured pilots are stored as MIA and intentionally remain unavailable
+        for this match. Campaign rescue/capture systems can revisit them later.
+        """
+        if len(self.operational_teams()) > 1:
+            return
+        for pilot in self.ejectedPilots:
+            if pilot.status == "Lost":
+                pilot.status = "RTB"
+                pilot.returned = True
 
     def _turn_slots(self):
         """Return squads in deterministic team/squad order, including empty ones."""
