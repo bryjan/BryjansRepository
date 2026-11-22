@@ -11,7 +11,7 @@ import math
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
     "execute_squad_combat", "execute_squad_movement", "issue_team_goal",
-    "start_road_patrol",
+    "request_reinforcement", "start_road_patrol",
 ]
 
 
@@ -574,14 +574,30 @@ def _review_engagement(match_info, squad, contacts):
     )
 
 
-def _issue_artillery_call(squad, contacts):
-    """Call local or nearby artillery only after a favorable-safe review."""
+def _notify_player_support_request(match_info, recipient, message):
+    """Surface a support request as a critical report for player control."""
+    if recipient.playerControlled and recipient.squadLead is not None:
+        recipient.squadLead.report(match_info, message, critical=True)
+
+
+def request_reinforcement(match_info, requesting_squad, recipient_squad):
+    """Record a future reinforcement request and notify a player recipient.
+
+    Reinforcement movement is intentionally a later planner feature; the
+    request record and player-facing critical report are ready for it now.
+    """
+    recipient_squad.reinforcementRequest = requesting_squad
+    _notify_player_support_request(
+        match_info, recipient_squad,
+        f"Reinforcement request from {requesting_squad.name} squad.",
+    )
+
+
+def _issue_artillery_call(match_info, squad):
+    """Call high-reserve artillery only during an unclear engagement."""
     squad.artilleryCallTarget = None
     squad.artilleryCallTurns = 0
-    ratio = getattr(squad, "forceRatio", 0)
-    if squad.engagementAssessment not in {"favorable", "unclear"}:
-        return
-    if not ARTILLERY_MIN_FORCE_RATIO <= ratio <= ARTILLERY_MAX_FORCE_RATIO:
+    if squad.engagementAssessment != "unclear":
         return
     target = getattr(squad, "strongestObservedThreat", None)
     if target is None:
@@ -593,6 +609,10 @@ def _issue_artillery_call(squad, contacts):
     for artillery_squad in eligible:
         artillery_squad.artilleryCallTarget = target
         artillery_squad.artilleryCallTurns = 1
+        _notify_player_support_request(
+            match_info, artillery_squad,
+            f"Artillery request from {squad.name} squad: engage {target.name}.",
+        )
 
 
 def _assign_anti_heavy_focus(squad, contacts):
@@ -791,7 +811,7 @@ def execute_squad_combat(match_info, squad=None):
         squad.artilleryCallTarget = incoming_artillery_call
         squad.artilleryCallTurns = 1
     else:
-        _issue_artillery_call(squad, contacts)
+        _issue_artillery_call(match_info, squad)
 
     _assign_anti_heavy_focus(squad, contacts)
     primary_target = _select_primary_target(squad)

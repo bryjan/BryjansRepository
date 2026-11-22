@@ -52,6 +52,7 @@ class Squad:
         # combat pass. They are tactical memory, not hidden enemy knowledge.
         self.artilleryCallTarget = None
         self.artilleryCallTurns = 0
+        self.reinforcementRequest = None
         self.observedEnemyForce = 0
         self.nearbyFriendlyForce = 0
         self.avoidContact = False

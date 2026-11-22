@@ -3,7 +3,7 @@
 import random
 import unittest
 
-from mechgame.ai import execute_squad_combat, execute_squad_movement
+from mechgame.ai import execute_squad_combat, execute_squad_movement, request_reinforcement
 from mechgame.runner import Game
 
 
@@ -81,7 +81,7 @@ class AiCombatTests(unittest.TestCase):
         self.assertEqual(shooter.lastFiredAt, self.target.pos)
         self.assertLess(shooter.ap, starting_ap)
 
-    def test_artillery_launches_only_after_a_force_safe_leader_call(self):
+    def test_artillery_launches_after_an_unclear_two_turn_review(self):
         squad = self.player_squad
         squad.playerControlled = False
         mortar = next(
@@ -180,6 +180,15 @@ class AiCombatTests(unittest.TestCase):
         self.assertEqual(squad.engagementAssessment, "favorable")
         self.assertGreater(squad.estimatedDamageGiven, squad.estimatedDamageReceived)
         self.assertIs(squad.primaryTarget, self.target)
+
+    def test_player_squad_receives_a_critical_reinforcement_request(self):
+        request_reinforcement(self.match, self.enemy_squad, self.player_squad)
+
+        self.assertIs(self.player_squad.reinforcementRequest, self.enemy_squad)
+        self.assertTrue(any(
+            critical and "Reinforcement request" in message
+            for message, critical, _ in self.player_squad.reportLog
+        ))
 
     def test_attack_order_marks_a_low_accuracy_contact_for_approach(self):
         target = self.target
