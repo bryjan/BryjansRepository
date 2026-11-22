@@ -265,32 +265,89 @@ def _leader_destination(match_info, squad):
     return None
 
 
-def _legal_steps(match_info, mech):
-    """Yield legal one-tile steps with their energy cost from shared movement rules."""
+def _is_roadway(match_info, position):
+    """Return whether a position uses road-style movement for a patrol."""
+    terrain = match_info.map[position[1]][position[0]].terrain
+    return terrain.name in {"road", "tunnel"}
+
+
+def _road_patrol_active(squad):
+    """Recognize an explicit road patrol or an AI-issued patrol objective."""
+    goal_kind = getattr(squad.currentGoal, "kind", "")
+    return squad.movementBehavior == "road_patrol" or goal_kind in {
+        "patrol", "patrol_map", "patrol_location",
+    }
+
+
+def _energy_floor(mech, movement_mode):
+    """Return the reserve a movement mode must leave after every step."""
+    if movement_mode == "patrol":
+        # A sustainable patrol spends no more than its next-turn generation,
+        # allowing the reserve to refill fully before its next action.
+        return max(0, mech.mechClass.energyMax - mech.mechClass.energyGen)
+    if movement_mode == "double_time":
+        return math.ceil(mech.mechClass.energyMax * .20)
+    return math.ceil(mech.mechClass.energyMax * .70)
+
+
+def _legal_steps(match_info, mech, movement_mode, roadway_only=False):
+    """Yield shared-rules steps that obey a squad's energy reserve policy."""
+    restrict_to_roadway = roadway_only and _is_roadway(match_info, mech.pos)
     for offset_x, offset_y in _ADJACENT_OFFSETS:
         position = [mech.pos[0] + offset_x, mech.pos[1] + offset_y]
         energy_cost, reason = mech.moveCostTo(match_info, position)
-        if reason is None:
+        if reason is None and mech.energy - energy_cost >= _energy_floor(mech, movement_mode):
+            if restrict_to_roadway and not _is_roadway(match_info, position):
+                continue
             yield position, energy_cost
 
 
-def _move_leader(match_info, squad):
-    """Advance the leader one efficient step toward its current known goal."""
+def _nearest_roadway(match_info, position):
+    """Return the nearest road/tunnel tile so an off-road patrol can join it."""
+    roads = [
+        cell.pos
+        for row in match_info.map
+        for cell in row
+        if _is_roadway(match_info, cell.pos)
+    ]
+    return _nearest_location(position, roads) if roads else None
+
+
+def _leader_needs_regroup(squad, leader_range):
+    """Return whether any follower has fallen outside the leader's sight range."""
+    return any(
+        math.dist(mech.pos, squad.squadLead.pos) > leader_range
+        for mech in squad.mechList
+        if mech is not squad.squadLead
+    )
+
+
+def _move_leader(match_info, squad, leader_range, roadway_only):
+    """Advance the leader until it reaches its reserve, goal, or regroup hold."""
     leader = squad.squadLead
     destination = _leader_destination(match_info, squad)
+    if roadway_only and not _is_roadway(match_info, leader.pos):
+        destination = _nearest_roadway(match_info, leader.pos)
     if destination is None:
-        return False
-    current_distance = math.dist(leader.pos, destination)
-    steps = [
-        (math.dist(position, destination), energy_cost, position)
-        for position, energy_cost in _legal_steps(match_info, leader)
-    ]
-    if not steps:
-        return False
-    _, _, position = min(steps, key=lambda option: (option[0], option[1], option[2]))
-    if math.dist(position, destination) >= current_distance:
-        return False
-    return leader.moveTo(match_info, position, announce=False)
+        return []
+    moved = []
+    while not _leader_needs_regroup(squad, leader_range):
+        current_distance = math.dist(leader.pos, destination)
+        steps = [
+            (math.dist(position, destination), energy_cost, position)
+            for position, energy_cost in _legal_steps(
+                match_info, leader, squad.movementMode, roadway_only,
+            )
+        ]
+        if not steps:
+            break
+        _, _, position = min(steps, key=lambda option: (option[1], option[0], option[2]))
+        if math.dist(position, destination) >= current_distance:
+            break
+        if not leader.moveTo(match_info, position, announce=False):
+            break
+        moved.append(leader)
+    return moved
 
 
 def _formation_status(position, leader_position, teammate_positions, leader_range):
@@ -308,70 +365,77 @@ def _formation_status(position, leader_position, teammate_positions, leader_rang
     )
 
 
-def _move_follower(match_info, squad, mech, leader_range):
-    """Move one clustered or separated follower toward a valid formation tile."""
+def _move_follower(match_info, squad, mech, leader_range, roadway_only):
+    """Move a follower until it reaches a valid formation or reserve floor."""
     leader = squad.squadLead
-    teammate_positions = [
-        teammate.pos for teammate in squad.mechList if teammate is not mech
-    ]
-    current = _formation_status(mech.pos, leader.pos, teammate_positions, leader_range)
-    if current[0] and current[1]:
-        # Holding a valid position costs no energy and is therefore preferred.
-        return False
+    moved = []
+    while True:
+        teammate_positions = [
+            teammate.pos for teammate in squad.mechList if teammate is not mech
+        ]
+        current = _formation_status(mech.pos, leader.pos, teammate_positions, leader_range)
+        spacing_valid = roadway_only or current[1]
+        if current[0] and spacing_valid:
+            # Holding a valid position costs no energy and is therefore preferred.
+            break
 
-    candidates = []
-    for position, energy_cost in _legal_steps(match_info, mech):
-        status = _formation_status(position, leader.pos, teammate_positions, leader_range)
-        candidates.append((status, energy_cost, position))
-    if not candidates:
-        return False
+        candidates = []
+        for position, energy_cost in _legal_steps(
+            match_info, mech, squad.movementMode, roadway_only,
+        ):
+            status = _formation_status(position, leader.pos, teammate_positions, leader_range)
+            candidates.append((status, energy_cost, position))
+        if not candidates:
+            break
 
-    # First satisfy both formation rules. When several tiles are valid, take
-    # the least expensive route; only then prefer additional teammate spacing.
-    valid = [candidate for candidate in candidates if candidate[0][0] and candidate[0][1]]
-    if valid:
-        _, _, position = min(
-            valid,
-            key=lambda candidate: (
-                candidate[1], -candidate[0][3], candidate[0][2], candidate[2],
-            ),
-        )
-    else:
-        # Constrained terrain can make perfect spacing impossible. Favor a
-        # tile inside leader range, then the greatest available separation.
-        _, _, position = max(
-            candidates,
-            key=lambda candidate: (
-                candidate[0][0], candidate[0][1], candidate[0][3],
-                -candidate[1], -candidate[0][2],
-            ),
-        )
-    return mech.moveTo(match_info, position, announce=False)
+        valid = [
+            candidate for candidate in candidates
+            if candidate[0][0] and (roadway_only or candidate[0][1])
+        ]
+        if valid:
+            _, _, position = min(
+                valid,
+                key=lambda candidate: (
+                    candidate[1], -candidate[0][3], candidate[0][2], candidate[2],
+                ),
+            )
+        else:
+            # Constrained terrain can make perfect spacing impossible. Favor a
+            # tile inside leader range, then the greatest available separation.
+            _, _, position = max(
+                candidates,
+                key=lambda candidate: (
+                    candidate[0][0], roadway_only or candidate[0][1], candidate[0][3],
+                    -candidate[1], -candidate[0][2],
+                ),
+            )
+        if not mech.moveTo(match_info, position, announce=False):
+            break
+        moved.append(mech)
+    return moved
 
 
 def execute_squad_movement(match_info, squad=None):
-    """Perform one bounded, visibility-limited AI formation movement pass.
+    """Perform visibility-limited AI movement under squad reserve policies.
 
-    The leader moves first toward its goal or a known contact. Each follower
-    then takes at most one shared-rules step to remain within the leader's
-    plains visual range (at least 10 tiles) while seeking three-tile spacing.
-    Movement is intentionally limited to one step per mech so the later
-    combat planner retains AP/MP budget for sensing, firing, or retreating.
+    Leaders hold to regroup any follower outside their plains visual range
+    (at least 10 tiles). Otherwise they advance first. Formation followers
+    seek three-tile spacing; road patrols stay on roads/tunnels and deliberately
+    ignore that spacing so a column can travel together. Patrol movement only
+    spends sustainable regeneration, normal movement preserves 70 percent of
+    energy, and double time stops at 20 percent.
     """
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
         return []
 
-    moved = []
-    if _move_leader(match_info, squad):
-        moved.append(squad.squadLead)
-
     leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
+    roadway_only = _road_patrol_active(squad)
+    moved = _move_leader(match_info, squad, leader_range, roadway_only)
     for mech in list(squad.mechList):
         if mech is squad.squadLead:
             continue
-        if _move_follower(match_info, squad, mech, leader_range):
-            moved.append(mech)
+        moved.extend(_move_follower(match_info, squad, mech, leader_range, roadway_only))
     return moved
 
 

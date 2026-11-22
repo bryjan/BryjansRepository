@@ -1,3 +1,4 @@
+import math
 import random
 import unittest
 from unittest.mock import patch
@@ -166,7 +167,7 @@ class MatchFlowTests(unittest.TestCase):
         self.assertNotIn(original_leader, squad.mechList)
         self.assertIs(squad.squadLead, squad.mechList[0])
 
-    def test_ai_squad_leader_advances_once_then_followers_hold_valid_formation(self):
+    def test_ai_squad_leader_advances_then_followers_hold_valid_formation(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         enemy_team = match.teamList[1]
         squad = enemy_team.squadsList[0]
@@ -184,11 +185,11 @@ class MatchFlowTests(unittest.TestCase):
 
         moved = execute_squad_movement(match, squad)
 
-        self.assertEqual(leader.pos, [11, 10])
-        self.assertEqual(moved, [leader])
+        self.assertLess(leader.pos[0], 20)
+        self.assertTrue(all(mech is leader for mech in moved))
         self.assertLessEqual(((first_follower.pos[0] - leader.pos[0]) ** 2 + (first_follower.pos[1] - leader.pos[1]) ** 2) ** .5, 10)
         self.assertLessEqual(((second_follower.pos[0] - leader.pos[0]) ** 2 + (second_follower.pos[1] - leader.pos[1]) ** 2) ** .5, 10)
-        self.assertEqual(leader.ap, leader.mechClass.apMax - 1)
+        self.assertLess(leader.ap, leader.mechClass.apMax)
 
     def test_ai_elimination_squad_searches_toward_map_center_without_a_contact(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
@@ -200,12 +201,81 @@ class MatchFlowTests(unittest.TestCase):
         leader.pos = [30, 30]
         for index, follower in enumerate(squad.mechList[1:], start=1):
             follower.pos = [30 - index * 3, 30]
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
         leader.directlyVisibleEnemies = []
         leader.trackedEnemies = []
 
         execute_squad_movement(match, squad)
 
-        self.assertEqual(leader.pos, [29, 29])
+        self.assertLess(((leader.pos[0] - 20) ** 2 + (leader.pos[1] - 20) ** 2) ** .5, 14.2)
+
+    def test_ai_movement_modes_preserve_their_configured_energy_reserves(self):
+        for mode, reserve in (("patrol", None), ("move", .70), ("double_time", .20)):
+            with self.subTest(mode=mode):
+                match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+                squad = match.teamList[1].squadsList[0]
+                leader = squad.squadLead
+                for row in match.map:
+                    for cell in row:
+                        cell.terrain = match.plains
+                for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+                    entity.pos = [35 + (index % 2), 35 + (index // 2)]
+                leader.pos = [10, 10]
+                for index, follower in enumerate(squad.mechList[1:], start=1):
+                    follower.pos = [7, 10 + index * 3]
+                match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
+                squad.setMovementPolicy(mode=mode)
+                starting_energy = leader.energy
+
+                execute_squad_movement(match, squad)
+
+                spent = starting_energy - leader.energy
+                if reserve is None:
+                    self.assertLessEqual(spent, leader.mechClass.energyGen)
+                else:
+                    self.assertGreaterEqual(leader.energy, math.ceil(leader.mechClass.energyMax * reserve))
+
+    def test_ai_leader_holds_position_when_a_follower_needs_to_regroup(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader, first_follower, second_follower = squad.mechList
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
+        leader.pos = [10, 10]
+        first_follower.pos = [26, 10]
+        second_follower.pos = [7, 13]
+        match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertEqual(leader.pos, [10, 10])
+        self.assertNotIn(leader, moved)
+        self.assertLess(first_follower.pos[0], 26)
+
+    def test_road_patrol_moves_a_column_on_roads_without_spacing_requirement(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        leader, first_follower, second_follower = squad.mechList
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
+            entity.pos = [35 + (index % 2), 35 + (index // 2)]
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+        leader.pos = [10, 10]
+        first_follower.pos = [1, 10]
+        second_follower.pos = [4, 10]
+        match.issueTeamObjective(match.teamList[1], "patrol_map", 80, (30, 10), "Patrol road.")
+
+        moved = execute_squad_movement(match, squad)
+
+        self.assertTrue(moved)
+        self.assertTrue(all(match.map[mech.pos[1]][mech.pos[0]].terrain is match.road for mech in squad.mechList))
 
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

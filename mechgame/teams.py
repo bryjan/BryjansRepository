@@ -6,6 +6,10 @@ from dataclasses import dataclass
 __all__ = ["MapVisibilityFlags", "Squad", "Team"]
 
 
+MOVEMENT_MODES = {"patrol", "move", "double_time"}
+MOVEMENT_BEHAVIORS = {"formation", "road_patrol"}
+
+
 @dataclass
 class MapVisibilityFlags:
     """Policy controls for a team's strategic-map fog of war."""
@@ -33,6 +37,11 @@ class Squad:
 
         self.role = squadRole
         self.playerControlled = playerControlled
+        # Movement policy is deliberately separate from formation behavior.
+        # A leader/planner may, for example, order a road patrol at normal
+        # speed or double time without changing the squad's assigned mission.
+        self.movementMode = "move"
+        self.movementBehavior = "formation"
         # Teams hand down matching objective records to AI squads only.
         self.currentGoal = None
         self.currentGoals = []
@@ -128,6 +137,17 @@ class Squad:
     def canFillRoles(self, required_roles):
         """Return whether the squad currently supplies every requested role."""
         return all(self.roleCapabilityFlags.get(role, False) for role in required_roles)
+
+    def setMovementPolicy(self, mode=None, behavior=None):
+        """Set validated movement reserve and formation behavior preferences."""
+        if mode is not None:
+            if mode not in MOVEMENT_MODES:
+                raise ValueError(f"Unknown movement mode '{mode}'.")
+            self.movementMode = mode
+        if behavior is not None:
+            if behavior not in MOVEMENT_BEHAVIORS:
+                raise ValueError(f"Unknown movement behavior '{behavior}'.")
+            self.movementBehavior = behavior
 
     def statusReport(self):
         """Return a squad readiness summary for the player or future AI."""
