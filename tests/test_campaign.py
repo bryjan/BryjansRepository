@@ -52,6 +52,8 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(mission.diversion_payout(180), 1_050)
 
     def test_enemy_presence_applies_a_nonlinear_multiplier_to_all_contract_payouts(self):
+        self.assertEqual(self.campaign.normal_enemy_force(), 4.8)
+        self.assertAlmostEqual(self.campaign.projected_enemy_force(), 4.8)
         self.assertLess(self.campaign.enemy_payout_multiplier(.5), .6)
         self.assertAlmostEqual(self.campaign.enemy_payout_multiplier(1), 1)
         self.assertGreater(self.campaign.enemy_payout_multiplier(1.5), 1.4)
@@ -67,6 +69,33 @@ class MercenaryCampaignTests(unittest.TestCase):
 
         self.assertEqual(offers[0].payout, round(650 * self.campaign.enemy_payout_multiplier()))
         self.assertEqual(offers[1].payout, round(1_100 * self.campaign.enemy_payout_multiplier()))
+
+    def test_committing_more_of_the_company_increases_projected_enemy_response(self):
+        pilot_names = [pilot.name for pilot in self.campaign.pilots]
+        baseline = self.campaign.projected_enemy_force()
+        for pilot_name in pilot_names[:5]:
+            self.campaign.deploy("lancer.type_a", pilot_name)
+        self.campaign.deploy("bastion", pilot_names[5])
+
+        self.assertEqual(self.campaign.deployed_force(), self.campaign.company_force())
+        self.assertEqual(self.campaign.projected_enemy_force(), baseline * 2)
+        self.assertGreater(self.campaign.enemy_payout_multiplier(), 1.5)
+
+    def test_accepting_a_contract_locks_terms_after_the_roster_is_committed(self):
+        offer = CampaignMission(
+            1, "diversion", "Diversion", 700, "", (), "deal_damage", 120,
+            ("enemy_force",), base_payout=700,
+        )
+        self.campaign.missionOffers = [offer]
+        pilot_names = [pilot.name for pilot in self.campaign.pilots]
+        for pilot_name in pilot_names[:5]:
+            self.campaign.deploy("lancer.type_a", pilot_name)
+        self.campaign.deploy("bastion", pilot_names[5])
+
+        active = self.campaign.accept_mission(1)
+
+        self.assertEqual(active.objective_value, 240)
+        self.assertEqual(active.payout, 1_400)
 
     def test_sabotage_contracts_generate_one_to_three_targets_with_per_target_rewards(self):
         sabotage = next(template for template in MISSION_TEMPLATES if template[0] == "sabotage")
