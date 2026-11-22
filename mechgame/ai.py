@@ -8,6 +8,8 @@ combat choices for the future squad-leader action planner.
 from dataclasses import dataclass
 import math
 
+from . import artillery
+
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
     "execute_squad_combat", "execute_squad_movement", "issue_team_goal",
@@ -767,8 +769,36 @@ def _select_primary_target(squad):
     return squad.primaryTarget
 
 
+def _artillery_position_is_safe(match_info, shooter, weapon, position):
+    """Reject an explosive impact whose scatter-and-blast area reaches allies."""
+    ammo = weapon.selected_ammo
+    if ammo.payload not in {"explosive", "incendiary"}:
+        return True
+    profile = weapon.launcher_profile(math.dist(shooter.pos, position), match_info, shooter)
+    if profile is None:
+        return False
+    danger_radius = ammo.blastRadius + profile["inaccuracy"]
+    return not any(
+        entity is not shooter
+        and entity.team is shooter.team
+        and math.dist(entity.pos, position) <= danger_radius
+        for entity in match_info.entities
+    )
+
+
+def _artillery_target_position(match_info, shooter, weapon, target):
+    """Prefer a safe lead, then the target cell; hold fire if both are unsafe."""
+    lead = artillery.predict_launcher_lead(match_info, weapon, target, shooter)
+    if lead is not None and _artillery_position_is_safe(match_info, shooter, weapon, lead):
+        return lead
+    target_position = list(target.pos)
+    if _artillery_position_is_safe(match_info, shooter, weapon, target_position):
+        return target_position
+    return None
+
+
 def _fire_artillery_if_ordered(match_info, squad, mech):
-    """Launch one round only after the leader makes a force-safe call."""
+    """Launch one round after a leader call while avoiding friendly blast risk."""
     target = squad.artilleryCallTarget
     if target is None or target.destroyed:
         return False
@@ -777,7 +807,8 @@ def _fire_artillery_if_ordered(match_info, squad, mech):
             continue
         if weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
             continue
-        if weapon.launchAt(match_info, target.pos, shooter=mech):
+        position = _artillery_target_position(match_info, mech, weapon, target)
+        if position is not None and weapon.launchAt(match_info, position, shooter=mech):
             return True
     return False
 

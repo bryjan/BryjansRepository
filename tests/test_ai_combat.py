@@ -98,6 +98,9 @@ class AiCombatTests(unittest.TestCase):
         squad.refreshCombatForce()
         support.pos = [9, 10]
         mortar.pos = [10, 10]
+        for index, friendly in enumerate(self.match.entities):
+            if friendly not in {support, mortar}:
+                friendly.pos = [2, 2 + index]
         self.target = self.enemy_squad.squadLead
         self.target.pos = [15, 10]
         mortar.directlyVisibleEnemies = [self.target]

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 
 from . import effects
+from . import radar
 
 
 class LauncherAmmo:
@@ -75,6 +76,51 @@ class ScheduledImpact:
     owner_team: object
     ignite_chance: float
     sound_range: int
+
+
+def auto_lead_available(match_info, observer, target):
+    """Require team sight or a fully identified radar track for auto lead."""
+    return target is not None and (
+        radar.team_has_visual_contact(observer, target)
+        or radar.can_aim_at_contact(observer, match_info, target)
+    )
+
+
+def predict_launcher_lead(match_info, launcher, target, observer):
+    """Project a valid contact forward by the launcher's actual flight time."""
+    if not auto_lead_available(match_info, observer, target):
+        return None
+
+    detail = radar.contact_details(observer, match_info, target)
+    visual_contact = radar.team_has_visual_contact(observer, target)
+    position = list(target.pos) if visual_contact else list(detail["position"])
+    if visual_contact:
+        turn_start, speed = target.turnStartPos, target.speed
+    else:
+        memory = observer.team.radarContacts[target]
+        turn_start, speed = memory["turn_start_pos"], memory["speed"]
+
+    delta_x = position[0] - turn_start[0]
+    delta_y = position[1] - turn_start[1]
+    direction_x = (delta_x > 0) - (delta_x < 0)
+    direction_y = (delta_y > 0) - (delta_y < 0)
+    projected = list(position)
+    for _ in range(3):
+        profile = launcher.launcher_profile(
+            math.dist(observer.pos, projected), match_info, observer,
+        )
+        if profile is None:
+            return None
+        updated = [
+            position[0] + (direction_x * speed * profile["turns"]),
+            position[1] + (direction_y * speed * profile["turns"]),
+        ]
+        if updated == projected:
+            break
+        projected = updated
+    if not (1 <= projected[0] < match_info.mapWidth - 1 and 1 <= projected[1] < match_info.mapHeight - 1):
+        return None
+    return projected
 
 
 def scatter_position(match_info, target, inherent_inaccuracy):

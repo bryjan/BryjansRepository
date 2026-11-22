@@ -4,7 +4,7 @@ import math
 
 from ..ui import tactical as pv
 
-from .. import radar
+from .. import artillery, radar
 from ..coordinates import get_coordinate_input
 from .shared import read_nonempty
 
@@ -141,51 +141,12 @@ def launcherFirePrompt(matchInfo, launcher, target=None, hasDefault=False):
 
 def predictLauncherLead(matchInfo, launcher, target):
     """Project a fully resolved contact forward by the shell's travel time."""
-    observer = matchInfo.pov
-    if not launcherAutoLeadAvailable(matchInfo, target):
-        return None
-
-    detail = radar.contact_details(observer, matchInfo, target)
-    visual_contact = radar.team_has_visual_contact(observer, target)
-    position = list(target.pos) if visual_contact else list(detail["position"])
-    if visual_contact:
-        turn_start, speed = target.turnStartPos, target.speed
-    else:
-        memory = observer.team.radarContacts[target]
-        turn_start, speed = memory["turn_start_pos"], memory["speed"]
-
-    delta_x = position[0] - turn_start[0]
-    delta_y = position[1] - turn_start[1]
-    direction_x = (delta_x > 0) - (delta_x < 0)
-    direction_y = (delta_y > 0) - (delta_y < 0)
-    projected = list(position)
-    # A projected location can cross into a slower range band. Re-evaluate the
-    # band a few times so the final lead uses the shell's actual flight time.
-    for _ in range(3):
-        profile = launcher.launcher_profile(
-            math.dist(observer.pos, projected), matchInfo, observer,
-        )
-        if profile is None:
-            return None
-        updated = [
-            position[0] + (direction_x * speed * profile["turns"]),
-            position[1] + (direction_y * speed * profile["turns"]),
-        ]
-        if updated == projected:
-            break
-        projected = updated
-
-    if not (1 <= projected[0] < matchInfo.mapWidth - 1 and 1 <= projected[1] < matchInfo.mapHeight - 1):
-        return None
-    return projected
+    return artillery.predict_launcher_lead(matchInfo, launcher, target, matchInfo.pov)
 
 
 def launcherAutoLeadAvailable(matchInfo, target):
     """Require team sight or the highest radar ID before predicting movement."""
-    return target is not None and (
-        radar.team_has_visual_contact(matchInfo.pov, target)
-        or radar.can_aim_at_contact(matchInfo.pov, matchInfo, target)
-    )
+    return artillery.auto_lead_available(matchInfo, matchInfo.pov, target)
 
 
 def printLauncherProfile(matchInfo, mech, launcher, position):
