@@ -369,7 +369,7 @@ class MatchFlowTests(unittest.TestCase):
         for index, mech in enumerate(squad.mechList):
             mech.pos = [10 - index * 3, 10]
         match.issueTeamObjective(match.teamList[1], "patrol_map", 80, (30, 10), "Patrol road.")
-        leader.in_combat = True
+        leader.inCombat = True
 
         moved = execute_squad_movement(match, squad)
 
@@ -397,6 +397,80 @@ class MatchFlowTests(unittest.TestCase):
         self.assertTrue(moved)
         self.assertEqual(squad.patrolRouteDirection, -1)
         self.assertLess(squad.patrolRouteIndex, len(squad.patrolRoute) - 1)
+
+    def test_road_patrol_prefers_tactical_locations_near_its_objective(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.teamList[1].squadsList[0]
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+            match.map[20][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.tactical_locations.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
+        match.mapFeatures.add_road("road", [(x, 20) for x in range(1, match.mapWidth - 1)])
+        match.mapFeatures.add_tactical_location(
+            "bridge", "Bridge", "bridge", [(30, 20)],
+        )
+        squad.squadLead.pos = [10, 15]
+        match.issueTeamObjective(match.teamList[1], "patrol_location", 80, (30, 20), "Patrol bridge.")
+
+        self.assertTrue(start_road_patrol(match, squad))
+        self.assertEqual(squad.patrolRouteId, "road_2")
+
+    def test_road_patrol_avoids_a_route_already_assigned_to_a_friendly_squad(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        team = match.teamList[1]
+        squad = team.squadsList[0]
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+            match.map[20][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
+        match.mapFeatures.add_road("road", [(x, 20) for x in range(1, match.mapWidth - 1)])
+        other_squad = Squad("Existing Patrol", [], "patrol")
+        other_squad.patrolRoute = tuple((x, 20) for x in range(1, match.mapWidth - 1))
+        team.squadsList.append(other_squad)
+        other_squad.team = team
+        squad.squadLead.pos = [10, 19]
+
+        self.assertTrue(start_road_patrol(match, squad))
+        self.assertEqual(squad.patrolRouteId, "road_1")
+
+    def test_road_patrol_uses_its_shoulder_to_pass_another_friendly_patrol(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        team = match.teamList[1]
+        squad = team.squadsList[0]
+        for row in match.map:
+            for cell in row:
+                cell.terrain = match.plains
+        for x in range(1, match.mapWidth - 1):
+            match.map[10][x].terrain = match.road
+        match.mapFeatures.roads.clear()
+        match.mapFeatures.add_road("road", [(x, 10) for x in range(1, match.mapWidth - 1)])
+        leader, first_follower, second_follower = squad.mechList
+        leader.pos = [10, 10]
+        leader.ap = leader.mp = 1
+        first_follower.pos = [7, 10]
+        second_follower.pos = [4, 10]
+        blocker = Entity(create_mech("lancer.type_a"), Pilot("Blocker"))
+        blocker.pos = [11, 10]
+        blocker.team = team
+        blocker_squad = Squad("Other Patrol", [blocker], "patrol")
+        blocker_squad.team = team
+        team.squadsList.append(blocker_squad)
+        match.entities.append(blocker)
+
+        self.assertTrue(start_road_patrol(match, squad))
+        moved = execute_squad_movement(match, squad)
+
+        self.assertIn(leader, moved)
+        self.assertNotEqual(leader.pos[1], 10)
 
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()

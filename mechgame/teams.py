@@ -71,8 +71,9 @@ class Squad:
         self.canFulfillCurrentGoal = True
         # Active-radar contacts are shared by every mech in this squad.
         self.radarTrackedEnemies = []
-        # TODO(ai-squad-leader): retain the assessed stance, route, formation,
-        # and per-mech orders here after the planner is implemented.
+        # TODO(ai-squad-leader): retain the assessed stance and per-mech
+        # combat orders here after the planner is implemented. Patrol route
+        # state is already stored above because movement executes it today.
 
         for mech in self.mechList:
             mech.squad = self
@@ -188,12 +189,9 @@ class Squad:
             self.movementBehavior = "formation"
 
     @property
-    def in_combat(self):
-        """Expose a snake-case squad combat flag derived from its members."""
-        return any(
-            getattr(mech, "in_combat", getattr(mech, "inCombat", False))
-            for mech in self.mechList
-        )
+    def inCombat(self):
+        """Return whether any squad member has entered combat."""
+        return any(mech.inCombat for mech in self.mechList)
 
     def statusReport(self):
         """Return a squad readiness summary for the player or future AI."""

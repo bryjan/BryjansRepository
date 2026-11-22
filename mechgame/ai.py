@@ -1,9 +1,8 @@
-"""Strategic objective assignment shared by matches, teams, and squads.
+"""Strategic objective assignment and visibility-limited squad movement.
 
-This module intentionally stops at *intent*: it validates and distributes
-objectives, but it never reads hidden map information or issues a move/fire
-action. Keeping that boundary explicit lets the future squad-leader planner
-turn visible state into orders without coupling AI decisions to terminal UI.
+This module validates and distributes objectives, then executes a bounded
+first movement pass. It never reads hidden enemy or map information, leaving
+combat choices for the future squad-leader action planner.
 """
 
 from dataclasses import dataclass
@@ -17,6 +16,16 @@ __all__ = [
 
 FORMATION_SPACING = 3
 MIN_LEADER_VISUAL_RANGE = 10
+# Patrols favor roads serving strategic terrain and their assigned objective,
+# while treating another friendly patrol's recorded road as a meaningful cost.
+PATROL_TACTICAL_RADIUS = 10
+PATROL_OBJECTIVE_RADIUS = 16
+PATROL_TACTICAL_WEIGHT = 5
+PATROL_OBJECTIVE_WEIGHT = 6
+PATROL_OVERLAP_PENALTY = 12
+# A one-tile shoulder lets opposing or converging patrols pass on a narrow
+# road without letting a patrol drift into ordinary off-road movement.
+ROAD_PATROL_WIGGLE_RADIUS = 1
 ENERGY_RESERVE_BANDS = {
     # A patrol may take a costly catch-up step, but it only begins a burst
     # near full charge and stops before falling below its sustainable reserve.
@@ -258,7 +267,8 @@ def _leader_destination(match_info, squad):
     """Choose a known, legal-information destination for the squad leader."""
     leader = squad.squadLead
     patrol_destination = (
-        _patrol_destination(squad, leader) if _road_patrol_active(squad) else None
+        _patrol_destination(match_info, squad, leader)
+        if _road_patrol_active(squad) else None
     )
     if patrol_destination is not None:
         return patrol_destination
@@ -271,8 +281,8 @@ def _leader_destination(match_info, squad):
         return _nearest_location(leader.pos, [contact.pos for contact in contacts])
     if squad.currentGoal and squad.currentGoal.kind == "eliminate_enemies":
         # This neutral search point is map knowledge, not hidden enemy data.
-        # TODO(ai-search): replace it with leader-selected patrol routes and
-        # unexplored-frontier scouting once the planner owns search behavior.
+        # TODO(ai-search): replace it with unexplored-frontier scouting once
+        # the planner can assess map coverage rather than just route patrols.
         return (match_info.mapWidth // 2, match_info.mapHeight // 2)
     return None
 
@@ -287,7 +297,7 @@ def _road_patrol_active(squad):
     """Recognize an explicit road patrol or an AI-issued patrol objective."""
     goal_kind = getattr(squad.currentGoal, "kind", "")
     return squad.movementBehavior == "road_patrol" or goal_kind in {
-        "patrol", "patrol_map", "patrol_location",
+        "patrol", "patrol_map", "patrol_location", "defend",
     }
 
 
@@ -300,6 +310,45 @@ def _recorded_road_tiles(match_info, route):
     return tuple(tiles)
 
 
+def _route_distance(route_tiles, locations):
+    """Return the nearest Euclidean distance between one route and locations."""
+    return min(
+        math.dist(route_tile, location)
+        for route_tile in route_tiles
+        for location in locations
+    )
+
+
+def _other_patrol_tiles(squad):
+    """Return friendly patrol coverage the leader should avoid duplicating."""
+    if not getattr(squad, "team", None):
+        return set()
+    return {
+        tile
+        for other_squad in squad.team.squadsList
+        if other_squad is not squad
+        for tile in other_squad.patrolRoute
+    }
+
+
+def _patrol_route_score(match_info, squad, route_tiles):
+    """Score one route using strategic value, objective access, and coverage."""
+    tactical_score = sum(
+        max(0, PATROL_TACTICAL_RADIUS - _route_distance(route_tiles, location.tiles))
+        * PATROL_TACTICAL_WEIGHT
+        for location in match_info.mapFeatures.tactical_locations
+        if location.tiles
+    )
+    objective_tiles = getattr(squad.currentGoal, "locations", ())
+    objective_score = 0
+    if objective_tiles:
+        objective_score = max(
+            0, PATROL_OBJECTIVE_RADIUS - _route_distance(route_tiles, objective_tiles),
+        ) * PATROL_OBJECTIVE_WEIGHT
+    overlap = len(set(route_tiles) & _other_patrol_tiles(squad))
+    return tactical_score + objective_score - (overlap * PATROL_OVERLAP_PENALTY)
+
+
 def start_road_patrol(match_info, squad, route_id=None):
     """Give a squad leader a repeatable patrol order from recorded map roads.
 
@@ -309,25 +358,24 @@ def start_road_patrol(match_info, squad, route_id=None):
     """
     routes = getattr(match_info.mapFeatures, "roads", ())
     candidates = [
-        route for route in routes
+        (route, _recorded_road_tiles(match_info, route))
+        for route in routes
         if route_id is None or route.route_id == route_id
     ]
+    candidates = [candidate for candidate in candidates if len(candidate[1]) >= 2]
     if not candidates:
         return False
 
     origin = squad.squadLead.pos
-    if squad.currentGoal and squad.currentGoal.kind == "defend" and squad.currentGoal.locations:
-        origin = _nearest_location(squad.squadLead.pos, squad.currentGoal.locations)
-    route = min(
+    ranked_routes = sorted(
         candidates,
         key=lambda candidate: (
-            math.dist(origin, _nearest_location(origin, candidate.tiles)),
-            candidate.route_id,
+            -_patrol_route_score(match_info, squad, candidate[1]),
+            _route_distance(candidate[1], (tuple(origin),)),
+            candidate[0].route_id,
         ),
     )
-    tiles = _recorded_road_tiles(match_info, route)
-    if len(tiles) < 2:
-        return False
+    route, tiles = ranked_routes[0]
     squad.beginRoadPatrol(route.route_id, tiles)
     return True
 
@@ -344,7 +392,7 @@ def _ensure_road_patrol(match_info, squad):
     return False
 
 
-def _patrol_destination(squad, leader):
+def _patrol_destination(match_info, squad, leader):
     """Return and advance toward the next ordered road waypoint.
 
     Non-circuit routes reverse at their endpoints.  This makes a simple road
@@ -354,18 +402,35 @@ def _patrol_destination(squad, leader):
     if not route:
         return None
     index = squad.patrolRouteIndex
-    if tuple(leader.pos) == route[index]:
+
+    def advance(index):
         next_index = index + squad.patrolRouteDirection
         if not 0 <= next_index < len(route):
             squad.patrolRouteDirection *= -1
             next_index = index + squad.patrolRouteDirection
-        squad.patrolRouteIndex = next_index
-    return squad.patrolRoute[squad.patrolRouteIndex]
+        return next_index
+
+    if tuple(leader.pos) == route[index]:
+        index = advance(index)
+    # An unrelated friendly patrol may be travelling the opposite direction.
+    # Skip its occupied waypoint so this leader can use the roadside shoulder
+    # to pass it instead of waiting forever on a single-lane road.
+    checked = set()
+    while index not in checked and any(
+        entity.team is leader.team
+        and entity.squad is not squad
+        and entity.pos == list(route[index])
+        for entity in match_info.entities
+    ):
+        checked.add(index)
+        index = advance(index)
+    squad.patrolRouteIndex = index
+    return route[index]
 
 
 def _patrol_interrupted(squad):
     """Stop route-following as soon as the squad enters or detects combat."""
-    if squad.in_combat:
+    if squad.inCombat:
         return True
     return any(
         mech.directlyVisibleEnemies or mech.trackedEnemies
@@ -390,14 +455,27 @@ def _can_begin_movement(mech, movement_mode):
     return mech.energy >= _energy_ceiling(mech, movement_mode)
 
 
-def _legal_steps(match_info, mech, movement_mode, roadway_only=False):
+def _in_patrol_corridor(position, patrol_route):
+    """Return whether a cell is on or one tile beside the selected route."""
+    return any(
+        max(abs(position[0] - route_tile[0]), abs(position[1] - route_tile[1]))
+        <= ROAD_PATROL_WIGGLE_RADIUS
+        for route_tile in patrol_route
+    )
+
+
+def _legal_steps(match_info, mech, movement_mode, roadway_only=False, patrol_route=()):
     """Yield shared-rules steps that obey a squad's energy reserve policy."""
-    restrict_to_roadway = roadway_only and _is_roadway(match_info, mech.pos)
+    restrict_to_corridor = (
+        roadway_only
+        and patrol_route
+        and _in_patrol_corridor(mech.pos, patrol_route)
+    )
     for offset_x, offset_y in _ADJACENT_OFFSETS:
         position = [mech.pos[0] + offset_x, mech.pos[1] + offset_y]
         energy_cost, reason = mech.moveCostTo(match_info, position)
         if reason is None and mech.energy - energy_cost >= _energy_floor(mech, movement_mode):
-            if restrict_to_roadway and not _is_roadway(match_info, position):
+            if restrict_to_corridor and not _in_patrol_corridor(position, patrol_route):
                 continue
             yield position, energy_cost
 
@@ -472,14 +550,28 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
         steps = [
             (math.dist(position, destination), energy_cost, position)
             for position, energy_cost in _legal_steps(
-                match_info, leader, squad.movementMode, roadway_only,
+                match_info, leader, squad.movementMode, roadway_only, squad.patrolRoute,
             )
         ]
         if not steps:
             break
-        _, _, position = min(steps, key=lambda option: (option[1], option[0], option[2]))
-        if math.dist(position, destination) >= current_distance:
-            break
+        progressing_steps = [step for step in steps if step[0] < current_distance]
+        if progressing_steps:
+            _, _, position = min(
+                progressing_steps,
+                key=lambda option: (option[1], option[0], option[2]),
+            )
+        else:
+            # A roadside shoulder can be temporarily less direct than the
+            # destination. Allow one such step so allied patrols do not lock
+            # each other in place on a one-tile road.
+            wiggle_steps = [
+                step for step in steps
+                if step[0] <= current_distance + ROAD_PATROL_WIGGLE_RADIUS
+            ]
+            if not roadway_only or not wiggle_steps:
+                break
+            _, _, position = min(wiggle_steps, key=lambda option: (option[0], option[1], option[2]))
         if not leader.moveTo(match_info, position, announce=False):
             break
         moved.append(leader)
@@ -504,7 +596,7 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
 
         candidates = []
         for position, energy_cost in _legal_steps(
-            match_info, mech, squad.movementMode, roadway_only,
+            match_info, mech, squad.movementMode, roadway_only, squad.patrolRoute,
         ):
             status = _formation_status(position, leader.pos, teammate_positions, leader_range)
             candidates.append((status, energy_cost, position))
