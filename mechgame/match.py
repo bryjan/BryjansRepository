@@ -30,6 +30,9 @@ class MatchInfo:
         self.playerSquad = ""
         self.entities = []
         self.abandonedMechs = []
+        # Fled mechs are intact withdrawals, separate from ejected pilots and
+        # destroyed chassis so campaign recovery can preserve both later.
+        self.fledMechs = []
         self.destroyedMechs = []
         self.ejectedPilots = []
         self.killedPilots = []

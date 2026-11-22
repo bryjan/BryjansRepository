@@ -12,7 +12,7 @@ from . import artillery
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
-    "execute_squad_combat", "execute_squad_movement", "issue_team_goal",
+    "execute_squad_combat", "execute_squad_flee", "execute_squad_movement", "issue_team_goal",
     "request_reinforcement", "start_road_patrol",
 ]
 
@@ -983,6 +983,83 @@ def _legal_steps(match_info, mech, movement_mode, roadway_only=False, patrol_rou
             yield position, energy_cost
 
 
+def _is_border_position(match_info, position):
+    """Return whether a coordinate is an exit tile around the generated map."""
+    x, y = position
+    return x in (0, match_info.mapWidth - 1) or y in (0, match_info.mapHeight - 1)
+
+
+def _flee_destination(match_info, mech):
+    """Pick the closest exit, preferring one farther from known threats."""
+    exits = [
+        (x, y)
+        for y in range(match_info.mapHeight)
+        for x in range(match_info.mapWidth)
+        if _is_border_position(match_info, (x, y))
+    ]
+    threats = list(dict.fromkeys(
+        [*mech.directlyVisibleEnemies, *mech.trackedEnemies]
+    ))
+    return min(
+        exits,
+        key=lambda position: (
+            math.dist(mech.pos, position),
+            -min((math.dist(position, enemy.pos) for enemy in threats), default=0),
+            position,
+        ),
+    )
+
+
+def _move_fleeing_mech(match_info, mech):
+    """Run one mech double-time toward an exit, avoiding known enemies en route."""
+    moved = []
+    if _is_border_position(match_info, mech.pos):
+        mech.flee(match_info)
+        return moved
+    destination = _flee_destination(match_info, mech)
+    threats = list(dict.fromkeys(
+        [*mech.directlyVisibleEnemies, *mech.trackedEnemies]
+    ))
+    while mech.ap > 0 and mech.mp > 0:
+        current_distance = math.dist(mech.pos, destination)
+        steps = [
+            (math.dist(position, destination), energy_cost, position)
+            for position, energy_cost in _legal_steps(match_info, mech, "double_time")
+        ]
+        progressing = [step for step in steps if step[0] < current_distance]
+        if not progressing:
+            break
+        _, _, position = min(
+            progressing,
+            key=lambda step: (
+                step[0],
+                -min((math.dist(step[2], enemy.pos) for enemy in threats), default=0),
+                step[1], step[2],
+            ),
+        )
+        if not mech.moveTo(match_info, position, announce=False):
+            break
+        moved.append(mech)
+        if _is_border_position(match_info, mech.pos):
+            mech.flee(match_info)
+            break
+    return moved
+
+
+def execute_squad_flee(match_info, squad=None):
+    """Withdraw every mech independently at double time until it exits safely."""
+    squad = squad or match_info.pov.squad
+    if not squad.mechList:
+        return []
+    squad.orderFlee()
+    moved = []
+    # Fleeing deliberately drops formation: preserving each mech is more
+    # important than waiting for a damaged straggler while under pressure.
+    for mech in list(squad.mechList):
+        moved.extend(_move_fleeing_mech(match_info, mech))
+    return moved
+
+
 def _nearest_roadway(match_info, position):
     """Return the nearest road/tunnel tile so an off-road patrol can join it."""
     roads = [
@@ -1143,6 +1220,9 @@ def execute_squad_movement(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
         return []
+
+    if squad.fleeOrdered or squad.shouldLeaveBattlefield:
+        return execute_squad_flee(match_info, squad)
 
     leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
     roadway_only = _road_patrol_active(squad)

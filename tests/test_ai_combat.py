@@ -3,7 +3,10 @@
 import random
 import unittest
 
-from mechgame.ai import execute_squad_combat, execute_squad_movement, request_reinforcement
+from mechgame.ai import (
+    execute_squad_combat, execute_squad_flee, execute_squad_movement,
+    request_reinforcement,
+)
 from mechgame.runner import Game
 from mechgame.teams import Squad
 
@@ -72,6 +75,43 @@ class AiCombatTests(unittest.TestCase):
         launcher = next(weapon for weapon in mortar.mechClass.gunList if weapon.isLauncher)
         self.assertEqual(launcher.selected_ammo.payload, "smoke")
         self.assertTrue(self.match.pendingImpacts)
+
+    def test_flee_order_moves_an_ai_mech_to_the_border_and_preserves_it(self):
+        """An ordered withdrawal exits intact rather than ejecting or dying."""
+        squad = self.enemy_squad
+        mech = squad.squadLead
+        squad.mechList = [mech]
+        mech.squad = squad
+        mech.pos = [1, 10]
+        for entity in self.match.entities:
+            if entity is not mech:
+                entity.pos = [20, 20]
+        squad.orderFlee()
+
+        moved = execute_squad_flee(self.match, squad)
+
+        self.assertIn(mech, moved)
+        self.assertTrue(mech.fled)
+        self.assertTrue(mech.pilot.returned)
+        self.assertEqual(mech.pilot.status, "RTB")
+        self.assertIn(mech, self.match.fledMechs)
+        self.assertNotIn(mech, self.match.destroyedMechs)
+        self.assertNotIn(mech, self.match.entities)
+
+    def test_spent_artillery_without_team_supplies_marks_itself_for_fleeing(self):
+        mortar = next(
+            mech for mech in self.player_squad.mechList
+            if "artillery" in mech.mechClass.roles
+        )
+        for weapon in mortar.mechClass.gunList:
+            for ammo in weapon.ammoTypes:
+                ammo.charges = 0
+        self.match.teamList[0].supplies = 0
+
+        mortar.refreshReadiness(self.match)
+
+        self.assertFalse(mortar.hasAvailableRole)
+        self.assertTrue(mortar.shouldFlee)
 
     def test_low_ammo_mech_needs_attack_order_to_fire_on_radar_contact(self):
         shooter = self.enemy_squad.mechList[-1]

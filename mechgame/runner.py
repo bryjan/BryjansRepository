@@ -96,7 +96,7 @@ class Game:
     def run(self):
         # Terminal interaction belongs at the application boundary. Keeping
         # these imports here lets domain objects load without UI dependencies.
-        from .ai import execute_squad_combat, execute_squad_movement
+        from .ai import execute_squad_combat, execute_squad_flee, execute_squad_movement
         from .ui import tactical
         from .commands import receive_input
 
@@ -105,8 +105,12 @@ class Game:
         while not match.matchOver and not match.quitRequested:
             match.pov.getVisuals(match)
             if match.pov.squad.playerControlled:
-                tactical.printPOV(match, *match.pov.pos)
-                receive_input(match)
+                if match.pov.squad.fleeOrdered:
+                    execute_squad_flee(match, match.pov.squad)
+                    match.turnEnded = True
+                else:
+                    tactical.printPOV(match, *match.pov.pos)
+                    receive_input(match)
             else:
                 # AI uses a single bounded combat decision before its normal
                 # formation movement, then yields to the next squad.

@@ -37,6 +37,21 @@ def receive_input(matchInfo):
             return abilityMenu(matchInfo)
         case "eject":
             return matchInfo.pov.eject(matchInfo)
+        case "flee":
+            # At the map edge this preserves the active mech immediately.
+            # Elsewhere it is an explicit squad withdrawal order that begins
+            # the squad's double-time exit movement immediately.
+            if (
+                matchInfo.pov.pos[0] in (0, matchInfo.mapWidth - 1)
+                or matchInfo.pov.pos[1] in (0, matchInfo.mapHeight - 1)
+            ):
+                return matchInfo.pov.flee(matchInfo)
+            matchInfo.pov.squad.orderFlee()
+            from ..ai import execute_squad_flee
+            execute_squad_flee(matchInfo, matchInfo.pov.squad)
+            matchInfo.turnEnded = True
+            print("Squad ordered to flee toward the nearest border exit.")
+            return True
         case "end":
             # This is the sole command that hands control to the next squad.
             matchInfo.turnEnded = True

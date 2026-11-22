@@ -86,6 +86,8 @@ class Entity: #a character on the map
         self.hasUsableWeapon = False
         self.hasArtillery = False
         self.roleReadiness = {}
+        self.hasAvailableRole = True
+        self.shouldFlee = False
         self.travelSpeed = 0
         self.needrest = False
         # Tactical memory is useful to both AI and the player fire menu.
@@ -102,6 +104,7 @@ class Entity: #a character on the map
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
         self.ejected = False
+        self.fled = False
         self.refreshReadiness()
         self.baseOffRoadPatrolSpeed = self.offRoadPatrolSpeed
         self.baseRoadPatrolSpeed = self.roadPatrolSpeed
@@ -237,7 +240,10 @@ class Entity: #a character on the map
 
     def _role_readiness(self, role, integrity, energy, mobility, weapon_readiness):
         """Score one stated role without forcing it through combat readiness."""
-        sensor_operational = self.mechClass.helm.hp > 0 and self.mechClass.visPower > 0
+        # A sensor/scout needs its active array as well as an intact helm.
+        # Visual-only spotting remains useful to combat roles, but does not
+        # make a dedicated sensor fulfill its specialist role.
+        sensor_operational = self.mechClass.helm.hp > 0 and self.mechClass.radarPower > 0
         artillery_weapons = [
             weapon for weapon in self.mechClass.gunList if weapon.isLauncher
         ]
@@ -251,19 +257,21 @@ class Entity: #a character on the map
             # empty, so their score intentionally ignores weapon ammunition.
             score = integrity * 40 + energy * 25 + mobility * 20 + (15 if sensor_operational else 0)
             return round(score) if sensor_operational else 0
-        if role in ("artillery", "fire_support"):
+        if role in ("artillery", "fire_support", "long_range_fire_support"):
             if not artillery_operational:
                 return 0
             return round(integrity * 35 + artillery_ammo * 35 + energy * 15 + mobility * 15)
         if role == "skirmisher":
+            if not self.hasUsableWeapon:
+                return 0
             return round(
                 integrity * 25 + weapon_readiness * 25 + energy * 20 + mobility * 30
             )
         if role in ("front_line", "anchor", "assault", "combat"):
-            return self.combatReadiness
+            return self.combatReadiness if self.hasUsableWeapon else 0
         # New content can declare a role before it has bespoke logic; it gets
         # the general combat score rather than disappearing from AI planning.
-        return self.combatReadiness
+        return self.combatReadiness if self.hasUsableWeapon else 0
 
     def refreshReadiness(self, matchInfo=None):
         """Recalculate AI-facing condition, supply, and sustained-travel flags.
@@ -336,6 +344,18 @@ class Entity: #a character on the map
             role: self._role_readiness(role, integrity, energy, mobility, weapon_readiness)
             for role in self.mechClass.roles
         }
+        role_threshold = getattr(self.squad, "ROLE_CAPABILITY_THRESHOLD", 60)
+        self.hasAvailableRole = any(
+            score >= role_threshold for score in self.roleReadiness.values()
+        )
+        # Supplies are intentionally a simple team-wide reserve for now. A
+        # depleted specialist stays in the field only when a future resupply
+        # or repair action could restore its role.
+        team_supplies = getattr(self.team, "supplies", 0)
+        recoverable = team_supplies > 0 and (self.needsResupply or self.needsRepair)
+        self.shouldFlee = not self.destroyed and not self.ejected and not (
+            self.hasAvailableRole or recoverable
+        )
         if hasattr(self.squad, "refreshCombatForce"):
             self.squad.refreshCombatForce()
 
@@ -362,7 +382,8 @@ class Entity: #a character on the map
             return None, "That move would leave the map."
 
         targetCell = matchInfo.map[targetY][targetX]
-        if not targetCell.terrain.passable:
+        is_exit_tile = targetCell.terrain is matchInfo.border
+        if not targetCell.terrain.passable and not is_exit_tile:
             return None, "This cell's terrain is impassable."
         if any(entity is not self and entity.pos == [targetX, targetY] for entity in matchInfo.entities):
             return None, "Something is in your way."
@@ -371,7 +392,9 @@ class Entity: #a character on the map
         if targetCell.terrain.requireFloat and not can_cross_water:
             return None, "Your mech can't travel over water."
 
-        moveCost = targetCell.terrain.moveCost[self.size]
+        # Borders are normally impassable scenery, except when a mech is
+        # deliberately walking onto one to leave the battlefield.
+        moveCost = 1 if is_exit_tile else targetCell.terrain.moveCost[self.size]
         if self.flying:
             # Flight ignores terrain penalties but retains a size-based cost.
             moveCost = max(moveCost, self.size)
@@ -622,6 +645,35 @@ class Entity: #a character on the map
             matchInfo.abandonedMechs.append(self)
         if self.pilot not in matchInfo.ejectedPilots:
             matchInfo.ejectedPilots.append(self.pilot)
+        if matchInfo.pov is self:
+            matchInfo.turnEnded = True
+        return True
+
+    def flee(self, matchInfo):
+        """Leave from a border tile, preserving this mech and its pilot."""
+        if self.destroyed or self.ejected or self.fled:
+            print("This mech can no longer flee.")
+            return False
+        if not (
+            self.pos[0] in (0, matchInfo.mapWidth - 1)
+            or self.pos[1] in (0, matchInfo.mapHeight - 1)
+        ):
+            print("A mech must reach a border tile before it can flee.")
+            return False
+
+        self.fled = True
+        self.pilot.status = "RTB"
+        self.pilot.returned = True
+        self.report(matchInfo, "Fled the battlefield with mech intact.", critical=True)
+        if self in matchInfo.entities:
+            matchInfo.entities.remove(self)
+        if self.squad and self in self.squad.mechList:
+            self.squad.mechList.remove(self)
+            if self.squad.squadLead is self and self.squad.mechList:
+                self.squad.squadLead = self.squad.mechList[0]
+            self.squad.refreshCombatForce()
+        if self not in matchInfo.fledMechs:
+            matchInfo.fledMechs.append(self)
         if matchInfo.pov is self:
             matchInfo.turnEnded = True
         return True

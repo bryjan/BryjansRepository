@@ -90,6 +90,9 @@ class Squad:
         self.combatEffectiveness = 0
         self.combatEffective = False
         self.shouldLeaveBattlefield = False
+        # A flee order is an orderly withdrawal: units preserve both chassis
+        # and pilot by reaching a map-edge exit rather than ejecting.
+        self.fleeOrdered = False
         self.roleCapabilityFlags = {}
         self.canFulfillCurrentGoal = True
         # Active-radar contacts are shared by every mech in this squad.
@@ -161,9 +164,12 @@ class Squad:
             self.combatReadyCount > 0
             and self.combatForce >= self.baselineCombatForce * self.COMBAT_EFFECTIVE_FORCE_RATIO
         )
-        # This is advice for a future squad-leader action planner. It does not
-        # remove units or move the squad until that planner is implemented.
-        self.shouldLeaveBattlefield = not self.combatEffective
+        # A squad must withdraw when its force is spent or none of its mechs
+        # can still provide a useful stated role without team support.
+        self.shouldLeaveBattlefield = (
+            not self.combatEffective
+            or bool(self.mechList) and all(mech.shouldFlee for mech in self.mechList)
+        )
 
     def canFillRoles(self, required_roles):
         """Return whether the squad currently supplies every requested role."""
@@ -185,6 +191,16 @@ class Squad:
         if posture not in COMBAT_POSTURES:
             raise ValueError(f"Unknown combat posture '{posture}'.")
         self.combatPosture = posture
+
+    def orderFlee(self):
+        """Order an orderly, double-time withdrawal to the nearest map edge."""
+        self.fleeOrdered = True
+        self.setCombatPosture("retreat")
+        self.setMovementPolicy(mode="double_time", behavior="formation")
+
+    def cancelFleeOrder(self):
+        """Clear a voluntary withdrawal order without restoring an old stance."""
+        self.fleeOrdered = False
 
     def beginRoadPatrol(self, route_id, route_tiles):
         """Assign one recorded road route to this squad's leader.
@@ -336,6 +352,10 @@ class Team:
         self.name = teamName
         self.squadsList = squadsList
         self.resources = 0
+        # The first resupply/repair actions will consume this shared reserve.
+        # Readiness already uses it to decide whether a spent specialist can
+        # reasonably remain on the map awaiting support.
+        self.supplies = 0
         self.reportLog = []
         self.playerControlled = playerControlled
         # MatchInfo assigns this after scenario terrain and objectives exist.
@@ -364,6 +384,13 @@ class Team:
     def clear_shared_vision(self):
         """Discard only current visual coverage, retaining explored terrain."""
         self.sharedVisibleTiles.clear()
+
+    def orderFlee(self, squad=None):
+        """Send a withdrawal order to one squad or every squad on this team."""
+        squads = [squad] if squad is not None else self.squadsList
+        for member in squads:
+            if member in self.squadsList and member.mechList:
+                member.orderFlee()
 
     def share_vision(self, mech, cells):
         """Share one capable mech's visual cells with the full team map."""

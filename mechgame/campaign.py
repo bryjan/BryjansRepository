@@ -332,7 +332,13 @@ class MercenaryCampaign:
         recorded location for a later pilot-recovery mission.
         """
         field_clear = len(match.operational_teams()) <= 1
-        mission_pilots = list(match.ejectedPilots) + list(match.killedPilots)
+        # A fled mech and pilot are intact, but their copied tactical pilot
+        # still needs to be reconciled back into the campaign roster.
+        mission_pilots = (
+            list(match.ejectedPilots)
+            + list(match.killedPilots)
+            + [mech.pilot for mech in getattr(match, "fledMechs", ())]
+        )
         for pilot in mission_pilots:
             if pilot.status != "Evading":
                 continue
