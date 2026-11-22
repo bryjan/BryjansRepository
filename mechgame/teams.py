@@ -29,7 +29,7 @@ class Squad:
     def __init__(self, squadName, squadList, squadRole, playerControlled = False):
         self.name = squadName
         self.mechList = squadList #in order of command
-        self.squadLead = self.mechList[0]
+        self.squadLead = self.mechList[0] if self.mechList else None
 
         self.role = squadRole
         self.playerControlled = playerControlled
@@ -55,6 +55,8 @@ class Squad:
         self.canFulfillCurrentGoal = True
         # Active-radar contacts are shared by every mech in this squad.
         self.radarTrackedEnemies = []
+        # TODO(ai-squad-leader): retain the assessed stance, route, formation,
+        # and per-mech orders here after the planner is implemented.
 
         for mech in self.mechList:
             mech.squad = self
@@ -75,6 +77,10 @@ class Squad:
 
     def refreshCombatForce(self):
         """Refresh force, role capability, and battlefield-withdrawal flags."""
+        # The leader may be destroyed or ejected between refreshes. Keeping
+        # this invariant here means every caller sees a live leader or None.
+        if self.squadLead not in self.mechList:
+            self.squadLead = self.mechList[0] if self.mechList else None
         ready_mechs = [mech for mech in self.mechList if mech.combatReady]
         self.combatReadyCount = len(ready_mechs)
         self.combatForce = round(
@@ -252,6 +258,9 @@ class Team:
         # is rebuilt from the currently contributing friendly observers.
         self.exploredTiles = set()
         self.sharedVisibleTiles = set()
+        # TODO(ai-factions): store faction doctrine here (risk tolerance,
+        # preferred terrain, radar discipline, and morale behavior) rather
+        # than branching on team names inside a future planner.
 
         for squads in self.squadsList:
             # Keep the object reference: turn sequencing needs its squad list.

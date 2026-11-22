@@ -104,6 +104,9 @@ class Game:
         while not match.matchOver and not match.quitRequested:
             match.pov.getVisuals(match)
             tactical.printPOV(match, *match.pov.pos)
+            # TODO(ai-turn-executor): dispatch a non-player squad to the AI
+            # planner/executor here. It must end its own squad turn after
+            # bounded actions and never call interactive input functions.
             receive_input(match)
             if not match.quitRequested:
                 self.advance_turn_if_requested(match)

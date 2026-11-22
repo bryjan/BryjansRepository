@@ -46,8 +46,9 @@ class Entity: #a character on the map
         # spend energy on a single-turn pulse.
         self.radarOn = False
         self.radarPulseActive = False
-        # TODO(combat-state): a future threat evaluator owns this live tag.
-        # Ejection already consumes it so survival odds can model combat risk.
+        # TODO(ai-threat): replace this temporary switch with a shared,
+        # visibility-limited threat assessment. Ejection already consumes it
+        # so survival odds can model combat risk without reading hidden units.
         self.inCombat = False
 
         self.turnStartPos = list(self.pos)
@@ -87,6 +88,9 @@ class Entity: #a character on the map
         # The right tactical panel keeps a selected enemy here. When empty or
         # stale, it automatically falls back to the nearest tracked contact.
         self.focusedEnemy = None
+        # TODO(ai-orders): future individual orders should live here only for
+        # the current squad turn. The planner must not persist stale targets
+        # after radar/visual contacts expire.
 
         # A destroyed cockpit takes the whole mech out of the current match.
         self.destroyed = False
@@ -313,6 +317,9 @@ class Entity: #a character on the map
 
     def moveMech(self, matchInfo, input):
         """Attempt one keyboard-directed move and charge the required movement points."""
+        # TODO(ai-action-api): extract the validated one-step movement core
+        # into a coordinate-based action returning structured results. The AI
+        # executor must not synthesize keyboard input or parse printed errors.
         map = matchInfo.map
 
         if self.ap == 0 or self.mp == 0 or self.energy == 0:

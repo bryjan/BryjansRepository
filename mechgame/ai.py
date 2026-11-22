@@ -1,8 +1,9 @@
-"""Data-only strategic AI planning shared by matches, teams, and squads.
+"""Strategic objective assignment shared by matches, teams, and squads.
 
-This module assigns intent without issuing movement or combat commands. The
-later team, squad-leader, faction, and pilot layers all use these same ordered
-objective records rather than inventing incompatible state.
+This module intentionally stops at *intent*: it validates and distributes
+objectives, but it never reads hidden map information or issues a move/fire
+action. Keeping that boundary explicit lets the future squad-leader planner
+turn visible state into orders without coupling AI decisions to terminal UI.
 """
 
 from dataclasses import dataclass
@@ -62,11 +63,23 @@ class SquadGoal:
 
 
 def _coordinates(locations):
-    """Normalize Cells and coordinate pairs into immutable locations."""
-    return tuple(
-        tuple(location.pos) if hasattr(location, "pos") else tuple(location)
-        for location in locations
-    )
+    """Normalize one coordinate or a collection of Cells into immutable pairs."""
+    if locations is None:
+        return ()
+    if hasattr(locations, "pos"):
+        locations = (locations,)
+    else:
+        locations = tuple(locations)
+        if len(locations) == 2 and all(isinstance(value, int) for value in locations):
+            locations = (locations,)
+
+    coordinates = []
+    for location in locations:
+        coordinate = tuple(location.pos) if hasattr(location, "pos") else tuple(location)
+        if len(coordinate) != 2 or not all(isinstance(value, int) for value in coordinate):
+            raise ValueError("Goal locations must be map coordinates or Cells.")
+        coordinates.append(coordinate)
+    return tuple(coordinates)
 
 
 def _install_goals(team, goals, replace=False):
@@ -136,22 +149,28 @@ def assign_team_goals_to_squads(team):
     why readiness is evaluated across the squad rather than only on its lead.
     This only records orders; the later squad-leader layer decides routes and
     individual actions.
+
+    TODO(ai-team-planner): balance simultaneous objectives across eligible
+    squads instead of allowing the best squad to inherit several orders.
     """
     ai_squads = [squad for squad in team.squadsList if not squad.playerControlled]
     team_goal_ids = {goal.goal_id for goal in team.currentGoals}
     for squad in ai_squads:
         # Replace stale hand-downs while preserving future local-only orders.
-        squad.currentGoals = [
-            goal for goal in squad.currentGoals
-            if goal.team_goal_id in team_goal_ids
-        ]
+        squad.currentGoals = sorted(
+            (
+                goal for goal in squad.currentGoals
+                if goal.team_goal_id in team_goal_ids
+            ),
+            key=lambda goal: (-goal.priority, goal.goal_id),
+        )
         squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
         squad._refreshOperationalFlags()
 
     for team_goal in team.currentGoals:
         candidates = [
             squad for squad in ai_squads
-            if squad.canFillRoles(team_goal.required_roles)
+            if squad.mechList and squad.canFillRoles(team_goal.required_roles)
         ]
         if not candidates:
             continue
@@ -159,6 +178,8 @@ def assign_team_goals_to_squads(team):
             candidates,
             key=lambda candidate: (
                 _squad_role_readiness(candidate, team_goal.required_roles),
+                candidate.combatEffective,
+                candidate.combatForce,
                 len(candidate.mechList),
             ),
         )
@@ -206,3 +227,10 @@ def assign_team_goals(match_info):
         )
         _install_goals(team, [goal], replace=True)
         assign_team_goals_to_squads(team)
+
+
+# TODO(ai-execution): add a planner that consumes only team-shared vision,
+# radar contacts, squad readiness, and current goals. It should emit typed
+# squad orders (advance, hold, scout, engage, support, withdraw) that a
+# separate action executor can validate through the normal movement/combat
+# rules. Do not call player command menus or inspect enemy-only state here.

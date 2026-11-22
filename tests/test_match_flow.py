@@ -142,6 +142,29 @@ class MatchFlowTests(unittest.TestCase):
         )
         self.assertGreaterEqual(enemy_squad.roleReadiness()["front_line"], 60)
 
+    def test_goal_assignment_normalizes_a_single_coordinate_and_skips_empty_squads(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        team = match.teamList[1]
+        empty_squad = Squad("Empty Reserve", [], "Combat")
+        empty_squad.team = team
+        team.squadsList.insert(0, empty_squad)
+
+        goal = match.issueTeamObjective(team, "defend", 80, (12, 12), "Hold position.")
+
+        self.assertEqual(goal.locations, ((12, 12),))
+        self.assertIsNone(empty_squad.currentGoal)
+        self.assertIsNotNone(team.squadsList[1].currentGoal)
+
+    def test_destroying_a_squad_leader_promotes_the_next_operational_mech(self):
+        match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
+        squad = match.pov.squad
+        original_leader = squad.squadLead
+
+        original_leader.destroy(match)
+
+        self.assertNotIn(original_leader, squad.mechList)
+        self.assertIs(squad.squadLead, squad.mechList[0])
+
     def test_mission_generator_creates_initial_mission_templates(self):
         match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         missions = MissionGenerator(match)

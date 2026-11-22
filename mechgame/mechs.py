@@ -693,6 +693,10 @@ class WeaponLimb(MechPart):
     def shootAt(self, matchInfo, pos, aimedLimb=None):
         """Spend resources and resolve every projectile fired at a map position."""
 
+        # TODO(ai-action-api): take the firing entity explicitly instead of
+        # reading matchInfo.pov. Menu commands can retain POV as a wrapper,
+        # while AI then uses this same validated combat resolution directly.
+
         if self.isLauncher:
             return self.launchAt(matchInfo, pos)
 
