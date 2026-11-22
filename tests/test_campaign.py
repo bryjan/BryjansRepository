@@ -51,13 +51,10 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.assertEqual(mission.diversion_payout(120), 700)
         self.assertEqual(mission.diversion_payout(180), 1_050)
 
-    def test_enemy_presence_applies_a_nonlinear_multiplier_to_all_contract_payouts(self):
+    def test_enemy_force_is_calculated_at_contract_creation_and_drives_payout(self):
         self.assertEqual(self.campaign.normal_enemy_force(), 4.8)
-        self.assertAlmostEqual(self.campaign.projected_enemy_force(), 4.8)
-        self.assertLess(self.campaign.enemy_payout_multiplier(.5), .6)
-        self.assertAlmostEqual(self.campaign.enemy_payout_multiplier(1), 1)
-        self.assertGreater(self.campaign.enemy_payout_multiplier(1.5), 1.4)
-        self.assertNotAlmostEqual(self.campaign.enemy_payout_multiplier(1.5), 1.5)
+        self.assertEqual(self.campaign.mission_enemy_force(), 5)
+        self.assertEqual(self.campaign.mission_enemy_force(1.5), 7)
 
         templates = list(MISSION_TEMPLATES)
         self.campaign.rng = SimpleNamespace(
@@ -67,35 +64,16 @@ class MercenaryCampaignTests(unittest.TestCase):
         self.campaign.enemyPresence = 1.5
         offers = self.campaign._generate_mission_offers()
 
-        self.assertEqual(offers[0].payout, round(650 * self.campaign.enemy_payout_multiplier()))
-        self.assertEqual(offers[1].payout, round(1_100 * self.campaign.enemy_payout_multiplier()))
+        self.assertEqual(offers[0].enemy_combat_force, 7)
+        self.assertEqual(offers[0].payout, 650 + 700)
+        self.assertEqual(offers[1].payout, 1_100 + 700)
 
-    def test_committing_more_of_the_company_increases_projected_enemy_response(self):
-        pilot_names = [pilot.name for pilot in self.campaign.pilots]
-        baseline = self.campaign.projected_enemy_force()
-        for pilot_name in pilot_names[:5]:
-            self.campaign.deploy("lancer.type_a", pilot_name)
-        self.campaign.deploy("bastion", pilot_names[5])
+    def test_intelligence_can_reveal_precalculated_enemy_force_without_changing_payout(self):
+        offer = self.campaign.missionOffers[0]
+        revealed = self.campaign.reveal_enemy_force(offer.mission_id)
 
-        self.assertEqual(self.campaign.deployed_force(), self.campaign.company_force())
-        self.assertEqual(self.campaign.projected_enemy_force(), baseline * 2)
-        self.assertGreater(self.campaign.enemy_payout_multiplier(), 1.5)
-
-    def test_accepting_a_contract_locks_terms_after_the_roster_is_committed(self):
-        offer = CampaignMission(
-            1, "diversion", "Diversion", 700, "", (), "deal_damage", 120,
-            ("enemy_force",), base_payout=700,
-        )
-        self.campaign.missionOffers = [offer]
-        pilot_names = [pilot.name for pilot in self.campaign.pilots]
-        for pilot_name in pilot_names[:5]:
-            self.campaign.deploy("lancer.type_a", pilot_name)
-        self.campaign.deploy("bastion", pilot_names[5])
-
-        active = self.campaign.accept_mission(1)
-
-        self.assertEqual(active.objective_value, 240)
-        self.assertEqual(active.payout, 1_400)
+        self.assertTrue(revealed.enemy_force_revealed)
+        self.assertEqual(revealed.payout, offer.payout)
 
     def test_sabotage_contracts_generate_one_to_three_targets_with_per_target_rewards(self):
         sabotage = next(template for template in MISSION_TEMPLATES if template[0] == "sabotage")
@@ -109,8 +87,9 @@ class MercenaryCampaignTests(unittest.TestCase):
         offer = next(mission for mission in self.campaign._generate_mission_offers() if mission.kind == "sabotage")
 
         self.assertEqual(offer.objective_value, 3)
-        self.assertEqual(offer.reward_per_target, round(300 * self.campaign.enemy_payout_multiplier()))
-        self.assertEqual(offer.payout, 3 * offer.reward_per_target)
+        self.assertEqual(offer.reward_per_target, 300)
+        self.assertEqual(offer.enemy_force_payout, 700)
+        self.assertEqual(offer.payout, 3 * offer.reward_per_target + offer.enemy_force_payout)
 
     def test_deploying_requires_research_an_available_pilot_and_a_class_slot(self):
         pilot_names = [pilot.name for pilot in self.campaign.pilots]

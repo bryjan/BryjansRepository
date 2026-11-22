@@ -7,7 +7,7 @@ keeping them outside this module prevents a contract from mutating skirmish
 state before a battle actually begins.
 """
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import random
@@ -38,9 +38,10 @@ class CampaignMission:
     objective_value: int = 0
     objective_targets: tuple[str, ...] = ()
     reward_per_target: int = 0
-    # The unscaled reward remains available when terms are locked after the
-    # player commits a roster to the mission.
     base_payout: int = 0
+    enemy_combat_force: int = 0
+    enemy_force_payout: int = 0
+    enemy_force_revealed: bool = False
 
     def diversion_payout(self, damage_dealt):
         """Return scaled Diversion payment from actual enemy damage dealt.
@@ -108,6 +109,7 @@ class MercenaryCampaign:
     BASE_DIVERSION_DAMAGE = 120
     BASE_COMPANY_FORCE = 8
     DEFAULT_ENEMY_PRESENCE = 1.0
+    PAYOUT_PER_ENEMY_FORCE = 100
 
     def __init__(self, rng=None):
         self.rng = rng if rng is not None else random.Random()
@@ -148,55 +150,24 @@ class MercenaryCampaign:
         """Estimate available company weight using the shared class-size scale."""
         return sum((3 ** (size - 2)) * limit for size, limit in self.hangarLimits.items())
 
-    def deployed_force(self):
-        """Return the class-weighted strength committed to the next mission."""
-        return sum(3 ** (deployment.size - 2) for deployment in self.deployments)
-
     def normal_enemy_force(self):
         """Define ordinary local opposition as three fifths of company force."""
         return self.company_force() * .6
 
-    def projected_enemy_force(self, enemy_presence=None):
-        """Estimate opposition after enemies react to the committed force.
-
-        Taking a larger share of the company attracts a disproportionate
-        response. At full commitment the response doubles normal opposition;
-        at partial commitment it rises on a 1.5-power curve instead of a
-        linear one.
-        """
+    def mission_enemy_force(self, enemy_presence=None):
+        """Calculate the exact enemy combat force for one newly created contract."""
         local_presence = self.enemyPresence if enemy_presence is None else enemy_presence
-        deployed_share = min(1, self.deployed_force() / max(1, self.company_force()))
-        response_multiplier = 1 + deployed_share ** 1.5
-        return self.normal_enemy_force() * max(.5, min(2, float(local_presence))) * response_multiplier
-
-    def enemy_presence_ratio(self, enemy_presence=None):
-        """Express projected opposition relative to normal local opposition."""
-        return self.projected_enemy_force(enemy_presence) / max(1, self.normal_enemy_force())
+        return max(1, round(self.normal_enemy_force() * max(.5, min(2, float(local_presence)))))
 
     def diversion_damage_requirement(self, enemy_presence=None):
         """Scale a Diversion target for research, company strength, and threats."""
-        enemy_presence = self.enemy_presence_ratio(enemy_presence)
+        enemy_presence = self.enemyPresence if enemy_presence is None else enemy_presence
         baseline_research = len(self.STARTING_RESEARCH) / self._total_researchable_mechs()
         research_multiplier = 1 + (self.research_progress() - baseline_research) * .5
         company_multiplier = max(.75, min(1.5, self.company_force() / self.BASE_COMPANY_FORCE))
         enemy_multiplier = max(.5, min(2, float(enemy_presence)))
         requirement = self.BASE_DIVERSION_DAMAGE * research_multiplier * company_multiplier * enemy_multiplier
         return max(20, round(requirement / 5) * 5)
-
-    def enemy_payout_multiplier(self, enemy_presence=None):
-        """Return a curved reward multiplier for the current hostile activity.
-
-        Presence is centered on 1.0. The 1.25 exponent means low activity
-        lowers pay gently (0.5 becomes about 0.58×), while heavy activity
-        raises it faster than a linear rate (1.5 becomes about 1.42×).
-        """
-        presence = self.enemy_presence_ratio(enemy_presence)
-        difference = max(.5, min(2, presence)) - 1
-        return 1 + (abs(difference) ** 1.25) * (1 if difference >= 0 else -1)
-
-    def _scaled_payout(self, payout):
-        """Apply the current enemy-presence reward curve to a credit value."""
-        return round(payout * self.enemy_payout_multiplier())
 
     def _generate_mission_offers(self):
         """Offer three different contracts, selected reproducibly from templates."""
@@ -208,22 +179,24 @@ class MercenaryCampaign:
         ) in enumerate(templates, start=1):
             reward_per_target = 0
             base_payout = payout
-            payout = self._scaled_payout(payout)
+            enemy_combat_force = self.mission_enemy_force()
+            enemy_force_payout = enemy_combat_force * self.PAYOUT_PER_ENEMY_FORCE
             if kind == "diversion":
                 objective_value = self.diversion_damage_requirement()
                 description = f"Inflict {objective_value} damage on enemy forces, then disengage."
             elif kind == "sabotage":
                 objective_value = self.rng.randint(1, 3)
-                reward_per_target = self._scaled_payout(300)
-                payout = objective_value * reward_per_target
+                base_payout = objective_value * 300
+                reward_per_target = 300
                 description = (
                     f"Hold {objective_value} sabotage point(s) for one complete turn each. "
-                    f"Payment: {reward_per_target:,} credits per target."
+                    f"Payment: {reward_per_target:,} credits per target plus threat pay."
                 )
+            payout = base_payout + enemy_force_payout
             offers.append(CampaignMission(
                 index, kind, title, payout, description, roles,
                 objective_type, objective_value, objective_targets, reward_per_target,
-                base_payout if kind != "sabotage" else objective_value * 300,
+                base_payout, enemy_combat_force, enemy_force_payout,
             ))
         return offers
 
@@ -285,42 +258,29 @@ class MercenaryCampaign:
         return pilot.display_name if pilot is not None else pilot_name
 
     def accept_mission(self, mission_id):
-        """Lock one offered contract after scaling it to the committed roster."""
-        for index, mission in enumerate(self.missionOffers):
+        """Select one offered contract; its force and payout are already fixed."""
+        for mission in self.missionOffers:
             if mission.mission_id == mission_id:
-                mission = self._scale_mission_for_commitment(mission)
-                self.missionOffers[index] = mission
                 self.activeMission = mission
                 return mission
         raise ValueError(f"Unknown mission offer '{mission_id}'.")
 
-    def _scale_mission_for_commitment(self, mission):
-        """Update one contract's risk-driven terms while preserving its targets."""
-        base_payout = mission.base_payout or mission.payout
-        objective_value = mission.objective_value
-        reward_per_target = mission.reward_per_target
-        payout = self._scaled_payout(base_payout)
-        description = mission.description
-        if mission.kind == "diversion":
-            objective_value = self.diversion_damage_requirement()
-            description = f"Inflict {objective_value} damage on enemy forces, then disengage."
-        elif mission.kind == "sabotage":
-            base_per_target = base_payout / max(1, mission.objective_value)
-            reward_per_target = self._scaled_payout(base_per_target)
-            payout = reward_per_target * mission.objective_value
-            description = (
-                f"Hold {mission.objective_value} sabotage point(s) for one complete turn each. "
-                f"Payment: {reward_per_target:,} credits per target."
-            )
-        scaled = replace(
-            mission,
-            payout=payout,
-            description=description,
-            objective_value=objective_value,
-            reward_per_target=reward_per_target,
-            base_payout=base_payout,
-        )
-        return mission if scaled == mission else scaled
+    def reveal_enemy_force(self, mission_id):
+        """Mark one contract's already-calculated opposition as intel-visible."""
+        for index, mission in enumerate(self.missionOffers):
+            if mission.mission_id == mission_id:
+                revealed = CampaignMission(
+                    mission.mission_id, mission.kind, mission.title, mission.payout,
+                    mission.description, mission.required_roles, mission.objective_type,
+                    mission.objective_value, mission.objective_targets, mission.reward_per_target,
+                    mission.base_payout, mission.enemy_combat_force, mission.enemy_force_payout,
+                    True,
+                )
+                self.missionOffers[index] = revealed
+                if self.activeMission is mission:
+                    self.activeMission = revealed
+                return revealed
+        raise ValueError(f"Unknown mission offer '{mission_id}'.")
 
     def adjust_cash(self, amount):
         """Apply a payment or expense, rejecting purchases the company cannot cover."""
@@ -481,6 +441,8 @@ class MercenaryCampaign:
                 item.get("objective_type", ""), int(item.get("objective_value", 0)),
                 tuple(item.get("objective_targets", ())), int(item.get("reward_per_target", 0)),
                 int(item.get("base_payout", item["payout"])),
+                int(item.get("enemy_combat_force", 0)), int(item.get("enemy_force_payout", 0)),
+                bool(item.get("enemy_force_revealed", False)),
             )
             for item in data["mission_offers"]
         ]

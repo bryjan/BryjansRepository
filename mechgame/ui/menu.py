@@ -201,10 +201,14 @@ def _campaign_lines(campaign):
         role_text = ", ".join(offer.required_roles) or "general"
         payout = f"{offer.payout:,} credits"
         if offer.reward_per_target:
-            payout = f"{offer.reward_per_target:,}/target, {offer.payout:,} maximum"
+            payout = f"{offer.reward_per_target:,}/target + threat pay, {offer.payout:,} maximum"
+        enemy_force = (
+            f"Enemy force: {offer.enemy_combat_force}"
+            if offer.enemy_force_revealed else "Enemy force: unknown"
+        )
         lines.extend([
             f"'{offer.mission_id}' {offer.title} — {payout}{active}",
-            f"    {offer.description} Needed: {role_text}.",
+            f"    {offer.description} Needed: {role_text}. {enemy_force}",
         ])
     lines.extend(["", "'d' Deploy roster", "'p' Pilot identities", "'x' Back"])
     return lines
