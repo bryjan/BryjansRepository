@@ -31,6 +31,14 @@ The after-action screen shows damage dealt/received, destroyed mechs, pilot
 losses and mission objectives, then returns to the menu. Clearing defenders
 before completing the base hold ends the battle with that raid objective failed.
 
+The briefed raid base appears as a green `M` on the map through fog without
+revealing nearby terrain or enemies. Open `obj` / `objectives`, or choose `'o'`
+in the map menu, for main goals and requests addressed to your active squad.
+Select an entry for objective rules, progress, coordinates, or support details.
+Artillery/smoke requests include distance, suitable ammunition, range, scatter,
+flight time and costs. Requests retain their reported positions, expire after
+two rounds without renewal, and can be dismissed. Use `'n'` / `'p'` to page.
+
 In the squad menu (`sq`), use `'a'` to switch any friendly squad between AI and
 manual control. Use `'o'` to give move, defend, road patrol, attack, ambush,
 retreat, flee or hold orders from the dedicated AI Orders submenu, which lists

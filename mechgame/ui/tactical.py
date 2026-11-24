@@ -271,7 +271,7 @@ def _command_lines(width, command_text=None):
     if command_text is None:
         command_text = (
             "Commands | 'f' Fire | 'r' Toggle Radar | 'ab' Abilities | 'sq' Squad | "
-            "'o' Options | 'n' Next | '?' Help | 'end' End Turn"
+            "'obj' Objectives | 'o' Options | 'n' Next | '?' Help | 'end' End Turn"
         )
     # Separators may land at a wrap boundary; trimming both edges prevents a
     # separator from visually merging with the panel's actual border.
@@ -375,11 +375,22 @@ def _display_overview_chunk(matchInfo, chunk):
     known_tiles = None if terrain_revealed else viewing_team.exploredTiles
     visible_tiles = chunk_tiles if known_tiles is None else chunk_tiles & known_tiles
 
+    # Briefed mission locations are markers, not terrain discoveries. Reveal
+    # only the objective symbol through fog, never its surrounding units.
+    objective = next((objective for objective in matchInfo.mapFeatures.objectives
+                      if chunk_tiles.intersection(objective.tiles)
+                      and (visibility.show_all_objectives or visibility.debug_reveal_all
+                           or visible_tiles.intersection(objective.tiles))), None)
+    objective_symbol = "M" if objective is not None and "base" in objective.kind else "O"
+
     # A completely undiscovered chunk conveys no terrain, units, bases, or
     # effects. The question mark intentionally makes this distinct from a
     # known stretch of open plains.
     if not visible_tiles:
-        print(termcolor.colored("?", "dark_grey"), end=" ")
+        if objective is not None:
+            print(termcolor.colored(objective_symbol, "green" if objective_symbol == "M" else "yellow"), end=" ")
+        else:
+            print(termcolor.colored("?", "dark_grey"), end=" ")
         return
 
     if getattr(matchInfo, "showTacticalLocations", False):
@@ -416,6 +427,9 @@ def _display_overview_chunk(matchInfo, chunk):
         return
     if len(entities) > 1:
         print(termcolor.colored("+", "yellow"), end=" ")
+        return
+    if objective is not None:
+        print(termcolor.colored(objective_symbol, "green" if objective_symbol == "M" else "yellow"), end=" ")
         return
     base_tiles = {
         tile

@@ -30,7 +30,7 @@ def mapView(matchInfo):
     while True:
         pv.print_overview(
             matchInfo,
-            command_text="Map: 'r' radar contacts | 'd' debug options | 'x' return",
+            command_text="Map: 'o' objectives | 'r' radar contacts | 'd' debug options | 'x' return",
         )
         choice = input("Map: ").strip().lower()
         if choice in ("", "x"):
@@ -38,10 +38,14 @@ def mapView(matchInfo):
         if choice == "d":
             debugMapMenu(matchInfo)
             continue
+        if choice == "o":
+            from .objectives import objectiveMenu
+            objectiveMenu(matchInfo)
+            continue
         if choice == "r":
             radarMenu(matchInfo)
             continue
-        print("Choose 'r', 'd', or 'x'.")
+        print("Choose 'o', 'r', 'd', or 'x'.")
 
 
 def debugMapMenu(matchInfo):

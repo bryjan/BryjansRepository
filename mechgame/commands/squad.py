@@ -186,6 +186,7 @@ def helpCommand(matchInfo):
     print("'flee' — leave from a border tile intact, or order the squad to withdraw.")
     print("'look' or 'l' — inspect the tactical view around map coordinates.")
     print("'m' — open the strategic map for radar contacts and map display controls.")
+    print("'obj' or 'objectives' — main mission goals and support requests addressed to your active squad; also available from the map's 'o' submenu.")
     print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("Squad menu: 'a' AI/manual control; 'o' give a friendly AI squad orders; 'v' automatic travel.")

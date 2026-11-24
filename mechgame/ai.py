@@ -599,7 +599,7 @@ def _review_engagement(match_info, squad, contacts):
 
 def _notify_player_support_request(match_info, recipient, message):
     """Surface a support request as a critical report for player control."""
-    if recipient.playerControlled and recipient.squadLead is not None:
+    if recipient.playerCommandable and recipient.squadLead is not None:
         recipient.squadLead.report(match_info, message, critical=True)
 
 
@@ -610,6 +610,10 @@ def request_reinforcement(match_info, requesting_squad, recipient_squad):
     request record and player-facing critical report are ready for it now.
     """
     recipient_squad.reinforcementRequest = requesting_squad
+    from .objectives import request_support
+    if requesting_squad.squadLead is not None:
+        request_support(match_info, requesting_squad, recipient_squad, "Reinforcements",
+                        requesting_squad.squadLead.pos, "Move to support this friendly squad at its reported location.")
     _notify_player_support_request(
         match_info, recipient_squad,
         f"Reinforcement request from {requesting_squad.name} squad.",
@@ -632,6 +636,11 @@ def _issue_artillery_call(match_info, squad):
     for artillery_squad in eligible:
         artillery_squad.artilleryCallTarget = target
         artillery_squad.artilleryCallTurns = 1
+        from .objectives import request_support
+        from .radar import contact_details
+        detail = contact_details(squad.squadLead, match_info, target)
+        request_support(match_info, squad, artillery_squad, "Artillery", detail["position"],
+                        f"Support an unclear engagement. Target: {detail['classification']}. Check lead and friendly blast safety before firing.", target)
         _notify_player_support_request(
             match_info, artillery_squad,
             f"Artillery request from {squad.name} squad: engage {target.name}.",
@@ -665,6 +674,9 @@ def _issue_retreat_smoke_call(match_info, squad):
                     continue
                 artillery_squad.smokeCallPosition = position
                 artillery_squad.smokeCallTurns = 1
+                from .objectives import request_support
+                request_support(match_info, squad, artillery_squad, "Smoke", position,
+                                "Screen this squad's withdrawal with smoke at its reported position. Use smoke ammunition.")
                 _notify_player_support_request(
                     match_info, artillery_squad,
                     f"Smoke request from {squad.name} squad at {list(position)}.",
