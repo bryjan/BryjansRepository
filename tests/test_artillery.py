@@ -7,6 +7,7 @@ from unittest.mock import patch
 from mechgame import artillery, effects
 from mechgame.mechs import WeaponLimb
 from mechgame.runner import Game
+from mechgame.teams import Squad
 
 
 class ArtilleryTests(unittest.TestCase):
@@ -30,8 +31,10 @@ class ArtilleryTests(unittest.TestCase):
         )
 
         launcher.launchAt(self.match, [10, 10])
-        # Launcher travel time starts after the firing squad's current turn.
+        # Merely handing off between squads cannot advance a match round.
         artillery.advance_impacts(self.match)
+        self.assertEqual(self.match.map[10][10].onSmoke, 0)
+        self.match.matchRound += 1
         artillery.advance_impacts(self.match)
         impact_cell = self.match.map[10][10]
 
@@ -64,7 +67,7 @@ class ArtilleryTests(unittest.TestCase):
         self.assertEqual(launcher.launcher_range_bonus(self.match, self.match.pov), 2)
         self.assertIsNotNone(launcher.launcher_profile(82, self.match, self.match.pov))
 
-    def test_one_turn_shell_waits_through_a_complete_future_squad_turn(self):
+    def test_one_round_shell_waits_through_the_enemy_phase(self):
         smoke = artillery.LauncherAmmo(
             "Test Smoke", self.bands, payload="smoke", charges=1,
             effectRadius=0, effectTurns=2,
@@ -77,14 +80,41 @@ class ArtilleryTests(unittest.TestCase):
         launcher.launchAt(self.match, [10, 10])
         impact_cell = self.match.map[10][10]
 
-        # Ending the firing squad's turn starts the enemy turn, but the shell
-        # has not yet spent its one configured future turn in flight.
+        # The enemy phase is still round 0, so the shell remains in flight.
         self.match.nextSquadTurn()
         self.assertEqual(impact_cell.onSmoke, 0)
 
-        # It lands as the following squad turn begins.
+        # It lands when round 1 begins, after the enemy phase completes.
         self.match.nextSquadTurn()
         self.assertEqual(impact_cell.onSmoke, 1)
+
+    def test_three_round_shell_does_not_land_during_five_squad_handoffs(self):
+        player, enemy = self.match.teamList
+        reserve_mech = player.squadsList[0].mechList.pop()
+        reserve = Squad("Reserve", [reserve_mech], "Combat", playerControlled=True)
+        reserve.team = player
+        player.squadsList.append(reserve)
+        original = enemy.squadsList[0]
+        units = list(original.mechList)
+        enemy.squadsList = []
+        for index, unit in enumerate(units):
+            squad = Squad(f"Enemy {index}", [unit], "Combat")
+            squad.team = enemy
+            enemy.squadsList.append(squad)
+        bands = {name: [distance, 0, 3] for name, distance in (("close", 30), ("medium", 50), ("far", 80))}
+        launcher = WeaponLimb("Three-round mortar", 1, 1, [], 0, 0, 1, None,
+                              ammoTypes=[artillery.LauncherAmmo("Smoke", bands, payload="smoke", charges=1, effectRadius=0)])
+        launcher.launchAt(self.match, [10, 10])
+        with patch("mechgame.artillery.resolve_impact", wraps=artillery.resolve_impact) as resolve:
+            for _ in range(14):
+                self.match.nextSquadTurn()
+                resolve.assert_not_called()
+                self.assertEqual(self.match.map[10][10].onSmoke, 0)
+            self.assertEqual(self.match.matchRound, 2)
+            self.match.nextSquadTurn()
+            self.assertEqual(self.match.matchRound, 3)
+            resolve.assert_called_once()
+            self.assertEqual(self.match.map[10][10].onSmoke, 1)
 
     def test_zero_turn_shell_impacts_immediately_and_reports_its_launch(self):
         zero_turn_bands = {

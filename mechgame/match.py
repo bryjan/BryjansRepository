@@ -39,7 +39,7 @@ class MatchInfo:
         # These totals never reset with the squad leader's combat assessment.
         self.damageDealt = {}
         self.damageReceived = {}
-        # Fired launcher shells resolve only after future squad-turn handoffs.
+        # Fired launcher shells resolve on their scheduled match rounds.
         self.pendingImpacts = []
         self.matchRound = 0
         self.pov = ""

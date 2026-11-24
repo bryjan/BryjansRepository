@@ -181,7 +181,7 @@ def printLauncherProfile(matchInfo, mech, launcher, position):
     details = (
         f"{ammo.name} ({ammo.payload}) | distance {distance:.1f} tiles | "
         f"{profile['name'].capitalize()} profile — range ≤{profile['max_range']} | "
-        f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} turn(s) | "
+        f"scatter {profile['inaccuracy']} tile(s) | impact in {profile['turns']} round(s) | "
     )
     if ammo.payload == "explosive":
         details += f"damage {damage} | "

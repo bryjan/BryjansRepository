@@ -61,7 +61,7 @@ class LauncherAmmo:
 
 @dataclass
 class ScheduledImpact:
-    """One shell already fired and waiting to resolve on a future squad turn."""
+    """One shell in flight, due on a match round rather than a squad handoff."""
 
     position: list[int]
     turns_remaining: int
@@ -76,6 +76,7 @@ class ScheduledImpact:
     owner_team: object
     ignite_chance: float
     sound_range: int
+    impact_round: int
 
 
 def auto_lead_available(match_info, observer, target):
@@ -149,7 +150,7 @@ def schedule_impact(match_info, position, turns, radius, size, damage, weapon_na
     impact = ScheduledImpact(
         list(position), turns, radius, size, damage, weapon_name,
         payload, effect_radius, effect_turns, scout_vision, owner_team, ignite_chance,
-        sound_range,
+        sound_range, match_info.matchRound + turns,
     )
     match_info.pendingImpacts.append(impact)
     return impact
@@ -183,10 +184,10 @@ def resolve_impact(match_info, impact):
 
 
 def advance_impacts(match_info):
-    """Advance all shells once per squad-turn handoff and resolve arrivals."""
+    """Resolve due rounds; extra squad handoffs cannot speed up flight time."""
     remaining = []
     for impact in match_info.pendingImpacts:
-        impact.turns_remaining -= 1
+        impact.turns_remaining = max(0, impact.impact_round - match_info.matchRound)
         if impact.turns_remaining > 0:
             remaining.append(impact)
             continue

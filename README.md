@@ -54,6 +54,10 @@ coordinates, tracked targets and lead controls work as usual. Confirming plots
 one shot for that mech's next AI squad turn, with no out-of-turn AP or ammo cost.
 Replotting the same mech replaces its queued shot. All player-owned squads,
 including delegated AI squads, act before enemy squads each round.
+Launcher flight times count match rounds, not individual squad handoffs: a
+three-round shell fired in round 0 lands in round 3 regardless of squad count.
+Zero-round ammunition still lands immediately. The launch message names the
+scheduled impact round.
 
 Use `auto` (or `'v'` in the squad menu) to toggle automatic following. Move the
 squad leader manually; after each move the other mechs use normal formation
