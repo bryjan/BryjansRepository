@@ -211,7 +211,9 @@ class SensorOverdriveAbility(Ability):
             return False
         visible = [enemy for enemy in entity.directlyVisibleEnemies if enemy in matchInfo.entities]
         tracked = [enemy for enemy in entity.trackedEnemies if enemy in matchInfo.entities]
-        uncertain_contact = entity.inCombat and tracked and not visible
+        # Recent combat with no visual threat warrants searching even when
+        # ordinary radar has not acquired a contact yet.
+        uncertain_contact = entity.inCombat and not visible
         scouting = (
             not entity.inCombat and not tracked and not visible
             and entity.turnsStarted > 0 and entity.turnsStarted % 3 == 0

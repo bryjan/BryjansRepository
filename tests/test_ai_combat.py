@@ -23,9 +23,11 @@ class AiCombatTests(unittest.TestCase):
         mech.noteCombat("enemy detected")
         with patch.object(ability, "use", return_value=True) as use:
             self.assertTrue(ability.try_ai_use(self.match, mech))
+            mech.trackedEnemies = []
+            self.assertTrue(ability.try_ai_use(self.match, mech))
             mech.energy = mech.mechClass.energyMax * .5 + ability.energyCost - 1
             self.assertFalse(ability.try_ai_use(self.match, mech))
-            self.assertEqual(use.call_count, 1)
+            self.assertEqual(use.call_count, 2)
 
     def test_sensor_overdrive_scouts_every_third_turn_and_respects_stealth(self):
         mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
