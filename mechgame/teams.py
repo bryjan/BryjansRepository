@@ -62,6 +62,7 @@ class Squad:
         self.smokeCallTurns = 0
         self.reinforcementRequest = None
         self.supportRequests = []
+        self.fireMissions = []
         self.observedEnemyForce = 0
         self.nearbyFriendlyForce = 0
         self.avoidContact = False

@@ -47,6 +47,14 @@ the team's automatic planner. At least one surviving squad must remain manual;
 if that squad is destroyed, ejected or extracted, a surviving friendly squad
 automatically returns to manual control.
 
+For a **Fire Mission**, open `sq` → `'o'` AI Orders, select a squad, then `'g'`.
+Its artillery mech carrying the most ammunition opens in the launcher fire
+menu. Use `'u'` to switch artillery units and `'w'` to switch launchers; ammo,
+coordinates, tracked targets and lead controls work as usual. Confirming plots
+one shot for that mech's next AI squad turn, with no out-of-turn AP or ammo cost.
+Replotting the same mech replaces its queued shot. All player-owned squads,
+including delegated AI squads, act before enemy squads each round.
+
 Use `auto` (or `'v'` in the squad menu) to toggle automatic following. Move the
 squad leader manually; after each move the other mechs use normal formation
 rules, AP, MP and energy reserves to follow. When the leader is on a road or

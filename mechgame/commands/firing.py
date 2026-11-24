@@ -50,7 +50,7 @@ def fire(matchInfo, target=None):
     gun.shootAt(matchInfo, target_pos, aimed_limb)
 
 
-def launcherFireMenu(matchInfo, launcher, target=None):
+def launcherFireMenu(matchInfo, launcher, target=None, fire_mission=None):
     """Choose a location for a delayed launcher shot without limb aiming."""
     mech = matchInfo.pov
     default_target = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
@@ -67,6 +67,18 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     else:
         prompt = launcherFirePrompt(matchInfo, launcher, None)
 
+    if fire_mission is not None:
+        prompt += " | 'u' artillery unit"
+        print(f"Fire mission: {mech.pilot.display_name} — {launcher.name}. Plot a shot for this squad's turn.")
+
+    def launch(position):
+        return fire_mission(matchInfo, mech, launcher, position) if fire_mission is not None else launcher.launchAt(matchInfo, position)
+
+    def reopen(selected_target):
+        if fire_mission is not None:
+            return launcherFireMenu(matchInfo, launcher, selected_target, fire_mission=fire_mission)
+        return launcherFireMenu(matchInfo, launcher, selected_target)
+
     view_position = default_position if default_position is not None else mech.pos
     pv.printPOV(matchInfo, *view_position, command_text=prompt)
     raw_choice = input("Launch: ").strip()
@@ -80,7 +92,9 @@ def launcherFireMenu(matchInfo, launcher, target=None):
     else:
         choice = raw_choice.lower()
     if choice in ("", "f") and default_position is not None:
-        return launcher.launchAt(matchInfo, default_position)
+        return launch(default_position)
+    if choice == "u" and fire_mission is not None:
+        return "switch_artillery"
     if choice == "t":
         selected_target = chooseLauncherTrackedContact(matchInfo)
         if selected_target is None:
@@ -88,7 +102,7 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         # Reopen the complete launcher menu with this contact as its default.
         # This keeps lead offset and ammunition selection available after
         # changing target instead of forcing an immediate launch confirmation.
-        return launcherFireMenu(matchInfo, launcher, selected_target)
+        return reopen(selected_target)
     if choice == "c":
         position = get_coordinate_input(matchInfo, "Enter launch coordinates")
         if position == "x":
@@ -105,9 +119,11 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         position = getLauncherLeadOffset(matchInfo, base_position)
     elif choice == "a":
         if chooseLauncherAmmo(launcher):
-            return launcherFireMenu(matchInfo, launcher, target)
+            return reopen(target)
         return
     elif choice == "w":
+        if fire_mission is not None:
+            return "switch_launcher"
         return gunMenu(matchInfo, target)
     elif choice == "auto_lead":
         pass
@@ -124,7 +140,7 @@ def launcherFireMenu(matchInfo, launcher, target=None):
         )
         confirm = input("Press 'Enter' or 'f' to launch, or 'x' to cancel: ").strip().lower()
         if confirm in ("", "f"):
-            launcher.launchAt(matchInfo, position)
+            return launch(position)
 
 
 def launcherFirePrompt(matchInfo, launcher, target=None, hasDefault=False):

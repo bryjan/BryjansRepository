@@ -148,12 +148,12 @@ class MatchInfo:
                 pilot.returned = True
 
     def _turn_slots(self):
-        """Return squads in deterministic team/squad order, including empty ones."""
-        return [
+        """Player-owned squads act first, then enemies; retain stable intra-side order."""
+        return sorted([
             (team, squad)
             for team in self.teamList
             for squad in team.squadsList
-        ]
+        ], key=lambda slot: not slot[1].playerCommandable)
 
     def _begin_new_round(self):
         """Advance match-round effects and expire round-limited team memory."""

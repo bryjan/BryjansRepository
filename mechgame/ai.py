@@ -1012,6 +1012,8 @@ def execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    from .fire_missions import execute as execute_fire_missions
+    plotted_shooters = execute_fire_missions(match_info, squad) if not squad.playerControlled else set()
     if not squad.playerControlled:
         coordination.plan(match_info, squad.team)
         if coordination.waiting(squad):
@@ -1084,7 +1086,8 @@ def execute_squad_combat(match_info, squad=None):
             if not sustain_fire:
                 break
             target, weapon, _ = _choose_target(match_info, squad, mech)
-        _fire_artillery_if_ordered(match_info, squad, mech)
+        if mech not in plotted_shooters:
+            _fire_artillery_if_ordered(match_info, squad, mech)
     if squad.engagementAssessment == "favorable":
         squad.primaryTarget = getattr(squad, "strongestObservedThreat", None)
     elif _attack_ordered(squad) or approach_targets:

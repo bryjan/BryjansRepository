@@ -42,14 +42,16 @@ def order_menu(match):
     if squad is None:
         return
     options = {"m": "move", "d": "defend", "p": "patrol", "a": "attack",
-               "b": "ambush", "r": "retreat", "f": "flee", "h": "hold"}
+               "b": "ambush", "r": "retreat", "f": "flee", "h": "hold", "g": "fire_mission"}
     pv.printPOV(match, *match.pov.pos,
-                command_text="Orders: 'm' move | 'd' defend | 'p' road patrol | 'a' attack | 'b' ambush | 'r' retreat | 'f' flee | 'h' hold | 'x' cancel",
+                command_text="Orders: 'm' move | 'd' defend | 'p' road patrol | 'a' attack | 'b' ambush | 'g' Fire Mission | 'r' retreat | 'f' flee | 'h' hold | 'x' cancel",
                 right_panel=("AI SQUAD ORDERS", [squad.name, "Choose an order for this AI-controlled squad."]))
     choice = input("Order: ").strip().lower()
     if choice not in options:
         return
     kind = options[choice]
+    if kind == "fire_mission":
+        return fireMissionMenu(match, squad)
     target, position = None, None
     if kind == "attack":
         from ..coordination import contacts
@@ -83,3 +85,49 @@ def automatic_travel(match):
     if squad.autoTravelEnabled:
         from ..travel import warnings
         warnings(match, squad)
+
+
+def fireMissionMenu(match, squad):
+    """Open the fullest artillery unit's launcher menu without changing turns."""
+    from .. import fire_missions, radar
+    from .firing import launcherFireMenu
+    units = fire_missions.artillery_units(squad)
+    if not units:
+        print("This squad has no operational artillery with ammunition.")
+        return
+    original_pov = match.pov
+    mech = units[0]
+    weapon = max((w for w in mech.mechClass.gunList if w.isLauncher and w.hp > 0), key=fire_missions.ammunition)
+    try:
+        while True:
+            match.pov = mech
+            radar.refresh_tracked_enemies(mech)
+            try:
+                result = launcherFireMenu(match, weapon, fire_mission=fire_missions.queue)
+            except ValueError as error:
+                print(error)
+                return
+            if result == "switch_artillery":
+                pv.printPOV(match, *mech.pos,
+                            command_text="Fire Mission: enter artillery unit number | 'x' cancel",
+                            right_panel=("ARTILLERY UNITS", [
+                                f"'{index}' {unit.pilot.display_name} — {sum(fire_missions.ammunition(w) for w in unit.mechClass.gunList if w.isLauncher and w.hp > 0)} rounds"
+                                for index, unit in enumerate(units, 1)]))
+                choice = input("Artillery unit: ").strip()
+                if not choice.isdigit() or not 1 <= int(choice) <= len(units):
+                    return
+                mech = units[int(choice) - 1]
+                weapon = max((w for w in mech.mechClass.gunList if w.isLauncher and w.hp > 0), key=fire_missions.ammunition)
+            elif result == "switch_launcher":
+                weapons = [w for w in mech.mechClass.gunList if w.isLauncher and w.hp > 0]
+                pv.printPOV(match, *mech.pos,
+                            command_text="Fire Mission: enter launcher number | 'x' cancel",
+                            right_panel=("LAUNCHERS", [f"'{index}' {w.name}" for index, w in enumerate(weapons, 1)]))
+                choice = input("Launcher: ").strip()
+                if not choice.isdigit() or not 1 <= int(choice) <= len(weapons):
+                    return
+                weapon = weapons[int(choice) - 1]
+            else:
+                return result
+    finally:
+        match.pov = original_pov
