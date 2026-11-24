@@ -5,6 +5,7 @@ import random
 import unittest
 
 from mechgame.ai import (
+    _best_dps_approach, _move_into_weapon_range,
     execute_squad_combat, execute_squad_flee, execute_squad_movement,
     request_reinforcement,
 )
@@ -199,6 +200,42 @@ class AiCombatTests(unittest.TestCase):
         execute_squad_movement(self.match, squad)
         lance = next(weapon for weapon in mech.mechClass.gunList if weapon.isMelee)
         self.assertLessEqual(math.dist(mech.pos, target.pos), lance.maxRange)
+
+    def test_direct_weapon_approaches_can_span_multiple_turns(self):
+        """Melee and ranged combinations share the same approach planner."""
+        mech = next(
+            entity for entity in self.player_squad.mechList
+            if any(weapon.isMelee for weapon in entity.mechClass.gunList)
+        )
+        target = self.enemy_squad.squadLead
+        weapon = next(weapon for weapon in mech.mechClass.gunList if weapon.isMelee)
+        for reach, melee in ((1.5, True), (4, False), (None, False)):
+            with self.subTest(reach=reach):
+                weapon.maxRange = reach
+                weapon.isMelee = melee
+                weapon.accuracy = 3 if reach is None else 13
+                mech.pos = [10, 10]
+                target.pos = [24, 10]
+                mech.directlyVisibleEnemies = [target]
+                mech.trackedEnemies = [target]
+                for entity in self.match.entities:
+                    if entity not in {mech, target}:
+                        entity.pos = [35, 35]
+                for _ in range(8):
+                    mech.ap = mech.mechClass.apMax
+                    mech.mp = mech.mechClass.mpMax
+                    mech.energy = mech.mechClass.energyMax
+                    mech.speed = 0
+                    approach = _best_dps_approach(self.match, mech)
+                    if approach is None:
+                        break
+                    self.assertIs(approach[2], weapon)
+                    mech.approachTarget = target
+                    mech.approachWeapon = weapon
+                    self.assertTrue(_move_into_weapon_range(self.match, mech, "move"))
+                self.assertLess(math.dist(mech.pos, target.pos), 14)
+                if reach is not None:
+                    self.assertLessEqual(math.dist(mech.pos, target.pos), reach)
 
     def test_artillery_launches_after_an_unclear_two_turn_review(self):
         squad = self.player_squad

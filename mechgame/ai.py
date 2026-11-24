@@ -6,6 +6,7 @@ combat choices for the future squad-leader action planner.
 """
 
 from dataclasses import dataclass
+import copy
 import math
 
 from . import artillery
@@ -810,21 +811,25 @@ def _best_direct_shot(match_info, mech, target):
 
 
 def _best_dps_approach(match_info, mech):
-    """Find a target worth closing with for a substantially better weapon."""
+    """Find a useful direct weapon to approach with, even across many turns.
+
+    Explicit range and accuracy both determine effective reach. Reassess
+    contacts each turn so an approach never relies on an expired contact.
+    """
     best = None
-    for target in _known_targets(mech):
-        current_weapon, _, current_dps = _best_direct_shot(match_info, mech, target)
+    targets = _known_targets(mech)
+    assigned = mech.squad.assignedTargets.get(mech)
+    if assigned in targets:
+        targets = [assigned]
+    for target in targets:
+        _, _, current_dps = _best_direct_shot(match_info, mech, target)
         for weapon in mech.mechClass.gunList:
             if weapon.isLauncher or weapon.hp <= 0:
                 continue
             if weapon.charges is not None and weapon.charges <= 0:
                 continue
-            if weapon.maxRange is None:
-                continue
             distance = math.dist(mech.pos, target.pos)
-            # Do not promise an approach that cannot reach the weapon's band
-            # with this mech's currently available movement points.
-            if distance <= weapon.maxRange or distance - weapon.maxRange > min(mech.ap, mech.mp):
+            if distance <= 1.5:
                 continue
             projected_dps, _ = _weapon_damage_per_turn(
                 match_info, mech, target, weapon, projected=True,
@@ -1210,18 +1215,31 @@ def _leader_needs_regroup(squad, leader_range):
 
 
 def _move_into_weapon_range(match_info, mech, movement_mode):
-    """Spend available movement closing to the weapon range chosen by AI."""
+    """Close over successive turns until the chosen weapon is effective."""
     target = getattr(mech, "approachTarget", None)
     weapon = getattr(mech, "approachWeapon", None)
     if (
         target not in match_info.entities
+        or target not in _known_targets(mech)
         or weapon is None
-        or weapon.maxRange is None
         or not _can_begin_movement(mech, movement_mode)
     ):
         return []
     moved = []
-    while math.dist(mech.pos, target.pos) > weapon.maxRange:
+    while True:
+        # Compare stationary, full-turn output so movement penalties and AP
+        # already spent walking cannot make a mech chase forever.
+        preview = copy.copy(mech)
+        preview.speed = 0
+        preview.ap = mech.mechClass.apMax
+        preview.energy = mech.mechClass.energyMax
+        current_dps, _ = _weapon_damage_per_turn(match_info, preview, target, weapon)
+        ideal_dps, _ = _weapon_damage_per_turn(
+            match_info, preview, target, weapon, projected=True,
+        )
+        in_range = weapon.maxRange is None or math.dist(mech.pos, target.pos) <= weapon.maxRange
+        if in_range and current_dps * AI_DPS_MOVEMENT_IMPROVEMENT >= ideal_dps:
+            break
         current_distance = math.dist(mech.pos, target.pos)
         candidates = [
             (math.dist(position, target.pos), energy_cost, position)
