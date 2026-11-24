@@ -10,6 +10,7 @@ import copy
 import math
 
 from . import artillery
+from . import ambush
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
@@ -140,6 +141,9 @@ def _install_squad_goals(squad, goals, replace=False):
         [*existing, *goals], key=lambda goal: (-goal.priority, goal.goal_id),
     )
     squad.currentGoal = squad.currentGoals[0] if squad.currentGoals else None
+    if squad.currentGoal and squad.currentGoal.kind == "ambush" and squad.currentGoal.locations:
+        if not squad.ambushLocation or squad.ambushLocation != squad.currentGoal.locations[0]:
+            squad.beginAmbush(squad.currentGoal.locations[0])
     squad.goalHistory.extend(goals)
     squad._refreshOperationalFlags()
 
@@ -278,6 +282,8 @@ def _nearest_location(origin, locations):
 def _leader_destination(match_info, squad):
     """Choose a known, legal-information destination for the squad leader."""
     leader = squad.squadLead
+    if ambush.waiting(squad) and not squad.fleeOrdered and squad.combatPosture != "retreat":
+        return squad.ambushLocation
     if squad.avoidContact and squad.avoidanceTarget is not None:
         return squad.avoidanceTarget
     patrol_destination = (
@@ -684,14 +690,16 @@ def _assign_anti_heavy_focus(squad, contacts):
 def _attack_ordered(squad):
     """Return whether the leader has issued a committed attack order."""
     goal_kind = getattr(squad.currentGoal, "kind", "")
-    return squad.combatPosture == "attack" or goal_kind in {
+    return squad.combatPosture == "attack" or (
+        squad.ambushLocation is not None and squad.ambushTriggered
+    ) or goal_kind in {
         "attack", "attack_military_base", "eliminate_enemies",
     }
 
 
 def _fire_suppressed(squad):
     """Return whether this squad's movement or posture forbids firing."""
-    return squad.movementMode == "double_time" or squad.combatPosture in {
+    return ambush.waiting(squad) or squad.movementMode == "double_time" or squad.combatPosture in {
         "hold_fire", "stealth", "retreat",
     }
 
@@ -973,6 +981,10 @@ def execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    if not squad.playerControlled:
+        ambush.update(match_info, squad)
+        if ambush.waiting(squad) and not squad.fleeOrdered and squad.combatPosture != "retreat":
+            return []
     if not squad.playerControlled:
         retreating = squad.combatPosture == "retreat" or squad.fleeOrdered
         for mech in list(squad.mechList):

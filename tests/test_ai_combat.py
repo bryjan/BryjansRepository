@@ -12,9 +12,52 @@ from mechgame.ai import (
 )
 from mechgame.runner import Game
 from mechgame.teams import Squad
+from mechgame import ambush
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_ambush_waits_for_lance_range_then_releases(self):
+        mech = next(mech for mech in self.player_squad.mechList if any(w.isMelee for w in mech.mechClass.gunList))
+        squad = self.player_squad
+        squad.mechList = [mech]
+        squad.squadLead = mech
+        target = self.enemy_squad.squadLead
+        mech.pos = [10, 10]
+        target.pos = [20, 10]
+        mech.directlyVisibleEnemies = mech.trackedEnemies = [target]
+        squad.team.orderAmbush(squad, (10, 10))
+        mech.radarOn = True
+        ambush.update(self.match, squad)
+        self.assertFalse(squad.ambushTriggered)
+        self.assertFalse(mech.radarOn)
+        self.assertIs(squad.ambushMech, mech)
+        target.pos = [11, 10]
+        ambush.update(self.match, squad)
+        self.assertTrue(squad.ambushTriggered)
+
+    def test_ambush_releases_if_enemy_recedes_after_near_approach(self):
+        mech = next(mech for mech in self.player_squad.mechList if any(w.isMelee for w in mech.mechClass.gunList))
+        squad = self.player_squad
+        squad.mechList = [mech]
+        squad.squadLead = mech
+        target = self.enemy_squad.squadLead
+        mech.pos = [10, 10]
+        target.pos = [13, 10]
+        mech.directlyVisibleEnemies = mech.trackedEnemies = [target]
+        squad.beginAmbush((10, 10))
+        ambush.update(self.match, squad)
+        self.assertFalse(squad.ambushTriggered)
+        target.pos = [14, 10]
+        ambush.update(self.match, squad)
+        self.assertTrue(squad.ambushTriggered)
+
+    def test_ambush_releases_on_damage_even_when_waiting_for_order(self):
+        squad = self.enemy_squad
+        squad.beginAmbush((10, 10), wait_for_order=True)
+        squad.damageReceived += 1
+        ambush.update(self.match, squad)
+        self.assertTrue(squad.ambushTriggered)
+
     def _disable_sensor_bursts(self):
         """Keep authored contact lists stable in targeting/assessment tests."""
         for mech in self.match.entities:

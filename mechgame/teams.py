@@ -93,6 +93,13 @@ class Squad:
         # A flee order is an orderly withdrawal: units preserve both chassis
         # and pilot by reaching a map-edge exit rather than ejecting.
         self.fleeOrdered = False
+        self.ambushLocation = None
+        self.ambushTriggered = False
+        self.ambushWaitForOrder = False
+        self.ambushDistances = {}
+        self.ambushDamageBaseline = 0
+        self.ambushMech = self.ambushTarget = None
+        self.ambushEffectiveRange = None
         self.roleCapabilityFlags = {}
         self.canFulfillCurrentGoal = True
         # Active-radar contacts are shared by every mech in this squad.
@@ -110,6 +117,8 @@ class Squad:
         matchInfo.clearVisuals()
         self.radarTrackedEnemies = []
         for entity in self.mechList:
+            if self.ambushLocation is not None and not self.ambushTriggered:
+                entity.radarOn = entity.radarPulseActive = False
             entity.roundRefresh(matchInfo)
         self.refreshCombatForce()
 
@@ -197,6 +206,30 @@ class Squad:
         self.fleeOrdered = True
         self.setCombatPosture("retreat")
         self.setMovementPolicy(mode="double_time", behavior="formation")
+
+    def beginAmbush(self, location, wait_for_order=False):
+        """Stage quietly, then release on the squad's best damage opportunity."""
+        if len(location) != 2 or not all(isinstance(value, int) for value in location):
+            raise ValueError("An ambush location must be an integer coordinate pair.")
+        self.ambushLocation = tuple(location)
+        self.fleeOrdered = False
+        self.setCombatPosture("engage")
+        self.setMovementPolicy(mode="move", behavior="formation")
+        self.avoidContact = False
+        self.avoidanceTarget = None
+        self.primaryTarget = None
+        self.ambushTriggered = False
+        self.ambushWaitForOrder = wait_for_order
+        self.ambushDistances = {}
+        self.ambushDamageBaseline = self.damageReceived
+        self.stopRoadPatrol()
+        for mech in self.mechList:
+            mech.radarOn = mech.radarPulseActive = False
+            mech.approachTarget = mech.approachWeapon = None
+
+    def releaseAmbush(self):
+        """Let the team explicitly spring an ordered ambush."""
+        self.ambushTriggered = True
 
     def cancelFleeOrder(self):
         """Clear a voluntary withdrawal order without restoring an old stance."""
@@ -391,6 +424,12 @@ class Team:
         for member in squads:
             if member in self.squadsList and member.mechList:
                 member.orderFlee()
+
+    def orderAmbush(self, squad, location, wait_for_order=False):
+        """Hand a specific squad a quiet ambush position."""
+        if squad not in self.squadsList:
+            raise ValueError("Ambush orders must target a squad on this team.")
+        squad.beginAmbush(location, wait_for_order)
 
     def share_vision(self, mech, cells):
         """Share one capable mech's visual cells with the full team map."""
