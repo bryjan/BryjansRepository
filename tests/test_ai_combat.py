@@ -13,9 +13,25 @@ from mechgame.ai import (
 from mechgame.runner import Game
 from mechgame.teams import Squad
 from mechgame import ambush
+from mechgame import radar
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_passive_detection_warning_springs_an_ambush(self):
+        detector = self.player_squad.squadLead
+        detector.mechClass.passiveRadar = True
+        detector.speed = 0
+        detector.pos = [10, 10]
+        emitter = self.enemy_squad.squadLead
+        self.player_squad.beginAmbush((10, 10), wait_for_order=True)
+        cell = self.match.map[10][10]
+        cell.radarPower = 0
+        radar.passive_detect(detector, self.match, emitter)
+        self.assertFalse(self.player_squad.ambushTriggered)
+        cell.radarPower = max(50, radar.entity_detection_threshold(detector.radarSig) * 2)
+        radar.passive_detect(detector, self.match, emitter)
+        self.assertTrue(self.player_squad.ambushTriggered)
+
     def test_ambush_waits_for_lance_range_then_releases(self):
         mech = next(mech for mech in self.player_squad.mechList if any(w.isMelee for w in mech.mechClass.gunList))
         squad = self.player_squad

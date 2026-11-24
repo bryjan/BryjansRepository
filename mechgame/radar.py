@@ -179,6 +179,13 @@ def passive_detect(detector, match_info, emitter):
     else:
         status = "undetected"
 
+    # A passive warning that the enemy can actually detect a squad member
+    # compromises its ambush. Weak scans that leave it undetected do not.
+    if status != "undetected":
+        from . import ambush
+        if ambush.waiting(detector.squad):
+            detector.squad.releaseAmbush()
+
     direction = nesw_direction(detector.pos, emitter.pos)
     detector.report(
         match_info,
