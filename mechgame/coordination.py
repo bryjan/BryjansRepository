@@ -170,10 +170,12 @@ def plan(match, team):
         return
     team.lastCoordinationRound = match.matchRound
     from .ai import _entity_combat_force
+    from . import recon
     available = [s for s in team.squadsList if not s.playerControlled and s.mechList
                  and s.combatEffective and not s.shouldLeaveBattlefield and not s.fleeOrdered
                  and s.combinedAttack is None and s.ambushLocation is None
                  and not s.manualOrder
+                 and s.investigationPosition is None and not recon.emergency(match, s)
                  and s.combatPosture in {"engage", "attack"}]
     if prefer_ambush(match, team, available):
         return

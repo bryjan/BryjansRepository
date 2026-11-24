@@ -263,6 +263,25 @@ class InputTests(unittest.TestCase):
 
         self.assertIn("Critical reports!", lines[-1])
 
+    def test_reading_full_report_log_clears_critical_warning(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        match.pov.squad.reportLog = [["Critical test", True, False]]
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", return_value="x"):
+            squad.reportMenu(match)
+        self.assertTrue(match.pov.squad.reportLog[0][2])
+        self.assertNotIn("Critical reports!", "\n".join(tactical._side_panel_lines(match, height=19)))
+
+    def test_unseen_report_pages_remain_unread(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        critical = ["Unseen critical", True, False]
+        match.pov.squad.reportLog = [["ordinary " * 30, False, False], critical]
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", return_value="x"):
+            squad.unreadReportMenu(match)
+        self.assertFalse(critical[2])
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", side_effect=["n", "x"]):
+            squad.unreadReportMenu(match)
+        self.assertTrue(critical[2])
+
     def test_status_and_reports_use_tactical_panels(self):
         match = Game(map_size=40, window_size=9).create_match()
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
@@ -344,6 +363,35 @@ class InputTests(unittest.TestCase):
             original_menu(match, launcher)
 
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
+
+    def test_direct_fire_stays_open_for_multiple_shots_until_cancelled(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        mech = match.pov
+        mech.pos = [5, 5]
+        mech.trackedEnemies = []
+        gun = mech.mechClass.gunList[0]
+        gun.defaultGun = True
+        ammo, ap = gun.charges, mech.ap
+        with patch("builtins.input", side_effect=["c", "10,10", "f", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+            firing.fire(match)
+        self.assertEqual(gun.charges, ammo - 2)
+        self.assertEqual(mech.ap, ap - gun.apCost * 2)
+        self.assertFalse(match.turnEnded)
+
+    def test_launcher_stays_open_for_multiple_rounds_until_cancelled(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        mech = next(mech for mech in match.playerSquad.mechList if mech.hasArtillery)
+        match.pov = mech
+        mech.pos = [5, 5]
+        mech.trackedEnemies = []
+        launcher = mech.mechClass.gunList[0]
+        ammo, ap = launcher.selected_ammo.charges, mech.ap
+        with patch("builtins.input", side_effect=["c", "10,10", "", "f", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+            firing.launcherFireMenu(match, launcher)
+        self.assertEqual(launcher.selected_ammo.charges, ammo - 2)
+        self.assertEqual(mech.ap, ap - launcher.apCost * 2)
+        self.assertEqual(len(match.pendingImpacts), 2)
+        self.assertFalse(match.turnEnded)
 
     def test_launcher_auto_lead_projects_visual_contact_by_flight_time(self):
         match = Game(map_size=40, window_size=9).create_match()

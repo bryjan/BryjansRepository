@@ -101,7 +101,7 @@ def items(match, squad):
                         if request.kind == "Artillery" and ammo.payload not in {"explosive", "incendiary"}:
                             continue
                         profile = ammo.profile(math.dist(mech.pos, request.position), weapon.launcher_range_bonus(match, mech))
-                        reach = (f"{profile['name']} range, {profile['turns']} turn(s) to land, scatter {profile['inaccuracy']}"
+                        reach = (f"{profile['name']} range, {profile['turns']} round(s) to land, scatter {profile['inaccuracy']}"
                                  if profile else "Out of range")
                         ammunition.append(f"{mech.pilot.display_name}: {ammo.name} — {ammo.charges if ammo.charges is not None else 'Unlimited'} remaining; {reach}; {weapon.apCost} AP/{weapon.energyCost} energy.")
             details.extend(["Available ammunition:", *(ammunition or ["No suitable launcher ammunition in this squad."])])

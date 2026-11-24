@@ -36,14 +36,19 @@ def queue(match, mech, weapon, position):
         raise ValueError("Change the squad's retreat/stealth/hold-fire order before requesting fire.")
     if weapon not in mech.mechClass.gunList or not weapon.isLauncher or weapon.hp <= 0:
         raise ValueError("Select an operational launcher.")
-    if weapon.selected_ammo.charges == 0:
+    reserved = [order for order in squad.fireMissions if order.shooter is mech]
+    ammo_reserved = sum(order.weapon is weapon and order.ammo_index == weapon.selectedAmmoIndex for order in reserved)
+    if weapon.selected_ammo.charges is not None and weapon.selected_ammo.charges <= ammo_reserved:
         raise ValueError("The selected ammunition is empty.")
+    if sum(order.weapon.apCost for order in reserved) + weapon.apCost > mech.mechClass.apMax:
+        raise ValueError("No AP remains for more queued shots. Switch artillery unit or cancel.")
+    if sum(order.weapon.energyCost for order in reserved) + weapon.energyCost > mech.mechClass.energyMax:
+        raise ValueError("Not enough energy capacity for more queued shots.")
     if not (0 < position[0] < match.mapWidth - 1 and 0 < position[1] < match.mapHeight - 1):
         raise ValueError("Choose a playable impact location.")
     if weapon.launcher_profile(math.dist(mech.pos, position), match, mech) is None:
         raise ValueError("The selected ammunition cannot reach that location.")
-    # One plotted shot per mech; revising it replaces the previous plot.
-    squad.fireMissions = [order for order in squad.fireMissions if order.shooter is not mech]
+    # Retain every plotted round, including different payloads and locations.
     squad.fireMissions.append(FireMission(mech, weapon, weapon.selectedAmmoIndex, tuple(position)))
     squad.manualOrder = True
     squad.combinedAttack = None

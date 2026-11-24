@@ -43,7 +43,7 @@ class FireMissionTests(unittest.TestCase):
         launcher = mech.mechClass.gunList[0]
         ammo = launcher.selected_ammo.charges
         ap = mech.ap
-        with patch("builtins.input", side_effect=["c", "25,10", ""]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+        with patch("builtins.input", side_effect=["c", "25,10", "", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
             fireMissionMenu(self.match, self.squad)
         self.assertEqual(len(self.squad.fireMissions), 1)
         self.assertEqual(self.squad.fireMissions[0].position, (25, 10))
@@ -62,6 +62,21 @@ class FireMissionTests(unittest.TestCase):
         with patch("builtins.input", return_value="x"), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
             fireMissionMenu(self.match, self.squad)
         self.assertIs(self.match.pov, self.original_pov)
+        self.assertEqual(self.squad.fireMissions, [])
+
+    def test_multiple_payloads_and_locations_remain_queued_until_cancel(self):
+        mech = self.units[1]
+        launcher = mech.mechClass.gunList[0]
+        with patch("builtins.input", side_effect=["c", "25,10", "", "a", "2", "", "c", "26,10", "", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+            fireMissionMenu(self.match, self.squad)
+        self.assertEqual([order.ammo_index for order in self.squad.fireMissions], [0, 1, 1])
+        self.assertEqual([order.position for order in self.squad.fireMissions], [(25, 10), (25, 10), (26, 10)])
+        with self.assertRaises(ValueError):
+            fire_missions.queue(self.match, mech, launcher, [27, 10])
+        self.assertEqual(len(self.squad.fireMissions), 3)
+        execute_squad_combat(self.match, self.squad)
+        self.assertEqual(len(self.match.pendingImpacts), 3)
+        self.assertEqual(mech.ap, 0)
         self.assertEqual(self.squad.fireMissions, [])
 
     def test_all_player_owned_squads_precede_enemy_squads(self):

@@ -61,7 +61,7 @@ class LauncherAmmo:
 
 @dataclass
 class ScheduledImpact:
-    """One shell already fired and waiting to resolve on a future squad turn."""
+    """One shell in flight, due on a match round rather than a squad handoff."""
 
     position: list[int]
     turns_remaining: int
@@ -76,6 +76,8 @@ class ScheduledImpact:
     owner_team: object
     ignite_chance: float
     sound_range: int
+    impact_round: int
+    source_entity: object = None
 
 
 def auto_lead_available(match_info, observer, target):
@@ -144,12 +146,13 @@ def scatter_position(match_info, target, inherent_inaccuracy):
 
 def schedule_impact(match_info, position, turns, radius, size, damage, weapon_name,
                     payload="explosive", effect_radius=0, effect_turns=2,
-                    scout_vision=0, owner_team=None, ignite_chance=0, sound_range=0):
+                    scout_vision=0, owner_team=None, ignite_chance=0, sound_range=0,
+                    source_entity=None):
     """Store one delayed shell on the match until turn advancement resolves it."""
     impact = ScheduledImpact(
         list(position), turns, radius, size, damage, weapon_name,
         payload, effect_radius, effect_turns, scout_vision, owner_team, ignite_chance,
-        sound_range,
+        sound_range, match_info.matchRound + turns, source_entity,
     )
     match_info.pendingImpacts.append(impact)
     return impact
@@ -162,7 +165,7 @@ def resolve_impact(match_info, impact):
         match_info.explosion(
             impact.position, impact.radius, impact.size, impact.damage,
             soundRange=impact.sound_range,
-            attacker=impact.owner_team,
+            attacker=impact.source_entity or impact.owner_team,
         )
         if match_info.rng.random() < impact.ignite_chance:
             cell = match_info.map[impact.position[1]][impact.position[0]]
@@ -183,10 +186,10 @@ def resolve_impact(match_info, impact):
 
 
 def advance_impacts(match_info):
-    """Advance all shells once per squad-turn handoff and resolve arrivals."""
+    """Resolve due rounds; extra squad handoffs cannot speed up flight time."""
     remaining = []
     for impact in match_info.pendingImpacts:
-        impact.turns_remaining -= 1
+        impact.turns_remaining = max(0, impact.impact_round - match_info.matchRound)
         if impact.turns_remaining > 0:
             remaining.append(impact)
             continue

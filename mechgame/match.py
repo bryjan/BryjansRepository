@@ -39,7 +39,7 @@ class MatchInfo:
         # These totals never reset with the squad leader's combat assessment.
         self.damageDealt = {}
         self.damageReceived = {}
-        # Fired launcher shells resolve only after future squad-turn handoffs.
+        # Fired launcher shells resolve on their scheduled match rounds.
         self.pendingImpacts = []
         self.matchRound = 0
         self.pov = ""
@@ -266,7 +266,7 @@ class MatchInfo:
         """Rebuild active radar only after a detectable source-state change."""
         radar.refresh(self)
 
-    def recordCombatDamage(self, attacker, defender, damage):
+    def recordCombatDamage(self, attacker, defender, damage, damage_source=None):
         """Accumulate confirmed penetrating damage for squad leader reviews."""
         if damage <= 0:
             return
@@ -281,6 +281,9 @@ class MatchInfo:
         if defender is not None and getattr(defender, "squad", None):
             defender.squad.damageReceived += damage
             defender.team.lastEngagedRound = self.matchRound
+            if damage_source is not None and damage_source != "fire":
+                from .recon import unknown_damage
+                unknown_damage(self, defender, attacker)
 
     def explosion(self, location, radius, size, damage, soundRange=0, attacker=None):
         """Apply blast damage to several random parts of each mech in range."""

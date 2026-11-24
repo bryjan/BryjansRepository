@@ -42,6 +42,7 @@ class Ability:
 
     requiresDirection = False
     aiDuringFireSuppression = False
+    aiDuringThreatResponse = False
 
     def __init__(self, name, charges, description):
         self.name = name
@@ -194,6 +195,8 @@ class DashAbility(Ability):
 
 class SensorOverdriveAbility(Ability):
     """Temporarily overclock a mech's visual and active-radar systems."""
+
+    aiDuringThreatResponse = True
 
     def __init__(self, energy_cost=4, multiplier=1.4):
         super().__init__(
@@ -596,7 +599,7 @@ class MechPart: # super class to mech limbs
         # so squad force comparisons must update immediately.
         self.mech.noteCombat("took damage")
         if hasattr(matchInfo, "recordCombatDamage"):
-            matchInfo.recordCombatDamage(attacker, self.mech, actual_damage)
+            matchInfo.recordCombatDamage(attacker, self.mech, actual_damage, damage_source=damageSource)
         self.mech.refreshReadiness(matchInfo)
         return True
 
@@ -720,7 +723,7 @@ class WeaponLimb(MechPart):
 
     A launcher draws its profiles from selectable ammunition. Each ammunition
     type supplies three range-band arrays:
-    ``[max_range, scatter_tiles, turns_to_land, optional_damage_falloff]``.
+    ``[max_range, scatter_tiles, rounds_to_land, optional_damage_falloff]``.
     Direct weapons leave ``ammoTypes`` as ``None`` and resolve at once. A
     melee weapon is a direct weapon with ``melee=True`` and a short
     ``maxRange``; this deliberately keeps its accuracy and armor rules the
@@ -807,8 +810,10 @@ class WeaponLimb(MechPart):
             if entity.team is shooter.team:
                 continue
             if math.dist(shooter.pos, entity.pos) <= self.soundReport:
+                from .recon import hear_fire
+                direction = hear_fire(matchInfo, entity, shooter, self)
                 entity.report(
-                    matchInfo, f"I hear fire from a {self.name}.",
+                    matchInfo, f"I hear fire from a {self.name} to the {direction}.",
                     teamReport=False, critical=False,
                 )
 
@@ -918,10 +923,9 @@ class WeaponLimb(MechPart):
         impact = artillery.schedule_impact(
             matchInfo,
             impactPosition,
-            # The firing squad's turn is still in progress.  Add one pending
-            # handoff so a one-turn shell lands only after one *complete*
-            # future squad turn, rather than as soon as the player ends now.
-            profile["turns"] + 1,
+            # Flight time uses whole match rounds, independent of how many
+            # friendly or enemy squads act before the next round begins.
+            profile["turns"],
             ammo.blastRadius,
             ammo.blastSize,
             max(0, self.dmg + ammo.damageModifier - profile["damage_falloff"]),
@@ -933,6 +937,7 @@ class WeaponLimb(MechPart):
             shooter.team,
             ammo.igniteChance,
             self.soundReport,
+            source_entity=shooter,
         )
         if profile["turns"] == 0:
             print(f"{self.name} fired on its {profile['name']} profile. Impact is immediate.")
@@ -944,7 +949,7 @@ class WeaponLimb(MechPart):
         else:
             print(
                 f"{self.name} fired on its {profile['name']} profile. "
-                f"Impact expected after {profile['turns']} completed turn(s)."
+                f"Impact expected in {profile['turns']} match round(s), on round {impact.impact_round}."
             )
         matchInfo.advTurn = True
         return True

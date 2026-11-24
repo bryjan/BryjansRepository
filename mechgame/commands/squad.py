@@ -3,6 +3,7 @@
 from ..ui import tactical as pv
 
 from .shared import read_nonempty
+import textwrap
 
 
 def _print_options_panel(matchInfo, command_text):
@@ -136,24 +137,37 @@ def selectControllableSquad(matchInfo):
 
 def reportMenu(matchInfo):
     """Browse the squad report log inside the right tactical panel."""
-    reports = matchInfo.pov.squad.reportLog
+    return _read_reports(matchInfo, list(matchInfo.pov.squad.reportLog), "REPORTS")
+
+
+def _read_reports(matchInfo, reports, title):
+    """Mark reports read only after all their wrapped text has been displayed."""
     page_size = max(1, matchInfo.windowHeight - 2)
-    page = 1
-    page_max = max(1, (len(reports) + page_size - 1) // page_size)
+    pages = [([], [])]
+    for report in reports:
+        rows = textwrap.wrap(report[0], width=pv.SIDE_PANEL_WIDTH) or [""]
+        for row in rows:
+            if len(pages[-1][0]) == page_size:
+                pages.append(([], []))
+            pages[-1][0].append(row)
+        pages[-1][1].append(report)
+    page = 0
     while True:
-        start = (page - 1) * page_size
-        entries = [report[0] for report in reports[start:start + page_size]] or ["No squad reports."]
+        entries, completed = pages[page]
+        heading = title if title == "UNREAD REPORTS" and len(pages) == 1 else f"{title} {page + 1}/{len(pages)}"
         pv.printPOV(
             matchInfo, *matchInfo.pov.pos,
             command_text="Reports: 'n' next | 'p' previous | 'x' exit",
-            right_panel=(f"REPORTS {page}/{page_max}", entries),
+            right_panel=(heading, entries or ["No unread reports." if title == "UNREAD REPORTS" else "No squad reports."]),
         )
+        for report in completed:
+            report[2] = True
         choice = input("Reports: ").strip().lower()
         if choice in ("", "x"):
             return
-        if choice == "n" and page < page_max:
+        if choice == "n" and page < len(pages) - 1:
             page += 1
-        elif choice == "p" and page > 1:
+        elif choice == "p" and page > 0:
             page -= 1
         else:
             print("Choose 'n', 'p', or 'x'.")
@@ -162,15 +176,7 @@ def reportMenu(matchInfo):
 def unreadReportMenu(matchInfo):
     """Display unread reports in the right panel and mark them as read."""
     unread = [report for report in matchInfo.pov.squad.reportLog if not report[2]]
-    for report in unread:
-        report[2] = True
-    entries = [report[0] for report in unread] or ["No unread reports."]
-    pv.printPOV(
-        matchInfo, *matchInfo.pov.pos,
-        command_text="Unread reports: 'Enter' or 'x' return",
-        right_panel=("UNREAD REPORTS", entries),
-    )
-    input("Unread reports: ")
+    return _read_reports(matchInfo, unread, "UNREAD REPORTS")
 
 
 def helpCommand(matchInfo):
