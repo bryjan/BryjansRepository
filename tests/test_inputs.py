@@ -263,6 +263,25 @@ class InputTests(unittest.TestCase):
 
         self.assertIn("Critical reports!", lines[-1])
 
+    def test_reading_full_report_log_clears_critical_warning(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        match.pov.squad.reportLog = [["Critical test", True, False]]
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", return_value="x"):
+            squad.reportMenu(match)
+        self.assertTrue(match.pov.squad.reportLog[0][2])
+        self.assertNotIn("Critical reports!", "\n".join(tactical._side_panel_lines(match, height=19)))
+
+    def test_unseen_report_pages_remain_unread(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        critical = ["Unseen critical", True, False]
+        match.pov.squad.reportLog = [["ordinary " * 30, False, False], critical]
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", return_value="x"):
+            squad.unreadReportMenu(match)
+        self.assertFalse(critical[2])
+        with patch("mechgame.ui.tactical.printPOV"), patch("builtins.input", side_effect=["n", "x"]):
+            squad.unreadReportMenu(match)
+        self.assertTrue(critical[2])
+
     def test_status_and_reports_use_tactical_panels(self):
         match = Game(map_size=40, window_size=9).create_match()
         match.pov.squad.reportLog.append(["Round: 1 | B: Test report", False, False])
