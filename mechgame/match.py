@@ -60,6 +60,7 @@ class MatchInfo:
         self._nextMissionId = 0
         # MissionGenerator appends the exact team orders it creates here.
         self.missions = []
+        self.raidObjective = None
         # Debug-only strategic-map overlay. Tactical locations remain hidden
         # during ordinary play until this is deliberately toggled in map view.
         self.showTacticalLocations = False
@@ -109,6 +110,8 @@ class MatchInfo:
 
     def _finish_if_decided(self):
         """Record the result once only one operational team remains."""
+        if self.raidObjective is not None:
+            return self.raidObjective.finish_if_decided(self)
         survivors = self.operational_teams()
         if len(survivors) > 1:
             return False
@@ -178,6 +181,8 @@ class MatchInfo:
             return False
 
         current_squad = self.pov.squad
+        if self.raidObjective is not None:
+            self.raidObjective.end_turn(self, current_squad)
         # A pulse is active only for the squad turn in which it was ordered.
         # Clear every squad member so changing the point of view cannot let a
         # previous pilot's pulse survive into the next squad turn.
@@ -217,6 +222,10 @@ class MatchInfo:
         # makes impacts belong to the new turn and prevents fresh smoke or
         # fire from being immediately aged during a round-boundary refresh.
         artillery.advance_impacts(self)
+        if self.raidObjective is not None:
+            self.raidObjective.begin_turn(self, self.pov.squad)
+            if self._finish_if_decided():
+                return False
         self.advTurn = False
         self.turnEnded = False
         return True

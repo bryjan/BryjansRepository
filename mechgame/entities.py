@@ -427,6 +427,8 @@ class Entity: #a character on the map
         self.ap -= 1
         self.mp = int(self.mp - 1)
         self.pos = list(targetPos)
+        if matchInfo.raidObjective is not None:
+            matchInfo.raidObjective.moved(self)
         self.speed += 1
         effects.apply_entry_effects(matchInfo, self)
         self.refreshReadiness(matchInfo)

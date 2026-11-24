@@ -99,8 +99,8 @@ class MissionGenerator:
         """Create an assault mission against an existing or newly stamped base."""
         base = self._ensure_military_base()
         return self._issue(
-            team, "attack_military_base", f"Attack {base.base_id}", base.tiles, priority,
-            "Attack and secure the military base.", ("front_line", "artillery"),
+            team, "attack_military_base", f"Raid Military Base ({base.base_id})", base.tiles, priority,
+            "Remain inside the base for a turn, then extract or clear the enemy.", ("front_line", "artillery"),
         )
 
     def add_map_patrol(self, team, priority=30):

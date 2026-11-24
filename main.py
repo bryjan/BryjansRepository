@@ -19,8 +19,9 @@ def main():
             display_height=selected_settings.display_height,
             terrain_enabled=selected_settings.terrain_enabled,
             map_preset=selected_settings.map_preset,
+            **({"scenario": selected_settings.scenario} if selected_settings.scenario != "skirmish" else {}),
         ).run()
-        if not match.quitRequested:
+        if not match.quitRequested and selected_settings.scenario != "raid_military_base":
             return
 
 

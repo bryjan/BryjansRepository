@@ -14,6 +14,19 @@ python main.py
 
 Playable maps are a minimum of **40×40** tiles. The start menu offers `'s'` to
 launch the demo skirmish and `'o'` for complete display size and map generation.
+Choose `'t'` for the **Raid Military Base** test match. It uses a random map
+at least 100×100, with an edge-side base and a distant, initially undetected
+player deployment. The player controls the skirmish Lancer squad plus a
+sensor/two-mortar support squad. Three defending squads each carry two
+Bastions and one Kestrel, with terrain knowledge and base-defense orders.
+
+To raid the base, end a squad turn with a mech inside the marked compound
+and keep it there until that squad's next turn. Then extract every surviving
+player mech using `flee` at a border, or remove all enemy mechs from the map.
+Extracting before completing the raid fails the mission. Use `sq` to change
+player squads, `m` for map/debug controls, and `quit` to return to the menu.
+Test matches also return to the menu after success or failure for rapid retries.
+
 Display width and height describe the whole terminal frame, including the HUD,
 tactical map, right-hand information panel, and command panel. The default
 111×46 display provides the standard 37×37 tactical map. Under Options, `'p'`

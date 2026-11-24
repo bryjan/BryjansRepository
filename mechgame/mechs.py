@@ -162,6 +162,8 @@ class DashAbility(Ability):
 
         steps_taken = max(abs(landing[0] - entity.pos[0]), abs(landing[1] - entity.pos[1]))
         entity.pos = landing
+        if matchInfo.raidObjective is not None:
+            matchInfo.raidObjective.moved(entity)
         entity.speed += steps_taken
         self.charges -= 1
         # Dash momentum makes the Lancer's close-combat strike more decisive.

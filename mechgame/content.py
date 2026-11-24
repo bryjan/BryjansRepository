@@ -24,3 +24,22 @@ def create_demo_teams():
     # The match begins with the player squad, so keep it first in turn order.
     # A complete round is then player turn, enemy turn, and back to player.
     return [player, enemies]
+
+
+def create_raid_teams():
+    """The debug raid adds artillery support and three independent garrisons."""
+    player, _ = create_demo_teams()
+    support = Squad("Artillery Support", [
+        Entity(create_mech("lancer.pathfinder"), Pilot("Relay")),
+        Entity(create_mech("lancer.mortar"), Pilot("Arc")),
+        Entity(create_mech("lancer.mortar"), Pilot("Fuse")),
+    ], "Fire Support", playerControlled=True)
+    player = Team("Raiders", [player.squadsList[0], support], playerControlled=True)
+    defenders = Team("Base Garrison", [
+        Squad(f"Garrison {index + 1}", [
+            Entity(create_mech("bastion"), Pilot(f"Guard {index + 1}A")),
+            Entity(create_mech("kestrel"), Pilot(f"Watch {index + 1}")),
+            Entity(create_mech("bastion"), Pilot(f"Guard {index + 1}B")),
+        ], "Defense") for index in range(3)
+    ])
+    return [player, defenders]

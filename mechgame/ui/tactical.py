@@ -230,13 +230,19 @@ def _focused_contact_panel_lines(matchInfo, contacts, focus, height, width):
 def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     """Show contact intelligence first, falling back to own weapon readiness."""
     observer = matchInfo.pov
+    mission_lines = []
+    if getattr(matchInfo, "raidObjective", None) is not None:
+        mission_lines = _panel_text_lines("Raid Military Base", width)
+        mission_lines.extend(_panel_text_lines(matchInfo.raidObjective.status(), width))
+        mission_lines.append("+" + "-" * width + "+")
+        height -= len(mission_lines)
     contacts = radar.tracked_contacts(observer)
     focus = radar.panel_focus(observer)
     if focus is not None:
         lines = _focused_contact_panel_lines(matchInfo, contacts, focus, height, width)
     else:
         lines = _own_mech_panel_lines(observer, height, width)
-    return _add_critical_warning(matchInfo, lines, height, width)
+    return _add_critical_warning(matchInfo, mission_lines + lines, height + len(mission_lines), width)
 
 
 def _hud_lines(matchInfo, width):

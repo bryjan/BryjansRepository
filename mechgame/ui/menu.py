@@ -30,6 +30,7 @@ class DisplaySettings:
     display_height: int = DEFAULT_DISPLAY_HEIGHT
     terrain_enabled: dict = field(default_factory=lambda: dict(DEFAULT_TERRAIN_ENABLED))
     map_preset: str = DEFAULT_MAP_PRESET
+    scenario: str = "skirmish"
 
 
 def _frame_lines(lines, settings):
@@ -350,12 +351,17 @@ def start_menu(settings=None, campaign=None):
             "ASCII MECH GAME",
             "",
             "'s' Skirmish",
+            "'t' Test Match — Raid Military Base",
             "'m' Mercenary Mode",
             "'o' Options",
             "'q' Quit",
         ], settings)
         choice = input("Select: ").strip().lower()
         if choice == "s":
+            settings.scenario = "skirmish"
+            return settings
+        elif choice == "t":
+            settings.scenario = "raid_military_base"
             return settings
         elif choice == "m":
             mercenary_menu(settings, campaign)
@@ -364,4 +370,4 @@ def start_menu(settings=None, campaign=None):
         elif choice in ("", "q", "x"):
             return None
         else:
-            print("Choose 's', 'm', 'o', or 'q'.")
+            print("Choose 's', 't', 'm', 'o', or 'q'.")

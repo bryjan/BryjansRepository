@@ -700,23 +700,30 @@ class MapGenerator:
             if self.add_military_base(grid, road, suburb, protected_terrain) is None:
                 return
 
-    def add_military_base(self, grid, road, suburb, protected_terrain=()):
+    def add_military_base(self, grid, road, suburb, protected_terrain=(), *, origin=None, stamp=None):
         """Stamp one base for terrain generation or a scenario mission.
 
         The public method lets mission setup add a genuine base after terrain
         generation, while preserving the same footprint, roads, and metadata
         used by the procedural generator.
         """
-        stamp = MilitaryBaseStamp.random(self.rng)
+        stamp = stamp or MilitaryBaseStamp.random(self.rng)
         occupied_tiles = {
             tile
             for base in self.features.military_bases
             for tile in base.tiles
         }
-        candidates = [
-            origin for origin in self._stamp_candidates(stamp, grid, protected_terrain)
-            if not (set(stamp.positions(origin)) & occupied_tiles)
-        ]
+        if origin is not None:
+            x, y = origin
+            valid = (1 <= x < self.width - stamp.width and 1 <= y < self.height - stamp.height
+                     and self._can_stamp_rectangle(grid, origin, stamp, protected_terrain)
+                     and not (set(stamp.positions(origin)) & occupied_tiles))
+            candidates = [origin] if valid else []
+        else:
+            candidates = [
+                candidate for candidate in self._stamp_candidates(stamp, grid, protected_terrain)
+                if not (set(stamp.positions(candidate)) & occupied_tiles)
+            ]
         if not candidates:
             return None
         origin = self.rng.choice(candidates)

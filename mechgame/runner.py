@@ -4,7 +4,7 @@ import random
 
 from .match import MatchInfo
 
-from .content import create_demo_teams
+from .content import create_demo_teams, create_raid_teams
 
 
 MIN_PLAYABLE_MAP_SIZE = 40
@@ -17,7 +17,7 @@ class Game:
         self, map_size=100, window_size=None, rng=None, map_width=None,
         map_height=None, window_width=None, window_height=None, display_width=None,
         display_height=None, terrain_enabled=None,
-        map_preset=None,
+        map_preset=None, scenario="skirmish",
     ):
         if window_size is None:
             # Resolve the renderer's standard view lazily instead of creating
@@ -26,6 +26,12 @@ class Game:
             window_size = DEFAULT_TACTICAL_SIZE
         self.map_width = map_size if map_width is None else map_width
         self.map_height = map_size if map_height is None else map_height
+        if scenario not in {"skirmish", "raid_military_base"}:
+            raise ValueError(f"Unknown scenario: {scenario}")
+        self.scenario = scenario
+        if scenario == "raid_military_base":
+            self.map_width = max(100, self.map_width)
+            self.map_height = max(100, self.map_height)
         if self.map_width < MIN_PLAYABLE_MAP_SIZE or self.map_height < MIN_PLAYABLE_MAP_SIZE:
             raise ValueError(
                 f"Playable maps must be at least {MIN_PLAYABLE_MAP_SIZE}x{MIN_PLAYABLE_MAP_SIZE}."
@@ -55,7 +61,7 @@ class Game:
         match = MatchInfo(
             self.map_width,
             self.window_height,
-            create_demo_teams(),
+            create_raid_teams() if self.scenario == "raid_military_base" else create_demo_teams(),
             "",
             self.map_height,
             rng=self.rng,
@@ -68,6 +74,10 @@ class Game:
             terrain_enabled=self.terrain_enabled,
             map_preset=self.map_preset,
         )
+        if self.scenario == "raid_military_base":
+            from .raid import setup
+            setup(match)
+            return match
         # Playable maps are at least 40x40, so a quarter-map spawn margin
         # keeps opposing squads apart without compact-map special cases.
         xMargin = self.map_width // 4
