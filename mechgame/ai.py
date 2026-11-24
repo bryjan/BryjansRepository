@@ -710,6 +710,20 @@ def _direct_ammo_ratio(mech):
     return sum(reserves) / len(reserves) if reserves else 0
 
 
+def _can_sustain_direct_fire(mech):
+    """Spend multiple attacks only while the mech can afford the exchange."""
+    direct_reserves = _direct_ammo_ratio(mech)
+    has_melee = any(weapon.isMelee for weapon in mech.mechClass.gunList)
+    ammo_healthy = direct_reserves >= AI_GOOD_AMMO_THRESHOLD or (
+        has_melee and direct_reserves == 0
+    )
+    energy_healthy = (
+        mech.energy >= mech.mechClass.energyMax * AI_GOOD_AMMO_THRESHOLD
+        if mech.mechClass.energyMax else True
+    )
+    return ammo_healthy and energy_healthy
+
+
 def _known_targets(mech):
     """Return only contacts the mech has received through normal sensing."""
     return [
@@ -1000,10 +1014,16 @@ def execute_squad_combat(match_info, squad=None):
                 _, contact_chance, _ = _best_direct_shot(match_info, mech, contact)
                 if contact_chance < AI_APPROACH_ACCURACY_THRESHOLD:
                     approach_targets.append(contact)
-        if target is not None:
+        sustain_fire = _can_sustain_direct_fire(mech)
+        while target is not None:
             squad.assignedTargets.setdefault(mech, target)
-            if weapon.shootAt(match_info, target.pos, shooter=mech):
+            if not weapon.shootAt(match_info, target.pos, shooter=mech):
+                break
+            if mech not in fired:
                 fired.append(mech)
+            if not sustain_fire:
+                break
+            target, weapon, _ = _choose_target(match_info, squad, mech)
         _fire_artillery_if_ordered(match_info, squad, mech)
     if squad.engagementAssessment == "favorable":
         squad.primaryTarget = getattr(squad, "strongestObservedThreat", None)

@@ -38,6 +38,27 @@ class AiCombatTests(unittest.TestCase):
         self.assertTrue(all(mech.inCombat for mech in fired))
         self.assertIs(self.match.pov, player_pov)
 
+    def test_high_reserve_mech_spends_remaining_ap_on_direct_fire(self):
+        """Healthy ammunition and energy reserves permit sustained fire."""
+        squad = self.enemy_squad
+        shooter = squad.squadLead
+        squad.mechList = [shooter]
+        shooter.squad = squad
+        shooter.pos = [10, 10]
+        shooter.directlyVisibleEnemies = [self.target]
+        shooter.trackedEnemies = [self.target]
+        for limb in self.target.mechClass.limbList:
+            limb.hp = limb.startingHP = 1_000
+        chain_gun = next(
+            weapon for weapon in shooter.mechClass.gunList
+            if weapon.name == "Sustained ChainGun"
+        )
+        starting_charges = chain_gun.charges
+
+        execute_squad_combat(self.match, squad)
+
+        self.assertLessEqual(chain_gun.charges, starting_charges - 2)
+
     def test_double_time_and_retreat_suppress_ai_fire(self):
         self.enemy_squad.setMovementPolicy(mode="double_time")
         starting_ap = [mech.ap for mech in self.enemy_squad.mechList]
@@ -215,6 +236,11 @@ class AiCombatTests(unittest.TestCase):
         squad = self.player_squad
         squad.playerControlled = False
         squad.squadLead.pos = [10, 10]
+        # This test isolates force assessment from the new sustained-fire
+        # behavior; damaged weapons leave the observed enemy force intact.
+        for mech in squad.mechList:
+            for weapon in mech.mechClass.gunList:
+                weapon.hp = 0
         for index, enemy in enumerate(self.enemy_squad.mechList):
             enemy.pos = [14 + index, 10]
         squad.squadLead.directlyVisibleEnemies = list(self.enemy_squad.mechList)
@@ -266,6 +292,9 @@ class AiCombatTests(unittest.TestCase):
     def test_leader_waits_two_combat_turns_before_damage_assessment(self):
         squad = self.enemy_squad
         leader = squad.squadLead
+        # Keep the observed contact outside all direct weapon ranges. The
+        # test supplies damage figures directly and should not resolve fire.
+        self.target.pos = [39, 10]
         leader.noteCombat("enemy in visual range")
         leader.directlyVisibleEnemies = [self.target]
         leader.trackedEnemies = [self.target]
