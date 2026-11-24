@@ -32,6 +32,7 @@ ROAD_PATROL_WIGGLE_RADIUS = 1
 AI_FIRE_ACCURACY_THRESHOLD = 65
 AI_APPROACH_ACCURACY_THRESHOLD = 80
 AI_GOOD_AMMO_THRESHOLD = .50
+AI_DPS_MOVEMENT_IMPROVEMENT = 1.5
 ANTI_HEAVY_FORCE_TOLERANCE = .35
 NEARBY_SQUAD_SUPPORT_RANGE = 20
 ARTILLERY_MIN_FORCE_RATIO = .80
@@ -729,21 +730,97 @@ def _weapon_can_fire(mech, weapon, target):
     return weapon.maxRange is None or math.dist(mech.pos, target.pos) <= weapon.maxRange
 
 
+def _average_target_armor(target):
+    """Return the armor a random, non-aimed hit is expected to face."""
+    limbs = target.mechClass.limbList
+    return sum(limb.armor for limb in limbs) / len(limbs) if limbs else 0
+
+
+def _weapon_attacks_this_turn(mech, weapon, ap=None, energy=None):
+    """Count complete trigger pulls the current resources can support."""
+    ap = mech.ap if ap is None else ap
+    energy = mech.energy if energy is None else energy
+    if weapon.apCost <= 0:
+        return 0
+    attacks = ap // weapon.apCost
+    if weapon.energyCost > 0:
+        attacks = min(attacks, energy // weapon.energyCost)
+    if weapon.charges is not None:
+        attacks = min(attacks, weapon.charges)
+    return max(0, attacks)
+
+
+def _weapon_damage_per_turn(match_info, mech, target, weapon, *, projected=False):
+    """Estimate expected hull damage from one weapon over a full turn.
+
+    The estimate deliberately mirrors live combat: random limb targeting uses
+    average armor, each projectile rolls its own hit chance, and finite ammo,
+    AP, and energy cap how often the weapon can fire. ``projected`` estimates
+    a fresh turn after moving into range, so it omits the current movement
+    penalty and uses the weapon's best practical accuracy ceiling.
+    """
+    armor = _average_target_armor(target)
+    damage = weapon.dmg - (armor / 4 if weapon.piercing else armor)
+    if damage <= 0:
+        return 0, 0
+    if projected:
+        effective_accuracy = weapon.effective_accuracy(match_info, mech, target)
+        chance = weapon._hit_chance(mech, target, effective_accuracy, 0)
+        attacks = _weapon_attacks_this_turn(
+            mech, weapon, mech.mechClass.apMax, mech.mechClass.energyMax,
+        )
+    else:
+        low, high = weapon.hit_chance_range(match_info, mech, target, target.pos)
+        chance = (low + high) / 2
+        attacks = _weapon_attacks_this_turn(mech, weapon)
+    damage_per_attack = (chance / 100) * damage * weapon.projectileCount
+    return damage_per_attack * attacks, chance
+
+
 def _best_direct_shot(match_info, mech, target):
-    """Return a direct weapon, chance, and expected-damage score for target."""
+    """Return the weapon with the highest expected damage this turn."""
     choices = []
     for weapon in mech.mechClass.gunList:
         if not _weapon_can_fire(mech, weapon, target):
             continue
-        chance, _ = weapon.hit_chance_range(match_info, mech, target, target.pos)
-        expected_damage = chance * weapon.dmg * weapon.projectileCount
-        choices.append((expected_damage, chance, weapon))
+        damage_per_turn, chance = _weapon_damage_per_turn(
+            match_info, mech, target, weapon,
+        )
+        choices.append((damage_per_turn, chance, weapon))
     if not choices:
         return None, 0, 0
     expected_damage, chance, weapon = max(
         choices, key=lambda choice: (choice[0], choice[1], choice[2].name),
     )
     return weapon, chance, expected_damage
+
+
+def _best_dps_approach(match_info, mech):
+    """Find a target worth closing with for a substantially better weapon."""
+    best = None
+    for target in _known_targets(mech):
+        current_weapon, _, current_dps = _best_direct_shot(match_info, mech, target)
+        for weapon in mech.mechClass.gunList:
+            if weapon.isLauncher or weapon.hp <= 0:
+                continue
+            if weapon.charges is not None and weapon.charges <= 0:
+                continue
+            if weapon.maxRange is None:
+                continue
+            distance = math.dist(mech.pos, target.pos)
+            # Do not promise an approach that cannot reach the weapon's band
+            # with this mech's currently available movement points.
+            if distance <= weapon.maxRange or distance - weapon.maxRange > min(mech.ap, mech.mp):
+                continue
+            projected_dps, _ = _weapon_damage_per_turn(
+                match_info, mech, target, weapon, projected=True,
+            )
+            if projected_dps < max(1, current_dps * AI_DPS_MOVEMENT_IMPROVEMENT):
+                continue
+            candidate = (projected_dps, target, weapon)
+            if best is None or candidate[0] > best[0]:
+                best = candidate
+    return best
 
 
 def _choose_target(match_info, squad, mech):
@@ -906,7 +983,18 @@ def execute_squad_combat(match_info, squad=None):
     approach_targets = []
     fired = []
     for mech in list(squad.mechList):
+        mech.approachTarget = None
+        mech.approachWeapon = None
         target, weapon, _ = _choose_target(match_info, squad, mech)
+        approach = _best_dps_approach(match_info, mech)
+        if approach is not None:
+            _, approach_target, approach_weapon = approach
+            # Preserve AP for the move. Firing a weak sidearm first would
+            # repeatedly prevent a melee or short-range weapon from closing.
+            mech.approachTarget = approach_target
+            mech.approachWeapon = approach_weapon
+            approach_targets.append(approach_target)
+            target = weapon = None
         if _attack_ordered(squad):
             for contact in _known_targets(mech):
                 _, contact_chance, _ = _best_direct_shot(match_info, mech, contact)
@@ -919,7 +1007,7 @@ def execute_squad_combat(match_info, squad=None):
         _fire_artillery_if_ordered(match_info, squad, mech)
     if squad.engagementAssessment == "favorable":
         squad.primaryTarget = getattr(squad, "strongestObservedThreat", None)
-    elif _attack_ordered(squad):
+    elif _attack_ordered(squad) or approach_targets:
         squad.primaryTarget = min(
             dict.fromkeys(approach_targets),
             key=lambda target: (
@@ -1101,6 +1189,34 @@ def _leader_needs_regroup(squad, leader_range):
     return False
 
 
+def _move_into_weapon_range(match_info, mech, movement_mode):
+    """Spend available movement closing to the weapon range chosen by AI."""
+    target = getattr(mech, "approachTarget", None)
+    weapon = getattr(mech, "approachWeapon", None)
+    if (
+        target not in match_info.entities
+        or weapon is None
+        or weapon.maxRange is None
+        or not _can_begin_movement(mech, movement_mode)
+    ):
+        return []
+    moved = []
+    while math.dist(mech.pos, target.pos) > weapon.maxRange:
+        current_distance = math.dist(mech.pos, target.pos)
+        candidates = [
+            (math.dist(position, target.pos), energy_cost, position)
+            for position, energy_cost in _legal_steps(match_info, mech, movement_mode)
+        ]
+        candidates = [candidate for candidate in candidates if candidate[0] < current_distance]
+        if not candidates:
+            break
+        _, _, position = min(candidates, key=lambda candidate: (candidate[0], candidate[1], candidate[2]))
+        if not mech.moveTo(match_info, position, announce=False):
+            break
+        moved.append(mech)
+    return moved
+
+
 def _squad_ready_to_advance(squad):
     """Return whether every squad member has recharged for its next movement burst.
 
@@ -1117,6 +1233,9 @@ def _squad_ready_to_advance(squad):
 def _move_leader(match_info, squad, leader_range, roadway_only):
     """Advance the leader until it reaches its reserve, goal, or regroup hold."""
     leader = squad.squadLead
+    approach_moves = _move_into_weapon_range(match_info, leader, squad.movementMode)
+    if approach_moves:
+        return approach_moves
     if not _squad_ready_to_advance(squad):
         return []
     moved = []
@@ -1162,6 +1281,9 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
     """Correct a follower's leader tether and spacing during any regroup."""
     leader = squad.squadLead
     moved = []
+    approach_moves = _move_into_weapon_range(match_info, mech, squad.movementMode)
+    if approach_moves:
+        return approach_moves
     # This includes close-together units: spacing is kept even while another
     # follower is catching up, so the formation does not pile up at the lead.
     if not _can_begin_movement(mech, squad.movementMode):

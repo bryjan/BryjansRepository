@@ -1,5 +1,6 @@
 """Coverage for the first visibility-limited AI combat pass."""
 
+import math
 import random
 import unittest
 
@@ -148,6 +149,35 @@ class AiCombatTests(unittest.TestCase):
         self.assertIn(shooter, fired)
         self.assertEqual(shooter.lastFiredAt, self.target.pos)
         self.assertLess(shooter.ap, starting_ap)
+
+    def test_melee_mech_closes_when_its_lance_beats_sidearm_dps(self):
+        """A stronger short-range weapon preserves AP to close before firing."""
+        squad = self.player_squad
+        squad.playerControlled = False
+        mech = next(
+            entity for entity in squad.mechList
+            if any(weapon.isMelee for weapon in entity.mechClass.gunList)
+        )
+        squad.mechList = [mech]
+        squad.squadLead = mech
+        mech.squad = squad
+        target = self.enemy_squad.squadLead
+        mech.pos = [10, 10]
+        target.pos = [13, 10]
+        mech.directlyVisibleEnemies = [target]
+        mech.trackedEnemies = [target]
+        for entity in self.match.entities:
+            if entity not in {mech, target}:
+                entity.pos = [30, 30]
+        starting_ap = mech.ap
+
+        execute_squad_combat(self.match, squad)
+
+        self.assertIs(mech.approachTarget, target)
+        self.assertEqual(mech.ap, starting_ap)
+        execute_squad_movement(self.match, squad)
+        lance = next(weapon for weapon in mech.mechClass.gunList if weapon.isMelee)
+        self.assertLessEqual(math.dist(mech.pos, target.pos), lance.maxRange)
 
     def test_artillery_launches_after_an_unclear_two_turn_review(self):
         squad = self.player_squad

@@ -97,6 +97,10 @@ class Entity: #a character on the map
         # The right tactical panel keeps a selected enemy here. When empty or
         # stale, it automatically falls back to the nearest tracked contact.
         self.focusedEnemy = None
+        # AI preserves this short-lived intent between its combat choice and
+        # movement pass when closing distance would unlock better damage.
+        self.approachTarget = None
+        self.approachWeapon = None
         # TODO(ai-orders): future individual orders should live here only for
         # the current squad turn. The planner must not persist stale targets
         # after radar/visual contacts expire.
