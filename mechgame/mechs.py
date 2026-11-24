@@ -41,6 +41,7 @@ class Ability:
     """A finite-use action installed on a hull rather than a weapon limb."""
 
     requiresDirection = False
+    aiDuringFireSuppression = False
 
     def __init__(self, name, charges, description):
         self.name = name
@@ -223,12 +224,27 @@ class SensorOverdriveAbility(Ability):
 class FieldRepairAbility(Ability):
     """Restore the Bastion's most damaged components during a full action."""
 
+    aiDuringFireSuppression = True
+
     def __init__(self, charges=1, ap_cost=7):
         super().__init__(
             "Field Repair", charges,
             f"restore 2 limbs and repair 2 modules; costs {ap_cost} AP",
         )
         self.apCost = ap_cost
+
+    def try_ai_use(self, matchInfo, entity, retreating=False):
+        """Repair between engagements when cockpit or multiple limbs need it."""
+        if entity.inCombat or entity.squad.inCombat:
+            return False
+        if self.charges <= 0 or entity.ap < self.apCost:
+            return False
+        damaged_limbs = sum(
+            limb.limbCon < .75 for limb in entity.mechClass.limbList
+        )
+        if entity.cockpit.status == 2 and damaged_limbs < 2:
+            return False
+        return self.use(matchInfo, entity)
 
     def use(self, matchInfo, entity, direction=None):
         """Fully restore two damaged limbs and improve two damaged modules."""
@@ -248,9 +264,11 @@ class FieldRepairAbility(Ability):
                 module
                 for limb in entity.mechClass.limbList
                 for module in limb.modsList
-                if not isinstance(module, Cockpit) and module.status < 2
+                if module.status < 2
             ),
-            key=lambda module: module.status,
+            # A failing cockpit gets priority so a cockpit-triggered repair
+            # always addresses the crew's immediate condition.
+            key=lambda module: (not isinstance(module, Cockpit), module.status),
         )[:2]
         if not damaged_limbs and not damaged_modules:
             print("Field Repair has nothing to repair.")

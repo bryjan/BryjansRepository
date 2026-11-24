@@ -14,6 +14,29 @@ from mechgame.teams import Squad
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_field_repair_ai_triggers_only_outside_combat(self):
+        mech = self.enemy_squad.squadLead
+        ability = mech.mechClass.hull.abilities[0]
+        mech.cockpit.status = 1
+        mech.noteCombat("taking damage")
+        self.assertFalse(ability.try_ai_use(self.match, mech))
+        mech.inCombat = False
+        self.assertTrue(ability.try_ai_use(self.match, mech))
+        self.assertEqual(mech.cockpit.status, 2)
+        self.assertEqual(ability.charges, 0)
+
+    def test_field_repair_needs_two_limbs_strictly_below_75_percent(self):
+        mech = self.enemy_squad.squadLead
+        ability = mech.mechClass.hull.abilities[0]
+        limbs = mech.mechClass.limbList
+        limbs[0].limbCon = .74
+        limbs[1].limbCon = .75
+        self.assertFalse(ability.try_ai_use(self.match, mech))
+        limbs[1].limbCon = .74
+        self.assertTrue(ability.try_ai_use(self.match, mech))
+        self.assertEqual(limbs[0].limbCon, 1)
+        self.assertEqual(limbs[1].limbCon, 1)
+
     def test_dash_reserves_last_charge_for_combat_retreat(self):
         mech = next(
             mech for mech in self.player_squad.mechList

@@ -975,9 +975,9 @@ def execute_squad_combat(match_info, squad=None):
         return []
     if not squad.playerControlled:
         retreating = squad.combatPosture == "retreat" or squad.fleeOrdered
-        if retreating or not _fire_suppressed(squad):
-            for mech in list(squad.mechList):
-                for ability in mech.mechClass.hull.abilities:
+        for mech in list(squad.mechList):
+            for ability in mech.mechClass.hull.abilities:
+                if retreating or not _fire_suppressed(squad) or ability.aiDuringFireSuppression:
                     ability.try_ai_use(match_info, mech, retreating=retreating)
     if squad.combatPosture == "retreat" and squad.inCombat:
         _issue_retreat_smoke_call(match_info, squad)
