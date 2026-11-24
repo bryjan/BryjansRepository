@@ -24,7 +24,7 @@ def update(match, squad):
         mech.radarOn = mech.radarPulseActive = False
         mech.approachTarget = mech.approachWeapon = None
     if squad.damageReceived > squad.ambushDamageBaseline:
-        squad.ambushTriggered = True
+        squad.releaseAmbush()
         return
     if squad.ambushWaitForOrder:
         return
@@ -66,7 +66,8 @@ def update(match, squad):
     _, mech, target, distance, effective_range = max(candidates, key=lambda item: item[0])
     previous = squad.ambushDistances.get((mech, target))
     near_then_receding = previous is not None and previous <= effective_range + 2 and distance > previous
-    squad.ambushTriggered = distance <= effective_range or near_then_receding
+    if distance <= effective_range or near_then_receding:
+        squad.releaseAmbush()
     # Only retain currently observed pairs; no tracking through lost contact.
     squad.ambushDistances = {(unit, enemy): dist for _, unit, enemy, dist, _ in candidates}
     squad.ambushMech = mech

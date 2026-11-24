@@ -225,15 +225,55 @@ def prefer_ambush(match, team, squads):
                             continue
                         if any(tile.moveCost[mech.size] > mech.mechClass.energyMax for mech in squad.mechList):
                             continue
-                        # Cover close to an important approach beats a long
-                        # redeployment. Existing ambushes keep separation.
-                        if any(other.ambushLocation is not None and math.dist((x, y), other.ambushLocation) < 8
+                        # Keep distinct firing positions while allowing
+                        # mutually supporting ambushes at one choke point.
+                        if any(other.ambushLocation is not None and math.dist((x, y), other.ambushLocation) < 3
                                for other in team.squadsList):
                             continue
                         score = min(tile.visAbsorb, 20) - math.dist((x, y), squad.squadLead.pos) - math.dist((x, y), (tx, ty))
                         choices.append((score, squad, (x, y)))
     if not choices:
         return False
-    _, squad, position = max(choices, key=lambda choice: choice[0])
-    team.orderAmbush(squad, position)
-    return True
+    from .ai import _entity_combat_force
+    from .ambush import waiting as ambush_waiting
+    enemies = contacts(match, team)
+    for _, squad, position in sorted(choices, key=lambda choice: choice[0], reverse=True):
+        enemy_force = sum(_entity_combat_force(enemy) for enemy in enemies
+                          if math.dist(observed_fix(match, team, enemy)[0], position) <= 30)
+        if enemy_force < squad.combatForce * .8:
+            # With no comparable observed threat, a single squad is enough.
+            if any(other.ambushLocation is not None and math.dist(position, other.ambushLocation) < 8
+                   for other in team.squadsList):
+                continue
+            team.orderAmbush(squad, position)
+            return True
+        # Anchor a cluster on existing concealed squads when possible, then
+        # recruit additional covered positions until the force is sufficient.
+        supporting = [other for other in team.squadsList if other is not squad
+                      and ambush_waiting(other) and not other.fleeOrdered
+                      and other.combatEffective and other.combatPosture != "retreat"
+                      and math.dist(other.ambushLocation, position) <= 12]
+        selected = [(squad, position)]
+        used = {squad, *supporting}
+        occupied = [position, *(other.ambushLocation for other in supporting)]
+        force = squad.combatForce + sum(other.combatForce for other in supporting)
+        for _, recruit, site in sorted(choices, key=lambda choice: choice[0], reverse=True):
+            if force >= enemy_force * 1.1 and len(used) >= 2:
+                break
+            if recruit in used or math.dist(position, site) > 12:
+                continue
+            if any(math.dist(site, taken) < 3 for taken in occupied):
+                continue
+            selected.append((recruit, site))
+            occupied.append(site)
+            used.add(recruit)
+            force += recruit.combatForce
+        if force < enemy_force * 1.1 or len(used) < 2:
+            continue
+        for member, site in selected:
+            team.orderAmbush(member, site)
+        group = tuple([member for member, _ in selected] + supporting)
+        for member in group:
+            member.ambushGroup = group
+        return True
+    return False

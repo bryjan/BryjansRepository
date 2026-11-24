@@ -19,6 +19,50 @@ from mechgame import coordination
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_equal_enemy_force_encourages_linked_ambushes(self):
+        squad = self.enemy_squad
+        wing_mech = squad.mechList[-1]
+        squad.mechList = [squad.squadLead]
+        wing = Squad("Wing", [wing_mech], "Combat")
+        wing.team = squad.team
+        squad.team.squadsList.append(wing)
+        squad.squadLead.pos = [10, 10]
+        wing_mech.pos = [16, 10]
+        for member in (squad, wing):
+            member.combatForce = .8
+            member.combatEffective = True
+        wing_mech.directlyVisibleEnemies = wing_mech.trackedEnemies = [self.target]
+        self.target.pos = [20, 10]
+        team = squad.team
+        team.mapVisibility.show_all_terrain = True
+        self.match.mapFeatures.tactical_locations = [SimpleNamespace(marker_tiles=((13, 10),), tiles=((13, 10),))]
+        for x in (11, 15):
+            self.match.map[10][x].terrain = self.match.forest
+        self.assertTrue(coordination.prefer_ambush(self.match, team, [squad, wing]))
+        self.assertIsNotNone(squad.ambushLocation)
+        self.assertIsNotNone(wing.ambushLocation)
+        self.assertGreaterEqual(math.dist(squad.ambushLocation, wing.ambushLocation), 3)
+        self.assertIn(wing, squad.ambushGroup)
+        # Taking damage springs the first ambush and its supporting squad.
+        squad.damageReceived += 1
+        ambush.update(self.match, squad)
+        self.assertTrue(squad.ambushTriggered)
+        self.assertTrue(wing.ambushTriggered)
+
+    def test_linked_ambush_release_excludes_a_withdrawing_squad(self):
+        squad = self.enemy_squad
+        wing_mech = squad.mechList[-1]
+        squad.mechList.remove(wing_mech)
+        wing = Squad("Wing", [wing_mech], "Combat")
+        wing.team = squad.team
+        squad.beginAmbush((10, 10))
+        wing.beginAmbush((14, 10))
+        squad.ambushGroup = wing.ambushGroup = (squad, wing)
+        wing.orderFlee()
+        squad.releaseAmbush()
+        self.assertTrue(squad.ambushTriggered)
+        self.assertFalse(wing.ambushTriggered)
+
     def test_attack_projection_uses_stored_radar_motion(self):
         team = self.enemy_squad.team
         for mech in self.enemy_squad.mechList:

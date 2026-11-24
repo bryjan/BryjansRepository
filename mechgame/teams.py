@@ -95,6 +95,7 @@ class Squad:
         self.fleeOrdered = False
         self.combinedAttack = None
         self.ambushLocation = None
+        self.ambushGroup = ()
         self.ambushTriggered = False
         self.ambushWaitForOrder = False
         self.ambushDistances = {}
@@ -213,6 +214,7 @@ class Squad:
         if len(location) != 2 or not all(isinstance(value, int) for value in location):
             raise ValueError("An ambush location must be an integer coordinate pair.")
         self.ambushLocation = tuple(location)
+        self.ambushGroup = ()
         self.fleeOrdered = False
         self.setCombatPosture("engage")
         self.setMovementPolicy(mode="move", behavior="formation")
@@ -229,8 +231,17 @@ class Squad:
             mech.approachTarget = mech.approachWeapon = None
 
     def releaseAmbush(self):
-        """Let the team explicitly spring an ordered ambush."""
+        """Spring this ambush and release its nearby supporting ambushes."""
         self.ambushTriggered = True
+        for squad in self.ambushGroup:
+            if (squad is not self and squad.team is self.team and squad.mechList
+                    and self in squad.ambushGroup
+                    and not squad.fleeOrdered and squad.combatPosture != "retreat"
+                    and squad.ambushLocation is not None and self.ambushLocation is not None
+                    and sum((squad.ambushLocation[i] - self.ambushLocation[i]) ** 2 for i in (0, 1)) <= 12 ** 2):
+                # Set directly: group releases must not recursively cascade
+                # across the map through overlapping ambush networks.
+                squad.ambushTriggered = True
 
     def cancelFleeOrder(self):
         """Clear a voluntary withdrawal order without restoring an old stance."""
