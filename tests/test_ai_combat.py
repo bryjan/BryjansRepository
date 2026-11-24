@@ -15,6 +15,27 @@ from mechgame.teams import Squad
 
 
 class AiCombatTests(unittest.TestCase):
+    def _disable_sensor_bursts(self):
+        """Keep authored contact lists stable in targeting/assessment tests."""
+        for mech in self.match.entities:
+            for ability in mech.mechClass.hull.abilities:
+                if ability.name == "Sensor Overdrive":
+                    override = patch.object(ability, "try_ai_use", return_value=False)
+                    override.start()
+                    self.addCleanup(override.stop)
+
+    def test_overdrive_searches_for_squadmates_of_class_two_and_three_contacts(self):
+        mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
+        ability = mech.mechClass.hull.abilities[0]
+        mech.directlyVisibleEnemies = [self.target]
+        mech.trackedEnemies = [self.target]
+        with patch.object(ability, "use", return_value=True):
+            for size in (2, 3):
+                self.target.size = size
+                self.assertTrue(ability.try_ai_use(self.match, mech))
+            self.target.size = 4
+            self.assertFalse(ability.try_ai_use(self.match, mech))
+
     def test_sensor_overdrive_ai_triggers_and_energy_floor(self):
         mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
         ability = mech.mechClass.hull.abilities[0]
@@ -46,6 +67,7 @@ class AiCombatTests(unittest.TestCase):
         ability = mech.mechClass.hull.abilities[0]
         mortar = next(mech for mech in self.player_squad.mechList if mech.hasArtillery)
         mech.directlyVisibleEnemies = [mortar]
+        mech.trackedEnemies = []
         mech.explosionAlert = True
         with patch.object(ability, "use", return_value=True):
             self.assertFalse(ability.try_ai_use(self.match, mech))
@@ -236,6 +258,7 @@ class AiCombatTests(unittest.TestCase):
         self.assertTrue(mortar.shouldFlee)
 
     def test_low_ammo_mech_needs_attack_order_to_fire_on_radar_contact(self):
+        self._disable_sensor_bursts()
         shooter = self.enemy_squad.mechList[-1]
         shooter.directlyVisibleEnemies = []
         shooter.trackedEnemies = [self.target]
@@ -255,6 +278,7 @@ class AiCombatTests(unittest.TestCase):
         self.assertLess(shooter.ap, original_ap)
 
     def test_melee_weapon_is_used_against_a_close_visual_target(self):
+        self._disable_sensor_bursts()
         shooter = self.enemy_squad.mechList[-1]
         shooter.pos = [10, 10]
         self.target.pos = [11, 10]
@@ -408,6 +432,7 @@ class AiCombatTests(unittest.TestCase):
         self.assertTrue(all(squad.assignedTargets.get(mech) is target for mech in anti_heavies))
 
     def test_anti_swarm_mech_opportunistically_prioritizes_a_damaged_target(self):
+        self._disable_sensor_bursts()
         swarm_mech = next(
             mech for mech in self.enemy_squad.mechList if "anti_swarm" in mech.mechClass.roles
         )
@@ -426,6 +451,7 @@ class AiCombatTests(unittest.TestCase):
         self.assertIs(self.enemy_squad.assignedTargets[swarm_mech], damaged_target)
 
     def test_leader_waits_two_combat_turns_before_damage_assessment(self):
+        self._disable_sensor_bursts()
         squad = self.enemy_squad
         leader = squad.squadLead
         # Keep the observed contact outside all direct weapon ranges. The
@@ -457,6 +483,7 @@ class AiCombatTests(unittest.TestCase):
         ))
 
     def test_attack_order_marks_a_low_accuracy_contact_for_approach(self):
+        self._disable_sensor_bursts()
         target = self.target
         target.pos = [35, 10]
         for index, mech in enumerate(self.enemy_squad.mechList):

@@ -214,6 +214,9 @@ class SensorOverdriveAbility(Ability):
         # Recent combat with no visual threat warrants searching even when
         # ordinary radar has not acquired a contact yet.
         uncertain_contact = entity.inCombat and not visible
+        # Small and medium mechs usually travel in squads. A known contact
+        # is reason to search for companions even when that enemy is visible.
+        search_for_squadmates = any(enemy.size in (2, 3) for enemy in tracked)
         scouting = (
             not entity.inCombat and not tracked and not visible
             and entity.turnsStarted > 0 and entity.turnsStarted % 3 == 0
@@ -221,7 +224,7 @@ class SensorOverdriveAbility(Ability):
         unseen_artillery = entity.explosionAlert and not any(
             enemy.hasArtillery for enemy in visible
         )
-        if not (uncertain_contact or scouting or unseen_artillery):
+        if not (uncertain_contact or search_for_squadmates or scouting or unseen_artillery):
             return False
         used = self.use(matchInfo, entity)
         if used:
