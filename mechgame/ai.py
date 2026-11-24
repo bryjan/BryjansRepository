@@ -973,6 +973,12 @@ def execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    if not squad.playerControlled:
+        retreating = squad.combatPosture == "retreat" or squad.fleeOrdered
+        if retreating or not _fire_suppressed(squad):
+            for mech in list(squad.mechList):
+                for ability in mech.mechClass.hull.abilities:
+                    ability.try_ai_use(match_info, mech, retreating=retreating)
     if squad.combatPosture == "retreat" and squad.inCombat:
         _issue_retreat_smoke_call(match_info, squad)
     if squad.playerControlled or _fire_suppressed(squad):
@@ -1165,6 +1171,9 @@ def execute_squad_flee(match_info, squad=None):
     if not squad.mechList:
         return []
     squad.orderFlee()
+    for mech in list(squad.mechList):
+        for ability in mech.mechClass.hull.abilities:
+            ability.try_ai_use(match_info, mech, retreating=True)
     moved = []
     # Fleeing deliberately drops formation: preserving each mech is more
     # important than waiting for a damaged straggler while under pressure.

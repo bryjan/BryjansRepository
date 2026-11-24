@@ -53,6 +53,10 @@ class Ability:
         charges = "unlimited" if self.maxCharges is None else f"{self.charges}/{self.maxCharges}"
         return f"{self.name} {charges} — {self.description}"
 
+    def try_ai_use(self, matchInfo, entity, retreating=False):
+        """Override with this ability's tactical trigger when one is defined."""
+        return False
+
 
 class DashAbility(Ability):
     """Move a mech straight ahead while bypassing normal terrain movement costs."""
@@ -66,6 +70,63 @@ class DashAbility(Ability):
     def __init__(self, charges=2, distance=3):
         super().__init__("Dash", charges, f"up to {distance} tiles straight; ignores terrain costs")
         self.distance = distance
+
+    def landing_position(self, matchInfo, entity, direction):
+        """Preview the same legal landing used by player and AI activation."""
+        delta_x, delta_y = self.DIRECTION_DELTAS[direction]
+        path = []
+        for step in range(1, self.distance + 1):
+            x = entity.pos[0] + delta_x * step
+            y = entity.pos[1] + delta_y * step
+            if not (0 <= x < matchInfo.mapWidth and 0 <= y < matchInfo.mapHeight):
+                break
+            if not matchInfo.map[y][x].terrain.passable:
+                break
+            path.append([x, y])
+        occupied = {tuple(other.pos) for other in matchInfo.entities if other is not entity}
+        return next((pos for pos in reversed(path) if tuple(pos) not in occupied), None)
+
+    def try_ai_use(self, matchInfo, entity, retreating=False):
+        """Save the last charge for escape; spend spare charges closing for melee."""
+        if self.charges <= 0 or entity.aiDashUsedThisTurn:
+            return False
+        if not entity.inCombat and not (retreating and entity.squad.inCombat):
+            return False
+        contacts = [
+            target for target in dict.fromkeys(
+                [*entity.directlyVisibleEnemies, *entity.trackedEnemies]
+            )
+            if target in matchInfo.entities and target.team is not entity.team
+        ]
+        if not contacts:
+            return False
+        if retreating:
+            score = lambda pos: min(math.dist(pos, target.pos) for target in contacts)
+        else:
+            if self.charges <= 1 or not any(
+                weapon.isMelee and entity._weapon_is_usable(weapon)
+                for weapon in entity.mechClass.gunList
+            ):
+                return False
+            target = entity.squad.assignedTargets.get(entity)
+            if target not in contacts:
+                target = min(contacts, key=lambda target: math.dist(entity.pos, target.pos))
+            if not 3 <= math.dist(entity.pos, target.pos) <= 9:
+                return False
+            score = lambda pos: -math.dist(pos, target.pos)
+        candidates = [
+            (score(landing), direction)
+            for direction in self.DIRECTION_DELTAS
+            if (landing := self.landing_position(matchInfo, entity, direction)) is not None
+        ]
+        if not candidates:
+            return False
+        best_score, direction = max(candidates)
+        if best_score <= score(entity.pos):
+            return False
+        used = self.use(matchInfo, entity, direction)
+        entity.aiDashUsedThisTurn = used
+        return used
 
     def use(self, matchInfo, entity, direction):
         """Dash in one direction, stopping only for impassable terrain or map edge.

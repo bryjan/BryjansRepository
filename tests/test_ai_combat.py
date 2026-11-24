@@ -14,6 +14,43 @@ from mechgame.teams import Squad
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_dash_reserves_last_charge_for_combat_retreat(self):
+        mech = next(
+            mech for mech in self.player_squad.mechList
+            if any(weapon.isMelee for weapon in mech.mechClass.gunList)
+        )
+        ability = mech.mechClass.hull.abilities[0]
+        target = self.enemy_squad.squadLead
+        mech.pos = [10, 10]
+        target.pos = [16, 10]
+        mech.directlyVisibleEnemies = [target]
+        mech.trackedEnemies = [target]
+        mech.noteCombat("enemy in visual range")
+        self.assertTrue(ability.try_ai_use(self.match, mech))
+        self.assertLess(math.dist(mech.pos, target.pos), 6)
+        self.assertEqual(ability.charges, 1)
+        mech.clearTurnAbilities()
+        self.assertFalse(ability.try_ai_use(self.match, mech))
+        distance = math.dist(mech.pos, target.pos)
+        self.assertTrue(ability.try_ai_use(self.match, mech, retreating=True))
+        self.assertGreater(math.dist(mech.pos, target.pos), distance)
+        self.assertEqual(ability.charges, 0)
+
+    def test_dash_does_not_trigger_outside_combat_or_distance_band(self):
+        mech = next(
+            mech for mech in self.player_squad.mechList
+            if any(weapon.isMelee for weapon in mech.mechClass.gunList)
+        )
+        ability = mech.mechClass.hull.abilities[0]
+        target = self.enemy_squad.squadLead
+        mech.pos = [10, 10]
+        target.pos = [16, 10]
+        mech.directlyVisibleEnemies = [target]
+        self.assertFalse(ability.try_ai_use(self.match, mech))
+        mech.noteCombat("enemy in visual range")
+        target.pos = [20, 10]
+        self.assertFalse(ability.try_ai_use(self.match, mech))
+
     def setUp(self):
         self.match = Game(map_size=40, window_size=9, rng=random.Random(0)).create_match()
         for row in self.match.map:

@@ -44,6 +44,7 @@ class Entity: #a character on the map
         # Hull abilities can temporarily amplify both visual range and the
         # radar source projected by this individual mech.
         self.sensorBoostMultiplier = 1
+        self.aiDashUsedThisTurn = False
         # Active radar starts silent.  The pilot can enable continuous scans or
         # spend energy on a single-turn pulse.
         self.radarOn = False
@@ -174,6 +175,7 @@ class Entity: #a character on the map
     def clearTurnAbilities(self):
         """Remove temporary hull-ability effects as this mech begins a new turn."""
         self.sensorBoostMultiplier = 1
+        self.aiDashUsedThisTurn = False
         self.visPower = int(self.mechClass.visPower)
         for weapon in self.mechClass.gunList:
             if weapon.turnDamageBonus:
