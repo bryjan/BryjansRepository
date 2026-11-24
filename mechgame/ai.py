@@ -12,6 +12,7 @@ import math
 from . import artillery
 from . import ambush
 from . import coordination
+from . import recon
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
@@ -297,6 +298,8 @@ def _leader_destination(match_info, squad):
                 squad.manualAttackPosition = coordination.observed_fix(match_info, squad.team, squad.manualAttackTarget)[0]
             return squad.manualAttackPosition
         return _nearest_location(leader.pos, squad.currentGoal.locations)
+    if squad.investigationPosition is not None:
+        return squad.investigationPosition
     patrol_destination = (
         _patrol_destination(match_info, squad, leader)
         if _road_patrol_active(squad) else None
@@ -332,7 +335,7 @@ def _is_roadway(match_info, position):
 
 def _road_patrol_active(squad):
     """Recognize an explicit road patrol or an AI-issued patrol objective."""
-    if squad.combinedAttack is not None:
+    if squad.combinedAttack is not None or squad.investigationPosition is not None:
         return False
     goal_kind = getattr(squad.currentGoal, "kind", "")
     return squad.movementBehavior == "road_patrol" or goal_kind in {
@@ -1012,8 +1015,15 @@ def execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    if not squad.playerControlled:
+        recon.prepare(match_info, squad)
+    urgent = recon.emergency(match_info, squad)
+    if urgent and not squad.playerControlled:
+        squad.combinedAttack = None
+        if ambush.waiting(squad):
+            squad.releaseAmbush()
     from .fire_missions import execute as execute_fire_missions
-    plotted_shooters = execute_fire_missions(match_info, squad) if not squad.playerControlled else set()
+    plotted_shooters = execute_fire_missions(match_info, squad) if not squad.playerControlled and not urgent else set()
     if not squad.playerControlled:
         coordination.plan(match_info, squad.team)
         if coordination.waiting(squad):
@@ -1026,12 +1036,17 @@ def execute_squad_combat(match_info, squad=None):
         retreating = squad.combatPosture == "retreat" or squad.fleeOrdered
         for mech in list(squad.mechList):
             for ability in mech.mechClass.hull.abilities:
+                if urgent and not ability.aiDuringThreatResponse:
+                    continue
                 if retreating or not _fire_suppressed(squad) or ability.aiDuringFireSuppression:
                     ability.try_ai_use(match_info, mech, retreating=retreating)
     if squad.combatPosture == "retreat" and squad.inCombat:
         _issue_retreat_smoke_call(match_info, squad)
     if squad.playerControlled or _fire_suppressed(squad):
         return []
+    if urgent:
+        return []
+    plotted_shooters.update(recon.scout_fire(match_info, squad))
 
     contacts = list(dict.fromkeys(
         target for mech in squad.mechList for target in _known_targets(mech)
@@ -1467,6 +1482,10 @@ def execute_squad_movement(match_info, squad=None):
 
     if squad.fleeOrdered or squad.shouldLeaveBattlefield:
         return execute_squad_flee(match_info, squad)
+
+    recon.prepare(match_info, squad)
+    if recon.emergency(match_info, squad):
+        return recon.reposition(match_info, squad)
 
     coordination.update(match_info, squad.team)
 

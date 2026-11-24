@@ -63,6 +63,12 @@ class Squad:
         self.reinforcementRequest = None
         self.supportRequests = []
         self.fireMissions = []
+        self.soundContacts = []
+        self.unknownThreatRound = -100
+        self.unknownThreatSerial = 0
+        self.unknownThreatPositions = {}
+        self.investigationPosition = None
+        self.investigationPlannedRound = -1
         self.observedEnemyForce = 0
         self.nearbyFriendlyForce = 0
         self.avoidContact = False
@@ -409,6 +415,12 @@ class Team:
         self.lastCoordinationRound = -1
         self.lastEngagedRound = -100
         self.currentObservationRound = 0
+        self.lastSeenRound = {}
+        self.searchUntilRound = -1
+        self.searchFocus = None
+        self.heardFireContacts = []
+        self.lastScoutFireRound = -100
+        self.pendingScoutAreas = []
         # The first resupply/repair actions will consume this shared reserve.
         # Readiness already uses it to decide whether a spent specialist can
         # reasonably remain on the map awaiting support.
@@ -479,6 +491,8 @@ class Team:
         if not mech.mechClass.shareData:
             return
         positions = {tuple(cell.pos) for cell in cells}
+        for position in positions:
+            self.lastSeenRound[position] = self.currentObservationRound
         self.sharedVisibleTiles.update(positions)
         if self.mapVisibility.remember_explored_terrain:
             self.exploredTiles.update(positions)

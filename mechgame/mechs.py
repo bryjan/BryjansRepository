@@ -42,6 +42,7 @@ class Ability:
 
     requiresDirection = False
     aiDuringFireSuppression = False
+    aiDuringThreatResponse = False
 
     def __init__(self, name, charges, description):
         self.name = name
@@ -194,6 +195,8 @@ class DashAbility(Ability):
 
 class SensorOverdriveAbility(Ability):
     """Temporarily overclock a mech's visual and active-radar systems."""
+
+    aiDuringThreatResponse = True
 
     def __init__(self, energy_cost=4, multiplier=1.4):
         super().__init__(
@@ -596,7 +599,7 @@ class MechPart: # super class to mech limbs
         # so squad force comparisons must update immediately.
         self.mech.noteCombat("took damage")
         if hasattr(matchInfo, "recordCombatDamage"):
-            matchInfo.recordCombatDamage(attacker, self.mech, actual_damage)
+            matchInfo.recordCombatDamage(attacker, self.mech, actual_damage, damage_source=damageSource)
         self.mech.refreshReadiness(matchInfo)
         return True
 
@@ -807,8 +810,10 @@ class WeaponLimb(MechPart):
             if entity.team is shooter.team:
                 continue
             if math.dist(shooter.pos, entity.pos) <= self.soundReport:
+                from .recon import hear_fire
+                direction = hear_fire(matchInfo, entity, shooter, self)
                 entity.report(
-                    matchInfo, f"I hear fire from a {self.name}.",
+                    matchInfo, f"I hear fire from a {self.name} to the {direction}.",
                     teamReport=False, critical=False,
                 )
 
@@ -932,6 +937,7 @@ class WeaponLimb(MechPart):
             shooter.team,
             ammo.igniteChance,
             self.soundReport,
+            source_entity=shooter,
         )
         if profile["turns"] == 0:
             print(f"{self.name} fired on its {profile['name']} profile. Impact is immediate.")

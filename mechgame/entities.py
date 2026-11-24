@@ -59,6 +59,7 @@ class Entity: #a character on the map
         self.explosionAlert = False
         self.turnsStarted = 0
         self.lastCombatSignal = ""
+        self.unknownEvadeSerial = 0
         # Traits and skills can later alter this leader-facing uncertainty.
         self.combatAssessmentError = .25
 

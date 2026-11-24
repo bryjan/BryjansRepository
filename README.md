@@ -64,6 +64,18 @@ three-round shell fired in round 0 lands in round 3 regardless of squad count.
 Zero-round ammunition still lands immediately. The launch message names the
 scheduled impact round.
 
+AI squads hit by an unknown source briefly prioritize repositioning over firing,
+staging and ordinary formation holds, using available movement down to the
+double-time reserve floor. Manual squads receive a critical warning instead of
+being moved automatically. Audible weapons give an eight-way direction and an
+estimated search waypoint, never a hidden shooter's exact coordinates. Scouts,
+sensors and skirmishers investigate the least-recently observed nearby areas;
+revealed terrain is separate from actual visual-observation timestamps.
+During an active search, available AI artillery can fire scouting payloads to
+reveal stale areas, with a team cooldown and duplicate-area suppression. These
+payloads reveal nothing until they land normally. Explicit player orders and
+retreat/stealth discipline retain priority outside immediate evasive movement.
+
 Use `auto` (or `'v'` in the squad menu) to toggle automatic following. Move the
 squad leader manually; after each move the other mechs use normal formation
 rules, AP, MP and energy reserves to follow. When the leader is on a road or
