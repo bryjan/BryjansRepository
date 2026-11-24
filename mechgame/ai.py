@@ -11,6 +11,7 @@ import math
 
 from . import artillery
 from . import ambush
+from . import coordination
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
@@ -282,6 +283,8 @@ def _nearest_location(origin, locations):
 def _leader_destination(match_info, squad):
     """Choose a known, legal-information destination for the squad leader."""
     leader = squad.squadLead
+    if coordination.waiting(squad) and not squad.fleeOrdered:
+        return squad.combinedAttack.staging_positions[squad]
     if ambush.waiting(squad) and not squad.fleeOrdered and squad.combatPosture != "retreat":
         return squad.ambushLocation
     if squad.avoidContact and squad.avoidanceTarget is not None:
@@ -321,6 +324,8 @@ def _is_roadway(match_info, position):
 
 def _road_patrol_active(squad):
     """Recognize an explicit road patrol or an AI-issued patrol objective."""
+    if squad.combinedAttack is not None:
+        return False
     goal_kind = getattr(squad.currentGoal, "kind", "")
     return squad.movementBehavior == "road_patrol" or goal_kind in {
         "patrol", "patrol_map", "patrol_location", "defend",
@@ -691,6 +696,8 @@ def _attack_ordered(squad):
     """Return whether the leader has issued a committed attack order."""
     goal_kind = getattr(squad.currentGoal, "kind", "")
     return squad.combatPosture == "attack" or (
+        squad.combinedAttack is not None and squad.combinedAttack.state == "attacking"
+    ) or (
         squad.ambushLocation is not None and squad.ambushTriggered
     ) or goal_kind in {
         "attack", "attack_military_base", "eliminate_enemies",
@@ -898,6 +905,8 @@ def _choose_target(match_info, squad, mech):
 
 def _select_primary_target(squad):
     """Give the formation one known target to approach when it is attacking."""
+    if squad.combinedAttack is not None and squad.combinedAttack.state == "attacking":
+        return squad.primaryTarget
     leader = squad.squadLead
     contacts = [target for mech in squad.mechList for target in _known_targets(mech)]
     contacts = list(dict.fromkeys(contacts))
@@ -981,6 +990,10 @@ def execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    if not squad.playerControlled:
+        coordination.plan(match_info, squad.team)
+        if coordination.waiting(squad):
+            return []
     if not squad.playerControlled:
         ambush.update(match_info, squad)
         if ambush.waiting(squad) and not squad.fleeOrdered and squad.combatPosture != "retreat":
@@ -1069,6 +1082,8 @@ def execute_squad_combat(match_info, squad=None):
         squad.smokeCallTurns -= 1
         if squad.smokeCallTurns == 0:
             squad.smokeCallPosition = None
+    if squad.combinedAttack is not None:
+        coordination.update(match_info, squad.team)
     return fired
 
 
@@ -1404,6 +1419,8 @@ def execute_squad_movement(match_info, squad=None):
 
     if squad.fleeOrdered or squad.shouldLeaveBattlefield:
         return execute_squad_flee(match_info, squad)
+
+    coordination.update(match_info, squad.team)
 
     leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
     roadway_only = _road_patrol_active(squad)

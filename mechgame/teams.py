@@ -93,6 +93,7 @@ class Squad:
         # A flee order is an orderly withdrawal: units preserve both chassis
         # and pilot by reaching a map-edge exit rather than ejecting.
         self.fleeOrdered = False
+        self.combinedAttack = None
         self.ambushLocation = None
         self.ambushTriggered = False
         self.ambushWaitForOrder = False
@@ -385,6 +386,8 @@ class Team:
         self.name = teamName
         self.squadsList = squadsList
         self.resources = 0
+        self.combinedAttacks = []
+        self.lastCoordinationRound = -1
         # The first resupply/repair actions will consume this shared reserve.
         # Readiness already uses it to decide whether a spent specialist can
         # reasonably remain on the map awaiting support.
@@ -430,6 +433,11 @@ class Team:
         if squad not in self.squadsList:
             raise ValueError("Ambush orders must target a squad on this team.")
         squad.beginAmbush(location, wait_for_order)
+
+    def orderCombinedAttack(self, matchInfo, squads, targets):
+        """Assemble selected squads and release a joint attack when ready."""
+        from .coordination import order_attack
+        return order_attack(matchInfo, self, squads, targets)
 
     def share_vision(self, mech, cells):
         """Share one capable mech's visual cells with the full team map."""
