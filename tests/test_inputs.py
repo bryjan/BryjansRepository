@@ -364,6 +364,35 @@ class InputTests(unittest.TestCase):
 
         reopened_menu.assert_called_once_with(match, launcher, selected_target)
 
+    def test_direct_fire_stays_open_for_multiple_shots_until_cancelled(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        mech = match.pov
+        mech.pos = [5, 5]
+        mech.trackedEnemies = []
+        gun = mech.mechClass.gunList[0]
+        gun.defaultGun = True
+        ammo, ap = gun.charges, mech.ap
+        with patch("builtins.input", side_effect=["c", "10,10", "f", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+            firing.fire(match)
+        self.assertEqual(gun.charges, ammo - 2)
+        self.assertEqual(mech.ap, ap - gun.apCost * 2)
+        self.assertFalse(match.turnEnded)
+
+    def test_launcher_stays_open_for_multiple_rounds_until_cancelled(self):
+        match = Game(map_size=40, window_size=9).create_match()
+        mech = next(mech for mech in match.playerSquad.mechList if mech.hasArtillery)
+        match.pov = mech
+        mech.pos = [5, 5]
+        mech.trackedEnemies = []
+        launcher = mech.mechClass.gunList[0]
+        ammo, ap = launcher.selected_ammo.charges, mech.ap
+        with patch("builtins.input", side_effect=["c", "10,10", "", "f", "x"]), patch("mechgame.commands.firing.pv.printPOV"), patch("builtins.print"):
+            firing.launcherFireMenu(match, launcher)
+        self.assertEqual(launcher.selected_ammo.charges, ammo - 2)
+        self.assertEqual(mech.ap, ap - launcher.apCost * 2)
+        self.assertEqual(len(match.pendingImpacts), 2)
+        self.assertFalse(match.turnEnded)
+
     def test_launcher_auto_lead_projects_visual_contact_by_flight_time(self):
         match = Game(map_size=40, window_size=9).create_match()
         launcher_mech = next(

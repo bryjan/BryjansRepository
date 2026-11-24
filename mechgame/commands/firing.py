@@ -10,6 +10,21 @@ from .shared import read_nonempty
 
 
 def fire(matchInfo, target=None):
+    """Keep targeting open until cancelled, retaining the last chosen location."""
+    position = None
+    while True:
+        result = _fire_once(matchInfo, target, position)
+        if not isinstance(result, tuple) or result[0] != "repeat":
+            return result
+        position = result[1]
+        mech = matchInfo.pov
+        if mech.destroyed or mech.ejected or mech.fled:
+            return
+        target = next((enemy for enemy in mech.trackedEnemies
+                       if enemy in matchInfo.entities and radar.contact_position(mech, enemy) == position), None)
+
+
+def _fire_once(matchInfo, target=None, position=None):
     """Fire the selected weapon, optionally starting from a chosen target."""
     mech = matchInfo.pov
     if target is not None:
@@ -24,7 +39,8 @@ def fire(matchInfo, target=None):
     default_guns = [weapon for weapon in gunList if weapon.defaultGun]
     if len(default_guns) != 1:
         print("Select a default weapon.")
-        return gunMenu(matchInfo)
+        gunMenu(matchInfo)
+        return ("repeat", position) if sum(bool(weapon.defaultGun) for weapon in gunList) == 1 else None
     gun = default_guns[0]
 
     if gun.isLauncher:
@@ -32,51 +48,86 @@ def fire(matchInfo, target=None):
 
     # The radar menu can pass one exact shared contact here. Ordinary 'f'
     # input keeps the quick-fire behavior of choosing the nearest contact.
-    default_target = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
+    default_target = target if target is not None else nearestTrackedEnemy(matchInfo, mech) if position is None else None
     prompt = fireTargetPrompt(matchInfo, default_target, gun)
+    if default_target is None and position is not None:
+        prompt = "'Enter' or 'f' repeat location | " + prompt
     if default_target is not None:
         printTargetingSummary(matchInfo, gun, default_target, "Default target")
         detail = radar.contact_details(mech, matchInfo, default_target)
         pv.printPOV(matchInfo, *detail["position"], command_text=prompt)
     else:
-        pv.printPOV(matchInfo, *mech.pos, command_text=prompt)
+        pv.printPOV(matchInfo, *(position or mech.pos), command_text=prompt)
 
-    target_choice = chooseFireTarget(matchInfo, default_target, gun, promptDisplayed=True)
+    if position is not None and default_target is None:
+        target_choice = chooseFireTarget(matchInfo, default_target, gun, promptDisplayed=True, defaultPosition=position)
+    else:
+        target_choice = chooseFireTarget(matchInfo, default_target, gun, promptDisplayed=True)
     if target_choice == "weapon":
-        return gunMenu(matchInfo, default_target)
+        gunMenu(matchInfo)
+        return ("repeat", position if position is not None else
+                radar.contact_position(mech, default_target) if default_target is not None else None)
     if target_choice is None:
         return
     target_pos, aimed_limb = target_choice
     gun.shootAt(matchInfo, target_pos, aimed_limb)
+    return ("repeat", target_pos)
 
 
-def launcherFireMenu(matchInfo, launcher, target=None, fire_mission=None):
+def launcherFireMenu(matchInfo, launcher, target=None, fire_mission=None, initial_position=None):
+    """Repeat launch/plot choices without growing the call stack per shot."""
+    position = initial_position
+    while True:
+        result = _launcher_once(matchInfo, launcher, target, fire_mission, position)
+        if not isinstance(result, tuple) or result[0] != "repeat":
+            return result
+        position = result[1]
+        mech = matchInfo.pov
+        if mech.destroyed or mech.ejected or mech.fled:
+            return
+
+
+def _launcher_once(matchInfo, launcher, target=None, fire_mission=None, initial_position=None):
     """Choose a location for a delayed launcher shot without limb aiming."""
     mech = matchInfo.pov
     default_target = target if target is not None else nearestTrackedEnemy(matchInfo, mech)
     default_position = None
     if default_target is not None:
         detail = radar.contact_details(mech, matchInfo, default_target)
-        default_position = detail["position"]
+        default_position = initial_position if initial_position is not None else detail["position"]
         print(
             f"Launcher target: {detail['classification']} at {default_position} "
-            f"| distance {detail['distance']:.1f} tiles"
+            f"| distance {math.dist(mech.pos, default_position):.1f} tiles"
         )
         printLauncherProfile(matchInfo, mech, launcher, default_position)
         prompt = launcherFirePrompt(matchInfo, launcher, default_target, hasDefault=True)
     else:
-        prompt = launcherFirePrompt(matchInfo, launcher, None)
+        default_position = initial_position
+        prompt = launcherFirePrompt(matchInfo, launcher, None, hasDefault=default_position is not None)
+        if default_position is not None:
+            printLauncherProfile(matchInfo, mech, launcher, default_position)
 
     if fire_mission is not None:
         prompt += " | 'u' artillery unit"
         print(f"Fire mission: {mech.pilot.display_name} — {launcher.name}. Plot a shot for this squad's turn.")
+        queued = [order for order in mech.squad.fireMissions if order.shooter is mech]
+        print(f"Queued: {len(queued)} shot(s); {sum(order.weapon.apCost for order in queued)}/{mech.mechClass.apMax} AP reserved.")
 
     def launch(position):
-        return fire_mission(matchInfo, mech, launcher, position) if fire_mission is not None else launcher.launchAt(matchInfo, position)
+        try:
+            if fire_mission is not None:
+                fire_mission(matchInfo, mech, launcher, position)
+            else:
+                launcher.launchAt(matchInfo, position)
+        except ValueError as error:
+            print(error)
+        return ("repeat", list(position))
 
-    def reopen(selected_target):
+    def reopen(selected_target, position=None):
         if fire_mission is not None:
-            return launcherFireMenu(matchInfo, launcher, selected_target, fire_mission=fire_mission)
+            return launcherFireMenu(matchInfo, launcher, selected_target, fire_mission=fire_mission, initial_position=position)
+        if position is not None:
+            return launcherFireMenu(matchInfo, launcher, selected_target, initial_position=position)
         return launcherFireMenu(matchInfo, launcher, selected_target)
 
     view_position = default_position if default_position is not None else mech.pos
@@ -119,12 +170,16 @@ def launcherFireMenu(matchInfo, launcher, target=None, fire_mission=None):
         position = getLauncherLeadOffset(matchInfo, base_position)
     elif choice == "a":
         if chooseLauncherAmmo(launcher):
-            return reopen(target)
+            return reopen(target, default_position)
         return
     elif choice == "w":
         if fire_mission is not None:
             return "switch_launcher"
-        return gunMenu(matchInfo, target)
+        gunMenu(matchInfo)
+        selected = next((weapon for weapon in mech.mechClass.gunList if weapon.defaultGun), launcher)
+        if selected.isLauncher:
+            return launcherFireMenu(matchInfo, selected, default_target, initial_position=default_position)
+        return fire(matchInfo, default_target)
     elif choice == "auto_lead":
         pass
     elif choice in ("", "f", "x"):
@@ -277,7 +332,7 @@ def fireTargetPrompt(matchInfo, defaultTarget=None, weapon=None):
     return prompt + " 'w' weapon | 't' tracked enemy | 'l' last location | 'c' coordinates | 'x' cancel"
 
 
-def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None, promptDisplayed=False):
+def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None, promptDisplayed=False, defaultPosition=None):
     """Confirm the default target or choose another firing location."""
     mech = matchInfo.pov
     if defaultTarget is not None:
@@ -296,7 +351,12 @@ def chooseFireTarget(matchInfo, defaultTarget=None, weapon=None, promptDisplayed
     else:
         if not promptDisplayed:
             print(fireTargetPrompt(matchInfo, weapon=weapon))
-        choice = read_nonempty("Target: ").lower()
+        if defaultPosition is not None:
+            choice = input("Target: ").strip().lower()
+            if choice in ("", "f"):
+                return list(defaultPosition), None
+        else:
+            choice = read_nonempty("Target: ").lower()
 
     if choice == "x":
         return None
