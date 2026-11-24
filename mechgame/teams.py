@@ -388,6 +388,8 @@ class Team:
         self.resources = 0
         self.combinedAttacks = []
         self.lastCoordinationRound = -1
+        self.lastEngagedRound = -100
+        self.currentObservationRound = 0
         # The first resupply/repair actions will consume this shared reserve.
         # Readiness already uses it to decide whether a spent specialist can
         # reasonably remain on the map awaiting support.

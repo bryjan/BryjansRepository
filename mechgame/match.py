@@ -152,6 +152,7 @@ class MatchInfo:
         effects.advance_effects(self)
         for team in self.teamList:
             team.radarContacts.clear()
+            team.currentObservationRound = self.matchRound
 
     def _next_operational_slot(self, current_squad):
         """Find the next non-empty squad and whether that crosses a round."""
@@ -258,6 +259,7 @@ class MatchInfo:
             attacker.squad.damageGiven += damage
         if defender is not None and getattr(defender, "squad", None):
             defender.squad.damageReceived += damage
+            defender.team.lastEngagedRound = self.matchRound
 
     def explosion(self, location, radius, size, damage, soundRange=0):
         """Apply blast damage to several random parts of each mech in range."""

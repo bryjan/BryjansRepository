@@ -15,6 +15,35 @@ class CombinedAttack:
     target_positions: dict = field(default_factory=dict)
     target_forces: dict = field(default_factory=dict)
     kind: str = "stage_attack"
+    target_fixes: dict = field(default_factory=dict)
+
+
+def observed_fix(match, team, target):
+    """Snapshot a visual fix or stored radar data; unresolved motion stays zero."""
+    visual = any(target in mech.directlyVisibleEnemies for squad in team.squadsList for mech in squad.mechList)
+    memory = team.radarContacts.get(target)
+    if visual:
+        position, start, speed, turn = tuple(target.pos), target.turnStartPos, target.speed, match.matchRound
+    elif memory:
+        position = tuple(memory["position"])
+        start = memory["turn_start_pos"]
+        speed = memory["speed"] if memory["level"] >= 3 else 0
+        turn = memory.get("observed_round", match.matchRound)
+    else:
+        # Legacy scenario contacts may not carry a radar record yet.
+        return tuple(target.pos), (0, 0), match.matchRound
+    dx, dy = position[0] - start[0], position[1] - start[1]
+    length = math.hypot(dx, dy)
+    velocity = (dx * speed / length, dy * speed / length) if length else (0, 0)
+    return position, velocity, turn
+
+
+def projected_position(match, fix):
+    """Lead by one round; extrapolate stale fixes for at most three rounds."""
+    position, velocity, turn = fix
+    horizon = min(3, max(1, match.matchRound - turn + 1))
+    return tuple(max(1, min(limit - 2, round(position[i] + velocity[i] * horizon)))
+                 for i, limit in enumerate((match.mapWidth, match.mapHeight)))
 
 
 def waiting(squad):
@@ -59,7 +88,8 @@ def order_attack(match, team, squads, targets, *, stage=False):
     order = CombinedAttack(squads, targets, positions, match.matchRound)
     order.kind = "stage_attack" if stage else "coordinated_attack"
     order.state = "staging" if stage else "attacking"
-    order.target_positions = {enemy: tuple(enemy.pos) for enemy in targets}
+    order.target_fixes = {enemy: observed_fix(match, team, enemy) for enemy in targets}
+    order.target_positions = {enemy: projected_position(match, fix) for enemy, fix in order.target_fixes.items()}
     order.target_forces = {enemy: _entity_combat_force(enemy) for enemy in targets}
     team.combinedAttacks.append(order)
     for squad in squads:
@@ -90,8 +120,9 @@ def update(match, team):
         # Refresh only observed enemies. Losing a scan retains the last
         # position and force estimate instead of reading hidden movements.
         for target in live_targets:
-            order.target_positions[target] = tuple(target.pos)
+            order.target_fixes[target] = observed_fix(match, team, target)
             order.target_forces[target] = _entity_combat_force(target)
+        order.target_positions = {enemy: projected_position(match, fix) for enemy, fix in order.target_fixes.items()}
         enemy_force = sum(order.target_forces.values())
         if len(live_squads) < 2 or friendly_force < enemy_force:
             order.state = "cancelled"
@@ -143,6 +174,8 @@ def plan(match, team):
                  and s.combatEffective and not s.shouldLeaveBattlefield and not s.fleeOrdered
                  and s.combinedAttack is None and s.ambushLocation is None
                  and s.combatPosture in {"engage", "attack"}]
+    if prefer_ambush(match, team, available):
+        return
     if len(available) < 2:
         return
     known = contacts(match, team)
@@ -166,3 +199,41 @@ def plan(match, team):
                 )
                 order_attack(match, team, chosen, group, stage=not between)
                 return
+
+
+def prefer_ambush(match, team, squads):
+    """Prefer nearby known concealment overlooking a tactical approach."""
+    if match.matchRound - team.lastEngagedRound <= 1:
+        return False
+    choices = []
+    known = team.exploredTiles
+    for squad in squads:
+        if squad.inCombat:
+            # Mere visual contact is allowed; recent damage or firing isn't.
+            if any(mech.lastCombatSignal != "enemy in visual range" and mech.inCombat for mech in squad.mechList):
+                continue
+        for location in match.mapFeatures.tactical_locations:
+            for tx, ty in location.marker_tiles or location.tiles[:1]:
+                if math.dist(squad.squadLead.pos, (tx, ty)) > 15:
+                    continue
+                for y in range(max(1, ty - 3), min(match.mapHeight - 1, ty + 4)):
+                    for x in range(max(1, tx - 3), min(match.mapWidth - 1, tx + 4)):
+                        if not team.mapVisibility.show_all_terrain and (x, y) not in known:
+                            continue
+                        tile = match.map[y][x].terrain
+                        if not tile.passable or tile.requireFloat or tile.visAbsorb < 6:
+                            continue
+                        if any(tile.moveCost[mech.size] > mech.mechClass.energyMax for mech in squad.mechList):
+                            continue
+                        # Cover close to an important approach beats a long
+                        # redeployment. Existing ambushes keep separation.
+                        if any(other.ambushLocation is not None and math.dist((x, y), other.ambushLocation) < 8
+                               for other in team.squadsList):
+                            continue
+                        score = min(tile.visAbsorb, 20) - math.dist((x, y), squad.squadLead.pos) - math.dist((x, y), (tx, ty))
+                        choices.append((score, squad, (x, y)))
+    if not choices:
+        return False
+    _, squad, position = max(choices, key=lambda choice: choice[0])
+    team.orderAmbush(squad, position)
+    return True

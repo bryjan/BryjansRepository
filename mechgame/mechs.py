@@ -848,6 +848,9 @@ class WeaponLimb(MechPart):
         accuracyRequired = self.accuracy_required(matchInfo, shooter, pos)
 
         target = next((entity for entity in matchInfo.entities if entity.pos == pos), None)
+        if target is not None and target.team is not shooter.team:
+            # An incoming attack still counts as active engagement on a miss.
+            target.team.lastEngagedRound = matchInfo.matchRound
 
         i = 1
         while i <= self.projectileCount:

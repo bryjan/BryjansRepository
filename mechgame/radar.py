@@ -284,6 +284,7 @@ def remember_contact(team, target, radar_power):
             # entity later would reveal movement after radar lost the target.
             "speed": target.speed,
             "turn_start_pos": list(target.turnStartPos),
+            "observed_round": getattr(team, "currentObservationRound", 0),
         }
 
 

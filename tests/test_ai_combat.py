@@ -4,6 +4,7 @@ import math
 import random
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from mechgame.ai import (
     _best_dps_approach, _move_into_weapon_range,
@@ -18,6 +19,39 @@ from mechgame import coordination
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_attack_projection_uses_stored_radar_motion(self):
+        team = self.enemy_squad.team
+        for mech in self.enemy_squad.mechList:
+            mech.directlyVisibleEnemies = []
+        team.radarContacts[self.target] = {
+            "position": [20, 20], "turn_start_pos": [18, 20],
+            "speed": 2, "level": 3, "observed_round": 0,
+        }
+        self.target.pos = [35, 35]
+        fix = coordination.observed_fix(self.match, team, self.target)
+        self.assertEqual(coordination.projected_position(self.match, fix), (22, 20))
+        self.match.matchRound = 5
+        self.assertEqual(coordination.projected_position(self.match, fix), (26, 20))
+        team.radarContacts[self.target]["level"] = 1
+        fix = coordination.observed_fix(self.match, team, self.target)
+        self.assertEqual(coordination.projected_position(self.match, fix), (20, 20))
+
+    def test_ambush_preference_requires_known_cover_and_no_recent_engagement(self):
+        squad = self.enemy_squad
+        team = squad.team
+        squad.squadLead.pos = [10, 10]
+        team.exploredTiles = set()
+        team.mapVisibility.show_all_terrain = False
+        self.match.mapFeatures.tactical_locations = [SimpleNamespace(marker_tiles=((13, 10),), tiles=((13, 10),))]
+        self.match.map[10][12].terrain = self.match.forest
+        self.assertFalse(coordination.prefer_ambush(self.match, team, [squad]))
+        team.exploredTiles.add((12, 10))
+        team.lastEngagedRound = self.match.matchRound
+        self.assertFalse(coordination.prefer_ambush(self.match, team, [squad]))
+        team.lastEngagedRound = -100
+        self.assertTrue(coordination.prefer_ambush(self.match, team, [squad]))
+        self.assertEqual(squad.ambushLocation, (12, 10))
+
     def test_stage_attack_releases_and_remembers_lost_contact(self):
         squad = self.enemy_squad
         wing_mech = squad.mechList[-1]
