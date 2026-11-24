@@ -289,6 +289,8 @@ def _leader_destination(match_info, squad):
         return squad.ambushLocation
     if squad.avoidContact and squad.avoidanceTarget is not None:
         return squad.avoidanceTarget
+    if squad.combinedAttack is not None and squad.combinedAttack.state == "attacking":
+        return _nearest_location(leader.pos, squad.combinedAttack.target_positions.values())
     patrol_destination = (
         _patrol_destination(match_info, squad, leader)
         if _road_patrol_active(squad) else None

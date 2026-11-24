@@ -13,6 +13,8 @@ class CombinedAttack:
     state: str = "staging"
     reason: str = ""
     target_positions: dict = field(default_factory=dict)
+    target_forces: dict = field(default_factory=dict)
+    kind: str = "stage_attack"
 
 
 def waiting(squad):
@@ -29,8 +31,9 @@ def contacts(match, team):
     ))
 
 
-def order_attack(match, team, squads, targets):
-    """Stage explicitly selected AI squads before committing them together."""
+def order_attack(match, team, squads, targets, *, stage=False):
+    """Coordinate attacks in place, or explicitly assemble first with stage=True."""
+    from .ai import _entity_combat_force
     squads = tuple(dict.fromkeys(squads))
     known = contacts(match, team)
     targets = tuple(dict.fromkeys(targets))
@@ -41,7 +44,7 @@ def order_attack(match, team, squads, targets):
         raise ValueError("Combined attacks require operational, non-withdrawing AI squads on this team.")
     center = tuple(round(sum(squad.squadLead.pos[i] for squad in squads) / len(squads)) for i in (0, 1))
     positions = {}
-    for squad in squads:
+    for squad in squads if stage else ():
         # Spread assembly points while retaining immediate mutual support.
         # Unknown terrain is not considered for deliberate staging positions.
         choices = [
@@ -54,12 +57,15 @@ def order_attack(match, team, squads, targets):
         ]
         positions[squad] = min(choices, key=lambda pos: math.dist(pos, center), default=tuple(squad.squadLead.pos))
     order = CombinedAttack(squads, targets, positions, match.matchRound)
+    order.kind = "stage_attack" if stage else "coordinated_attack"
+    order.state = "staging" if stage else "attacking"
     order.target_positions = {enemy: tuple(enemy.pos) for enemy in targets}
+    order.target_forces = {enemy: _entity_combat_force(enemy) for enemy in targets}
     team.combinedAttacks.append(order)
     for squad in squads:
         squad.combinedAttack = order
         squad.ambushLocation = None
-        squad.primaryTarget = None
+        squad.primaryTarget = max(targets, key=_entity_combat_force) if not stage else None
         squad.stopRoadPatrol()
         squad.setCombatPosture("engage")
         squad.setMovementPolicy(mode="move")
@@ -81,10 +87,15 @@ def update(match, team):
                        and s.ambushLocation is None and s.combinedAttack is order]
         live_targets = [target for target in order.targets if target in known]
         friendly_force = sum(s.combatForce for s in live_squads)
-        enemy_force = sum(_entity_combat_force(target) for target in live_targets)
-        if len(live_squads) < 2 or not live_targets or friendly_force < enemy_force:
+        # Refresh only observed enemies. Losing a scan retains the last
+        # position and force estimate instead of reading hidden movements.
+        for target in live_targets:
+            order.target_positions[target] = tuple(target.pos)
+            order.target_forces[target] = _entity_combat_force(target)
+        enemy_force = sum(order.target_forces.values())
+        if len(live_squads) < 2 or friendly_force < enemy_force:
             order.state = "cancelled"
-            order.reason = "Insufficient force or lost enemy contact."
+            order.reason = "Insufficient participating force."
             for squad in order.squads:
                 if squad.combinedAttack is order:
                     squad.combinedAttack = None
@@ -108,9 +119,17 @@ def update(match, team):
             if not ready:
                 continue
             order.state = "attacking"
-        target = max(live_targets, key=_entity_combat_force)
+        target = max(live_targets, key=_entity_combat_force, default=None)
         for squad in live_squads:
             squad.primaryTarget = target
+        if target is None and all(
+            min(math.dist(squad.squadLead.pos, pos) for pos in order.target_positions.values()) <= 2
+            for squad in live_squads
+        ):
+            order.state = "complete"
+            order.reason = "Last known enemy area reached without reacquiring contact."
+            for squad in live_squads:
+                squad.combinedAttack = None
 
 
 def plan(match, team):
@@ -138,5 +157,12 @@ def plan(match, team):
         for squad in candidates:
             chosen.append(squad)
             if len(chosen) >= 2 and sum(s.combatForce for s in chosen) >= force * 1.1:
-                order_attack(match, team, chosen, group)
+                # Opposite sides: keep the existing encirclement and attack
+                # together. Otherwise assemble before advancing as a group.
+                between = any(
+                    sum((a.squadLead.pos[i] - target.pos[i]) *
+                        (b.squadLead.pos[i] - target.pos[i]) for i in (0, 1)) < 0
+                    for index, a in enumerate(chosen) for b in chosen[index + 1:]
+                )
+                order_attack(match, team, chosen, group, stage=not between)
                 return

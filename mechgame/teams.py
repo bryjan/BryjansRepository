@@ -435,9 +435,14 @@ class Team:
         squad.beginAmbush(location, wait_for_order)
 
     def orderCombinedAttack(self, matchInfo, squads, targets):
-        """Assemble selected squads and release a joint attack when ready."""
+        """Attack together from existing positions without assembling first."""
         from .coordination import order_attack
         return order_attack(matchInfo, self, squads, targets)
+
+    def orderStageAttack(self, matchInfo, squads, targets):
+        """Assemble selected squads before advancing against the enemy."""
+        from .coordination import order_attack
+        return order_attack(matchInfo, self, squads, targets, stage=True)
 
     def share_vision(self, mech, cells):
         """Share one capable mech's visual cells with the full team map."""

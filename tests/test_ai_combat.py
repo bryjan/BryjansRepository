@@ -18,7 +18,7 @@ from mechgame import coordination
 
 
 class AiCombatTests(unittest.TestCase):
-    def test_combined_attack_stages_releases_and_cancels_on_lost_contact(self):
+    def test_stage_attack_releases_and_remembers_lost_contact(self):
         squad = self.enemy_squad
         wing_mech = squad.mechList[-1]
         squad.mechList.remove(wing_mech)
@@ -29,7 +29,7 @@ class AiCombatTests(unittest.TestCase):
         squad.squadLead.pos = [10, 10]
         wing_mech.pos = [16, 10]
         wing_mech.directlyVisibleEnemies = wing_mech.trackedEnemies = [self.target]
-        order = squad.team.orderCombinedAttack(self.match, [squad, wing], [self.target])
+        order = squad.team.orderStageAttack(self.match, [squad, wing], [self.target])
         coordination.update(self.match, squad.team)
         self.assertEqual(order.state, "staging")
         for member in order.squads:
@@ -43,9 +43,17 @@ class AiCombatTests(unittest.TestCase):
         for member in order.squads:
             for mech in member.mechList:
                 mech.directlyVisibleEnemies = mech.trackedEnemies = []
+        last_known = order.target_positions[self.target]
+        self.target.pos = [38, 38]
         coordination.update(self.match, squad.team)
-        self.assertEqual(order.state, "cancelled")
-        self.assertIsNone(wing.combinedAttack)
+        self.assertEqual(order.state, "attacking")
+        self.assertEqual(order.target_positions[self.target], last_known)
+        self.assertIsNone(wing.primaryTarget)
+        # A coordinated order releases in place, without staging positions.
+        wing_mech.directlyVisibleEnemies = [self.target]
+        immediate = squad.team.orderCombinedAttack(self.match, [squad, wing], [self.target])
+        self.assertEqual(immediate.state, "attacking")
+        self.assertEqual(immediate.staging_positions, {})
 
     def test_passive_detection_warning_springs_an_ambush(self):
         detector = self.player_squad.squadLead
