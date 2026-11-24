@@ -14,9 +14,12 @@ def squadMenu(matchInfo):
     """Show squad readiness and roster before player-facing squad controls."""
     squad = matchInfo.pov.squad
     entries = [*squad.statusReport().splitlines(), *squad.rosterReport().splitlines()]
+    travel_state = "ON" if squad.autoTravelEnabled else "OFF"
+    entries.extend(["", f"'v' Auto Travel: {travel_state}",
+                    "Followers move after the squad leader; toggle with 'v'."])
     pv.printPOV(
         matchInfo, *matchInfo.pov.pos,
-        command_text="Squad: 'm' switch mech | 's' switch squad | 'a' AI/manual control | 'o' orders | 'v' auto travel | 'x' exit",
+        command_text=f"Squad: 'm' switch mech | 's' switch squad | 'a' AI/manual control | 'o' orders | 'v' Auto Travel ({travel_state}) | 'x' exit",
         right_panel=("SQUAD", entries),
     )
     choice = input("Squad: ").strip().lower()
