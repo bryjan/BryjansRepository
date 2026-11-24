@@ -15,14 +15,14 @@ LAST_NAMES = (
 # Familiar skirmish pilots may also appear in a Mercenary Mode roster. These
 # are complete preset names, so they do not need to follow first/last format.
 PRESET_PILOT_NAMES = (
-    "B", "MagikP", "Xactly", "115um6uy15", "Chiki", "Blastra", "UncLord", "Sybis",
+    "B", "MagikP", "Xactly", "115um6uy15", "Chiki", "Blastra", "UncLord", "Sybis", "Boly"
 )
 
 # Nicknames are informal pilot identities. Callsigns remain deliberately
 # player-assigned; these are used when creating a new campaign roster.
 NICKNAMES = (
-    "Anchor", "Ash", "Bolt", "Cinder", "Dove", "Flint", "Grit", "Haze",
-    "Ivy", "Jinx", "Knack", "Lark", "Moss", "Nix", "Omen", "Patch",
+    "Anchor", "Reaper", "Bolt", "Pigsty", "Thunder", "Zues", "Grit", "Haze",
+    "Ivy", "Jinx", "Archer", "Fiend", "Ace", "Nix", "Omen", "Patch",
     "Quill", "Rook", "Sable", "Thorn", "Vale", "Wisp", "Yarrow", "Zinc",
 )
 
