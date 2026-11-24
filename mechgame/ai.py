@@ -1127,8 +1127,11 @@ def _energy_ceiling(mech, movement_mode):
 
 
 def _can_begin_movement(mech, movement_mode):
-    """Require recharge to the policy ceiling before a new burst starts."""
-    return mech.energy >= _energy_ceiling(mech, movement_mode)
+    """Recharge before a new burst; keep an active burst until its reserve floor."""
+    return mech.energy >= _energy_ceiling(mech, movement_mode) or (
+        mech.movementBurstMode == movement_mode
+        and mech.energy >= _energy_floor(mech, movement_mode)
+    )
 
 
 def _in_patrol_corridor(position, patrol_route):
@@ -1326,7 +1329,7 @@ def _squad_ready_to_advance(squad):
     catch-up movement use costly terrain without splitting the formation.
     """
     return all(
-        _can_begin_movement(mech, squad.movementMode)
+        mech.energy >= _energy_ceiling(mech, squad.movementMode)
         for mech in squad.mechList
     )
 
@@ -1382,12 +1385,27 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
     """Correct a follower's leader tether and spacing during any regroup."""
     leader = squad.squadLead
     moved = []
+    if mech.ap <= 0 or mech.mp <= 0:
+        return moved
     approach_moves = _move_into_weapon_range(match_info, mech, squad.movementMode)
     if approach_moves:
         return approach_moves
     # This includes close-together units: spacing is kept even while another
     # follower is catching up, so the formation does not pile up at the lead.
     if not _can_begin_movement(mech, squad.movementMode):
+        return moved
+    if math.dist(mech.pos, leader.pos) > leader_range:
+        from .formation import catchup_route
+        route = catchup_route(match_info, squad, mech, leader_range)
+        for position in route:
+            energy, reason = mech.moveCostTo(match_info, position)
+            if reason or mech.energy - energy < _energy_floor(mech, squad.movementMode):
+                break
+            if not mech.moveTo(match_info, position, announce=False):
+                break
+            moved.append(mech)
+            if mech.destroyed:
+                break
         return moved
     while True:
         teammate_positions = [

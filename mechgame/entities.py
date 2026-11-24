@@ -36,6 +36,7 @@ class Entity: #a character on the map
         self.size = self.mechClass.size
         self.sizeStr = self.mechClass.sizeStr
         self.speed = 0 #tiles moved this turn
+        self.movementBurstMode = None
         self.ap = int(self.mechClass.apMax)
         self.mp = int(self.mechClass.mpMax)
         self.energy = int(self.mechClass.energyMax)
@@ -148,6 +149,7 @@ class Entity: #a character on the map
         self.clearTurnAbilities()
         self.turnStartPos = list(self.pos)
         self.speed = 0
+        self.movementBurstMode = None
 
         self.ap = int(self.mechClass.apMax)
         self.mp = int(self.mechClass.mpMax)
@@ -423,6 +425,10 @@ class Entity: #a character on the map
                 print(reason)
             return False
 
+        if hasattr(self.squad, "movementMode"):
+            from .ai import _energy_ceiling
+            if self.energy >= _energy_ceiling(self, self.squad.movementMode):
+                self.movementBurstMode = self.squad.movementMode
         self.energy = int(self.energy - moveCost)
         self.ap -= 1
         self.mp = int(self.mp - 1)
