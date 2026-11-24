@@ -17,8 +17,9 @@ launch the demo skirmish and `'o'` for complete display size and map generation.
 Choose `'t'` for the **Raid Military Base** test match. It uses a random map
 at least 100×100, with an edge-side base and a distant, initially undetected
 player deployment. The player controls the skirmish Lancer squad plus a
-sensor/two-mortar support squad. Three defending squads each carry two
-Bastions and one Kestrel, with terrain knowledge and base-defense orders.
+sensor/two-mortar support squad. Defenders have terrain knowledge and base-defense
+orders: one squad has a Kestrel and two Bastions; another has a Kestrel and a
+mortar Lancer; the third has three standard Lancers and a sensor Lancer.
 
 To raid the base, end a squad turn with a mech inside the marked compound
 and keep it there until that squad's next turn. Then extract every surviving
@@ -32,16 +33,20 @@ before completing the base hold ends the battle with that raid objective failed.
 
 In the squad menu (`sq`), use `'a'` to switch any friendly squad between AI and
 manual control. Use `'o'` to give move, defend, road patrol, attack, ambush,
-retreat, flee or hold orders; issuing an order enables AI control. Player orders
-are retained rather than replaced by the team's automatic planner. At least
-one manual squad keeps normal command access; if all squads are AI-controlled,
-their turns offer `'sq'` to resume control or issue new orders.
+retreat, flee or hold orders from the dedicated AI Orders submenu, which lists
+only AI-controlled squads. Player orders are retained rather than replaced by
+the team's automatic planner. At least one surviving squad must remain manual;
+if that squad is destroyed, ejected or extracted, a surviving friendly squad
+automatically returns to manual control.
 
-Use `auto` (or `'v'` in the squad menu) to select a travel destination for the
-player squad's leader and formation. It pays normal movement costs, prefers
-economical routes, recharges normally and gives enemies their turns. Travel
-pauses on combat/contact, a blocked route, or arrival. `quit` still abandons
-the match without saving it or producing an after-action result.
+Use `auto` (or `'v'` in the squad menu) to toggle automatic following. Move the
+squad leader manually; after each move the other mechs use normal formation
+rules, AP, MP and energy reserves to follow. When the leader is on a road or
+tunnel, followers join that road and use road-following without minimum spacing.
+Warnings appear when any mech drops below 50% energy or a follower lags beyond
+the leader's normal formation range (at least 10 tiles). You still choose when
+to end the turn. Toggle `auto` again to disable following. `quit` abandons the
+match without saving it or producing an after-action result.
 
 Display width and height describe the whole terminal frame, including the HUD,
 tactical map, right-hand information panel, and command panel. The default

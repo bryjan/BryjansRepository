@@ -1405,7 +1405,10 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
             _, _, position = max(
                 candidates,
                 key=lambda candidate: (
-                    candidate[0][0], candidate[0][3], -candidate[1], -candidate[0][2],
+                    candidate[0][0],
+                    -max(0, candidate[0][2] - leader_range),
+                    min(FORMATION_SPACING, candidate[0][3]),
+                    -candidate[1], -candidate[0][2],
                 ),
             )
         if not mech.moveTo(match_info, position, announce=False):

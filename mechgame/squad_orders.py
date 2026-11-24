@@ -3,14 +3,21 @@
 def set_control(squad, ai):
     if not squad.playerCommandable:
         raise ValueError("Only player-owned squads can change control.")
+    if ai and squad.playerControlled and not any(
+        other is not squad and other.playerCommandable and other.playerControlled and other.mechList
+        for other in squad.team.squadsList
+    ):
+        raise ValueError("At least one surviving squad must remain player controlled.")
     squad.playerControlled = not ai
-    squad.autoTravelTarget = None
+    squad.autoTravelEnabled = False
 
 
 def issue(match, squad, kind, position=None, target=None):
     from .ai import SquadGoal
     if not squad.playerCommandable or not squad.mechList:
         raise ValueError("Choose a live friendly squad.")
+    if squad.playerControlled:
+        raise ValueError("Delegate this squad to AI before giving it AI orders.")
     if kind not in {"move", "defend", "patrol", "attack", "ambush", "retreat", "flee", "hold"}:
         raise ValueError("Unknown squad order.")
     if kind == "attack":
@@ -27,7 +34,7 @@ def issue(match, squad, kind, position=None, target=None):
     squad.combinedAttack = None
     squad.ambushLocation = None
     squad.fleeOrdered = False
-    squad.autoTravelTarget = None
+    squad.autoTravelEnabled = False
     squad.stopRoadPatrol()
     squad.avoidContact = False
     squad.avoidanceTarget = None

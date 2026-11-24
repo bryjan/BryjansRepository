@@ -24,10 +24,14 @@ class RaidTests(unittest.TestCase):
 
     def test_rosters_positions_and_enemy_orders(self):
         self.assertEqual([len(s.mechList) for s in self.player.squadsList], [5, 3])
-        self.assertEqual([len(s.mechList) for s in self.enemy.squadsList], [3, 3, 3])
-        for squad in self.enemy.squadsList:
-            self.assertEqual(sum(m.mechClass.name == "Bastion" for m in squad.mechList), 2)
-            self.assertEqual(sum(m.mechClass.name == "Kestrel" for m in squad.mechList), 1)
+        self.assertEqual([len(s.mechList) for s in self.enemy.squadsList], [3, 2, 4])
+        expected = [
+            ["Kestrel", "Bastion", "Bastion"],
+            ["Kestrel", "Lancer Type.M Mortar"],
+            ["Lancer Type.A", "Lancer Type.A", "Lancer Type.A", "Lancer Type.S Pathfinder"],
+        ]
+        for squad, names in zip(self.enemy.squadsList, expected):
+            self.assertEqual([m.mechClass.name for m in squad.mechList], names)
             self.assertEqual(squad.currentGoal.kind, "defend_location")
         self.assertEqual(len({tuple(e.pos) for e in self.match.entities}), 17)
         self.assertTrue(all(m.pos[0] <= 8 for s in self.player.squadsList for m in s.mechList))

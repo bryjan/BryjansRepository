@@ -35,11 +35,15 @@ def create_raid_teams():
         Entity(create_mech("lancer.mortar"), Pilot("Fuse")),
     ], "Fire Support", playerControlled=True)
     player = Team("Raiders", [player.squadsList[0], support], playerControlled=True)
+    loadouts = (
+        ("kestrel", "bastion", "bastion"),
+        ("kestrel", "lancer.mortar"),
+        ("lancer.type_a", "lancer.type_a", "lancer.type_a", "lancer.pathfinder"),
+    )
     defenders = Team("Base Garrison", [
         Squad(f"Garrison {index + 1}", [
-            Entity(create_mech("bastion"), Pilot(f"Guard {index + 1}A")),
-            Entity(create_mech("kestrel"), Pilot(f"Watch {index + 1}")),
-            Entity(create_mech("bastion"), Pilot(f"Guard {index + 1}B")),
-        ], "Defense") for index in range(3)
+            Entity(create_mech(mech_id), Pilot(f"Guard {index + 1}-{slot + 1}"))
+            for slot, mech_id in enumerate(loadout)
+        ], "Defense") for index, loadout in enumerate(loadouts)
     ])
     return [player, defenders]

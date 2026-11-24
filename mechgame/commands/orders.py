@@ -5,11 +5,16 @@ from ..ui import tactical as pv
 from .. import squad_orders
 
 
-def friendly_squad(match):
-    squads = [s for s in match.pov.team.squadsList if s.playerCommandable and s.mechList]
+def friendly_squad(match, ai_only=False):
+    squads = [s for s in match.pov.team.squadsList if s.playerCommandable and s.mechList
+              and (not ai_only or not s.playerControlled)]
+    if not squads:
+        print("No AI-controlled squads. Use the control submenu to delegate a squad first."
+              if ai_only else "No friendly squads available.")
+        return None
     pv.printPOV(match, *match.pov.pos,
                 command_text="Friendly squads: enter a number | 'x' cancel",
-                right_panel=("FRIENDLY SQUADS", [
+                right_panel=("AI SQUADS" if ai_only else "FRIENDLY SQUADS", [
                     f"'{i}' {s.name} — {'Manual' if s.playerControlled else 'AI'}"
                     for i, s in enumerate(squads, 1)]))
     choice = input("Friendly squad: ").strip().lower()
@@ -25,18 +30,22 @@ def control_menu(match):
                 right_panel=("SQUAD CONTROL", [squad.name]))
     choice = input("Control: ").strip().lower()
     if choice in {"a", "m"}:
-        squad_orders.set_control(squad, ai=choice == "a")
+        try:
+            squad_orders.set_control(squad, ai=choice == "a")
+        except ValueError as error:
+            print(error)
 
 
 def order_menu(match):
-    squad = friendly_squad(match)
+    """Dedicated submenu lists only delegated AI squads before their orders."""
+    squad = friendly_squad(match, ai_only=True)
     if squad is None:
         return
     options = {"m": "move", "d": "defend", "p": "patrol", "a": "attack",
                "b": "ambush", "r": "retreat", "f": "flee", "h": "hold"}
     pv.printPOV(match, *match.pov.pos,
                 command_text="Orders: 'm' move | 'd' defend | 'p' road patrol | 'a' attack | 'b' ambush | 'r' retreat | 'f' flee | 'h' hold | 'x' cancel",
-                right_panel=("AI ORDERS", [squad.name, "Giving an order enables AI control for this squad."]))
+                right_panel=("AI SQUAD ORDERS", [squad.name, "Choose an order for this AI-controlled squad."]))
     choice = input("Order: ").strip().lower()
     if choice not in options:
         return
@@ -61,28 +70,16 @@ def order_menu(match):
             return
     try:
         squad_orders.issue(match, squad, kind, position, target)
-        squad_orders.set_control(squad, ai=True)
     except ValueError as error:
         print(error)
 
 
 def automatic_travel(match):
     squad = match.pov.squad
-    if squad.autoTravelTarget is not None:
-        squad.autoTravelTarget = None
-        print("Automatic travel cancelled.")
-        return
-    pv.printPOV(match, *match.pov.pos,
-                command_text="Auto travel: enter destination x,y | 'x' cancel",
-                right_panel=("AUTO TRAVEL", ["Squad follows its leader using normal movement and energy costs.",
-                                           "Pauses on contact, danger, blockage or arrival."]))
-    position = get_coordinate_input(match, "Travel destination")
-    if position == "x":
-        return
-    if not (0 < position[0] < match.mapWidth - 1 and 0 < position[1] < match.mapHeight - 1):
-        print("Choose an interior tile. Use 'flee' for extraction.")
-        return
-    squad.autoTravelTarget = tuple(position)
-    squad.fleeOrdered = False
-    squad.ambushLocation = None
-    squad.combinedAttack = None
+    squad.autoTravelEnabled = not squad.autoTravelEnabled
+    squad.travelWarnings.clear()
+    state = "ON" if squad.autoTravelEnabled else "OFF"
+    print(f"Automatic following {state}. Move the squad leader; followers use their own AP, MP and energy.")
+    if squad.autoTravelEnabled:
+        from ..travel import warnings
+        warnings(match, squad)

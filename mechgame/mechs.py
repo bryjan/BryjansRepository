@@ -184,6 +184,9 @@ class DashAbility(Ability):
         # Intermediate tiles are crossed rather than occupied, so only the
         # final landing tile can apply a persistent entry hazard such as fire.
         effects.apply_entry_effects(matchInfo, entity)
+        if entity is entity.squad.squadLead and not entity.destroyed and entity.squad.autoTravelEnabled:
+            from .travel import follow
+            follow(matchInfo, entity.squad)
         matchInfo.advTurn = True
         print(f"{entity.pilot.display_name} dashes {steps_taken} tile(s); melee damage +3 this turn.")
         return True

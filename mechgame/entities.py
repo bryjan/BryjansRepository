@@ -433,6 +433,12 @@ class Entity: #a character on the map
         effects.apply_entry_effects(matchInfo, self)
         self.refreshReadiness(matchInfo)
         matchInfo.advTurn = True
+        if getattr(self.squad, "autoTravelEnabled", False) and self.squad.playerControlled:
+            from .travel import follow, warnings
+            if self is self.squad.squadLead and not self.destroyed:
+                follow(matchInfo, self.squad)
+            else:
+                warnings(matchInfo, self.squad)
         return True
 
     def moveMech(self, matchInfo, direction):
@@ -586,6 +592,7 @@ class Entity: #a character on the map
             self.squad.refreshCombatForce()
         if self not in matchInfo.destroyedMechs:
             matchInfo.destroyedMechs.append(self)
+        self.team.ensureManualControl()
 
         # A destroyed active mech cannot continue taking actions this turn.
         if matchInfo.pov is self:
@@ -657,6 +664,7 @@ class Entity: #a character on the map
             matchInfo.abandonedMechs.append(self)
         if self.pilot not in matchInfo.ejectedPilots:
             matchInfo.ejectedPilots.append(self.pilot)
+        self.team.ensureManualControl()
         if matchInfo.pov is self:
             matchInfo.turnEnded = True
         return True
@@ -686,6 +694,7 @@ class Entity: #a character on the map
             self.squad.refreshCombatForce()
         if self not in matchInfo.fledMechs:
             matchInfo.fledMechs.append(self)
+        self.team.ensureManualControl()
         if matchInfo.pov is self:
             matchInfo.turnEnded = True
         return True

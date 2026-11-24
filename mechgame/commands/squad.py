@@ -186,7 +186,7 @@ def helpCommand(matchInfo):
     print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("Squad menu: 'a' AI/manual control; 'o' give a friendly AI squad orders; 'v' automatic travel.")
-    print("'auto' — travel automatically to coordinates; pauses for enemies, danger, blockage or arrival.")
+    print("'auto' — toggle automatic followers after manual squad-leader movement; follows roads and warns about energy/stragglers.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
     print("'o' or 'options' — change display options, including tactical width and height.")
     print("'n' or 'next' — switch to another mech in the active squad without ending its turn.")

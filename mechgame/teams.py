@@ -42,7 +42,8 @@ class Squad:
         self.manualOrder = False
         self.manualAttackTarget = None
         self.manualAttackPosition = None
-        self.autoTravelTarget = None
+        self.autoTravelEnabled = False
+        self.travelWarnings = set()
         # Movement policy is deliberately separate from formation behavior.
         # A leader/planner may, for example, order a road patrol at normal
         # speed or double time without changing the squad's assigned mission.
@@ -438,6 +439,15 @@ class Team:
     def clear_shared_vision(self):
         """Discard only current visual coverage, retaining explored terrain."""
         self.sharedVisibleTiles.clear()
+
+    def ensureManualControl(self):
+        """Keep one surviving player-owned squad manual after losses or exits."""
+        squads = [s for s in self.squadsList if s.playerCommandable and s.mechList]
+        if squads and not any(s.playerControlled for s in squads):
+            squads[0].playerControlled = True
+            squads[0].autoTravelEnabled = False
+            return squads[0]
+        return None
 
     def orderFlee(self, squad=None):
         """Send a withdrawal order to one squad or every squad on this team."""
