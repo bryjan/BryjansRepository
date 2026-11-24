@@ -55,6 +55,8 @@ class Entity: #a character on the map
         # combat without reading hidden units.
         self.inCombat = False
         self.combatQuietTurns = 0
+        self.explosionAlert = False
+        self.turnsStarted = 0
         self.lastCombatSignal = ""
         # Traits and skills can later alter this leader-facing uncertainty.
         self.combatAssessmentError = .25
@@ -133,6 +135,7 @@ class Entity: #a character on the map
         self.combatQuietTurns += 1
         if self.combatQuietTurns >= self.COMBAT_MEMORY_TURNS:
             self.inCombat = False
+            self.explosionAlert = False
             self.combatQuietTurns = 0
             self.lastCombatSignal = ""
 
@@ -140,6 +143,7 @@ class Entity: #a character on the map
         """Restore per-round state and refresh the mech's derived statistics."""
 
         #basic stats
+        self.turnsStarted += 1
         self._advanceCombatMemory()
         self.clearTurnAbilities()
         self.turnStartPos = list(self.pos)

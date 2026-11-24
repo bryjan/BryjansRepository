@@ -3,6 +3,7 @@
 import math
 import random
 import unittest
+from unittest.mock import patch
 
 from mechgame.ai import (
     _best_dps_approach, _move_into_weapon_range,
@@ -14,6 +15,42 @@ from mechgame.teams import Squad
 
 
 class AiCombatTests(unittest.TestCase):
+    def test_sensor_overdrive_ai_triggers_and_energy_floor(self):
+        mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
+        ability = mech.mechClass.hull.abilities[0]
+        mech.directlyVisibleEnemies = []
+        mech.trackedEnemies = [self.target]
+        mech.noteCombat("enemy detected")
+        with patch.object(ability, "use", return_value=True) as use:
+            self.assertTrue(ability.try_ai_use(self.match, mech))
+            mech.energy = mech.mechClass.energyMax * .5 + ability.energyCost - 1
+            self.assertFalse(ability.try_ai_use(self.match, mech))
+            self.assertEqual(use.call_count, 1)
+
+    def test_sensor_overdrive_scouts_every_third_turn_and_respects_stealth(self):
+        mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
+        ability = mech.mechClass.hull.abilities[0]
+        mech.directlyVisibleEnemies = mech.trackedEnemies = []
+        with patch.object(ability, "use", return_value=True):
+            mech.turnsStarted = 2
+            self.assertFalse(ability.try_ai_use(self.match, mech))
+            mech.turnsStarted = 3
+            self.assertTrue(ability.try_ai_use(self.match, mech))
+            mech.squad.setCombatPosture("stealth")
+            self.assertFalse(ability.try_ai_use(self.match, mech))
+
+    def test_sensor_overdrive_searches_after_observed_explosion(self):
+        mech = next(mech for mech in self.enemy_squad.mechList if mech.mechClass.name == "Kestrel")
+        ability = mech.mechClass.hull.abilities[0]
+        mortar = next(mech for mech in self.player_squad.mechList if mech.hasArtillery)
+        mech.directlyVisibleEnemies = [mortar]
+        mech.explosionAlert = True
+        with patch.object(ability, "use", return_value=True):
+            self.assertFalse(ability.try_ai_use(self.match, mech))
+            mech.directlyVisibleEnemies = []
+            self.assertTrue(ability.try_ai_use(self.match, mech))
+            self.assertFalse(mech.explosionAlert)
+
     def test_field_repair_ai_triggers_only_outside_combat(self):
         mech = self.enemy_squad.squadLead
         ability = mech.mechClass.hull.abilities[0]

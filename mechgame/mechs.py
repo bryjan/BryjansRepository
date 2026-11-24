@@ -198,6 +198,34 @@ class SensorOverdriveAbility(Ability):
         self.energyCost = energy_cost
         self.multiplier = multiplier
 
+    def try_ai_use(self, matchInfo, entity, retreating=False):
+        """Burst for uncertain contacts, periodic scouting, or unexplained blasts."""
+        squad = entity.squad
+        if retreating or squad.fleeOrdered or squad.combatPosture in {
+            "retreat", "stealth", "hold_fire",
+        } or squad.movementMode == "double_time":
+            return False
+        if entity.sensorBoostMultiplier > 1 or (
+            entity.energy - self.energyCost < entity.mechClass.energyMax * .5
+        ):
+            return False
+        visible = [enemy for enemy in entity.directlyVisibleEnemies if enemy in matchInfo.entities]
+        tracked = [enemy for enemy in entity.trackedEnemies if enemy in matchInfo.entities]
+        uncertain_contact = entity.inCombat and tracked and not visible
+        scouting = (
+            not entity.inCombat and not tracked and not visible
+            and entity.turnsStarted > 0 and entity.turnsStarted % 3 == 0
+        )
+        unseen_artillery = entity.explosionAlert and not any(
+            enemy.hasArtillery for enemy in visible
+        )
+        if not (uncertain_contact or scouting or unseen_artillery):
+            return False
+        used = self.use(matchInfo, entity)
+        if used:
+            entity.explosionAlert = False
+        return used
+
     def use(self, matchInfo, entity, direction=None):
         """Spend energy for a one-turn enhanced visual range and radar pulse."""
         if entity.sensorBoostMultiplier > 1:

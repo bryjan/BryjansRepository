@@ -290,6 +290,7 @@ class MatchInfo:
         affected_entities = set(affected_entities)
         for entity in self.entities:
             if entity in affected_entities:
+                entity.explosionAlert = True
                 entity.noteCombat("caught in an explosion")
                 entity.report(
                     self, "I was caught in an explosion!",
@@ -301,6 +302,7 @@ class MatchInfo:
                 cell.pos == location for cell in entity.visibleCells
             )
             if sees_impact:
+                entity.explosionAlert = True
                 entity.noteCombat("saw an explosion")
                 entity.report(
                     self, f"I see an explosion at {location}.",
