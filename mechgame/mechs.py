@@ -559,6 +559,7 @@ class MechPart: # super class to mech limbs
                 return False
 
         #applying damage
+        actual_damage = min(self.hp, dmg)
         self.hp -= dmg
         if self.hp < 0:
             self.hp = 0
@@ -592,7 +593,7 @@ class MechPart: # super class to mech limbs
         # so squad force comparisons must update immediately.
         self.mech.noteCombat("took damage")
         if hasattr(matchInfo, "recordCombatDamage"):
-            matchInfo.recordCombatDamage(attacker, self.mech, dmg)
+            matchInfo.recordCombatDamage(attacker, self.mech, actual_damage)
         self.mech.refreshReadiness(matchInfo)
         return True
 

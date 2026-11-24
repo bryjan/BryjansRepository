@@ -195,7 +195,7 @@ def assign_team_goals_to_squads(team):
     TODO(ai-team-planner): balance simultaneous objectives across eligible
     squads instead of allowing the best squad to inherit several orders.
     """
-    ai_squads = [squad for squad in team.squadsList if not squad.playerControlled]
+    ai_squads = [squad for squad in team.squadsList if not squad.playerControlled and not squad.manualOrder]
     team_goal_ids = {goal.goal_id for goal in team.currentGoals}
     for squad in ai_squads:
         # Replace stale hand-downs while preserving future local-only orders.
@@ -291,6 +291,12 @@ def _leader_destination(match_info, squad):
         return squad.avoidanceTarget
     if squad.combinedAttack is not None and squad.combinedAttack.state == "attacking":
         return _nearest_location(leader.pos, squad.combinedAttack.target_positions.values())
+    if squad.manualOrder and squad.currentGoal and squad.currentGoal.locations:
+        if squad.currentGoal.kind == "attack" and squad.manualAttackTarget is not None:
+            if squad.manualAttackTarget in coordination.contacts(match_info, squad.team):
+                squad.manualAttackPosition = coordination.observed_fix(match_info, squad.team, squad.manualAttackTarget)[0]
+            return squad.manualAttackPosition
+        return _nearest_location(leader.pos, squad.currentGoal.locations)
     patrol_destination = (
         _patrol_destination(match_info, squad, leader)
         if _road_patrol_active(squad) else None
@@ -834,6 +840,8 @@ def _best_dps_approach(match_info, mech):
     contacts each turn so an approach never relies on an expired contact.
     """
     best = None
+    if mech.squad.manualOrder and getattr(mech.squad.currentGoal, "kind", "") != "attack":
+        return None
     targets = _known_targets(mech)
     assigned = mech.squad.assignedTargets.get(mech)
     if assigned in targets:
@@ -863,7 +871,7 @@ def _choose_target(match_info, squad, mech):
     """Choose the best sensed target allowed by this mech's firing doctrine."""
     visible = set(mech.directlyVisibleEnemies)
     aggressive_fire = _attack_ordered(squad) or _direct_ammo_ratio(mech) >= AI_GOOD_AMMO_THRESHOLD
-    assigned_target = squad.assignedTargets.get(mech)
+    assigned_target = squad.manualAttackTarget or squad.assignedTargets.get(mech)
     choices = []
     for target in _known_targets(mech):
         weapon, chance, expected_damage = _best_direct_shot(match_info, mech, target)
@@ -1017,6 +1025,8 @@ def execute_squad_combat(match_info, squad=None):
     incoming_artillery_call = (
         squad.artilleryCallTarget if squad.artilleryCallTurns > 0 else None
     )
+    if squad.manualOrder and squad.manualAttackTarget in contacts:
+        incoming_artillery_call = squad.manualAttackTarget
     squad.assignedTargets = {}
     _assess_enemy_force(match_info, squad, contacts)
     _review_engagement(match_info, squad, contacts)

@@ -23,6 +23,9 @@ def receive_input(matchInfo):
             return statusPanel(matchInfo)
         case "sq" | "squad":
             return squadMenu(matchInfo)
+        case "auto":
+            from .orders import automatic_travel
+            return automatic_travel(matchInfo)
         case "o" | "options":
             return optionsMenu(matchInfo)
         case "n" | "next":

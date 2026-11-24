@@ -16,7 +16,7 @@ def squadMenu(matchInfo):
     entries = [*squad.statusReport().splitlines(), *squad.rosterReport().splitlines()]
     pv.printPOV(
         matchInfo, *matchInfo.pov.pos,
-        command_text="Squad: 'm' switch mech | 's' switch controllable squad | 'x' exit",
+        command_text="Squad: 'm' switch mech | 's' switch squad | 'a' AI/manual control | 'o' orders | 'v' auto travel | 'x' exit",
         right_panel=("SQUAD", entries),
     )
     choice = input("Squad: ").strip().lower()
@@ -27,7 +27,14 @@ def squadMenu(matchInfo):
         return selectSquadMech(matchInfo, squad)
     if choice == "s":
         return selectControllableSquad(matchInfo)
-    print("Choose 'm', 's', or 'x'.")
+    from .orders import control_menu, order_menu, automatic_travel
+    if choice == "a":
+        return control_menu(matchInfo)
+    if choice == "o":
+        return order_menu(matchInfo)
+    if choice == "v":
+        return automatic_travel(matchInfo)
+    print("Choose 'm', 's', 'a', 'o', 'v', or 'x'.")
 
 
 def optionsMenu(matchInfo):
@@ -178,6 +185,8 @@ def helpCommand(matchInfo):
     print("'m' — open the strategic map for radar contacts and map display controls.")
     print("'st' or 'status' — reopen the default tactical status panel.")
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
+    print("Squad menu: 'a' AI/manual control; 'o' give a friendly AI squad orders; 'v' automatic travel.")
+    print("'auto' — travel automatically to coordinates; pauses for enemies, danger, blockage or arrival.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
     print("'o' or 'options' — change display options, including tactical width and height.")
     print("'n' or 'next' — switch to another mech in the active squad without ending its turn.")

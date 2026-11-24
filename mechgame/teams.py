@@ -38,6 +38,11 @@ class Squad:
 
         self.role = squadRole
         self.playerControlled = playerControlled
+        self.playerCommandable = playerControlled
+        self.manualOrder = False
+        self.manualAttackTarget = None
+        self.manualAttackPosition = None
+        self.autoTravelTarget = None
         # Movement policy is deliberately separate from formation behavior.
         # A leader/planner may, for example, order a road patrol at normal
         # speed or double time without changing the squad's assigned mission.
@@ -406,7 +411,7 @@ class Team:
         # reasonably remain on the map awaiting support.
         self.supplies = 0
         self.reportLog = []
-        self.playerControlled = playerControlled
+        self.playerControlled = playerControlled or any(s.playerCommandable for s in squadsList)
         # MatchInfo assigns this after scenario terrain and objectives exist.
         # It is deliberately data-only until the team-planning layer arrives.
         self.currentGoal = None

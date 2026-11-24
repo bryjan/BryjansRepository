@@ -118,19 +118,41 @@ class Game:
                 if match.pov.squad.fleeOrdered:
                     execute_squad_flee(match, match.pov.squad)
                     match.turnEnded = True
+                elif match.pov.squad.autoTravelTarget is not None:
+                    from .travel import advance
+                    advance(match, match.pov.squad)
+                    tactical.printPOV(match, *match.pov.pos)
                 else:
                     tactical.printPOV(match, *match.pov.pos)
                     receive_input(match)
             else:
+                # Keep command access if the player delegates every squad.
+                if (match.pov.squad.playerCommandable and not any(
+                        s.playerControlled and s.mechList for s in match.pov.team.squadsList)):
+                    tactical.printPOV(match, *match.pov.pos,
+                                      command_text="AI control: 'Enter' run squad turn | 'sq' control/orders | 'quit' menu")
+                    value = input("AI control: ").strip().lower()
+                    if value == "quit":
+                        match.request_quit()
+                        continue
+                    if value == "sq":
+                        from .commands.squad import squadMenu
+                        squadMenu(match)
+                        continue
+                    if value:
+                        continue
                 # AI uses a single bounded combat decision before its normal
                 # formation movement, then yields to the next squad.
                 execute_squad_combat(match)
                 execute_squad_movement(match)
                 match.turnEnded = True
             if not match.quitRequested:
+                if match._finish_if_decided():
+                    continue
                 self.advance_turn_if_requested(match)
         if match.matchOver:
-            print(match.resultMessage)
+            from .after_action import show
+            show(match)
         return match
 
     @staticmethod

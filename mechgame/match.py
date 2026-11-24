@@ -36,6 +36,9 @@ class MatchInfo:
         self.destroyedMechs = []
         self.ejectedPilots = []
         self.killedPilots = []
+        # These totals never reset with the squad leader's combat assessment.
+        self.damageDealt = {}
+        self.damageReceived = {}
         # Fired launcher shells resolve only after future squad-turn handoffs.
         self.pendingImpacts = []
         self.matchRound = 0
@@ -134,10 +137,13 @@ class MatchInfo:
         Captured pilots are stored as MIA and intentionally remain unavailable
         for this match. Campaign rescue/capture systems can revisit them later.
         """
-        if len(self.operational_teams()) > 1:
-            return
+        active_teams = self.operational_teams()
+        roster = [*self.entities, *self.abandonedMechs, *self.destroyedMechs, *self.fledMechs]
         for pilot in self.ejectedPilots:
-            if pilot.status == "Evading":
+            owner = next((mech.team for mech in roster if mech.pilot is pilot), None)
+            # A raiding force extracting does not clear the enemy-held field
+            # for its evading pilots. Only a friendly/empty field is secure.
+            if pilot.status == "Evading" and owner is not None and not any(team is not owner for team in active_teams):
                 pilot.status = "RTB"
                 pilot.returned = True
 
@@ -264,13 +270,19 @@ class MatchInfo:
         """Accumulate confirmed penetrating damage for squad leader reviews."""
         if damage <= 0:
             return
+        attacking_team = getattr(attacker, "team", attacker)
+        if attacking_team in self.teamList:
+            self.damageDealt[attacking_team] = self.damageDealt.get(attacking_team, 0) + damage
+        defending_team = getattr(defender, "team", None)
+        if defending_team in self.teamList:
+            self.damageReceived[defending_team] = self.damageReceived.get(defending_team, 0) + damage
         if attacker is not None and getattr(attacker, "squad", None):
             attacker.squad.damageGiven += damage
         if defender is not None and getattr(defender, "squad", None):
             defender.squad.damageReceived += damage
             defender.team.lastEngagedRound = self.matchRound
 
-    def explosion(self, location, radius, size, damage, soundRange=0):
+    def explosion(self, location, radius, size, damage, soundRange=0, attacker=None):
         """Apply blast damage to several random parts of each mech in range."""
         affected_entities = [
             entity
@@ -287,7 +299,7 @@ class MatchInfo:
             # the number of limbs exposed, not the armor removed per limb.
             armor_damage = 1
             for limb in self.rng.sample(entity.mechClass.limbList, parts_to_hit):
-                limb.damage(self, damage, "explosion", armorDamage=armor_damage)
+                limb.damage(self, damage, "explosion", armorDamage=armor_damage, attacker=attacker)
 
         # TODO: explosions can later add fire, smoke, and terrain effects.
 

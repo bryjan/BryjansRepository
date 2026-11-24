@@ -162,10 +162,11 @@ def resolve_impact(match_info, impact):
         match_info.explosion(
             impact.position, impact.radius, impact.size, impact.damage,
             soundRange=impact.sound_range,
+            attacker=impact.owner_team,
         )
         if match_info.rng.random() < impact.ignite_chance:
             cell = match_info.map[impact.position[1]][impact.position[0]]
-            effects.add_fire(cell)
+            effects.add_fire(cell, owner_team=impact.owner_team)
     elif impact.payload in {"smoke", "incendiary"}:
         for row in match_info.map:
             for cell in row:
@@ -173,7 +174,7 @@ def resolve_impact(match_info, impact):
                     if impact.payload == "smoke":
                         effects.add_smoke(cell, impact.effect_turns)
                     else:
-                        effects.add_fire(cell, impact.effect_turns)
+                        effects.add_fire(cell, impact.effect_turns, owner_team=impact.owner_team)
     else:
         cell = match_info.map[impact.position[1]][impact.position[0]]
         effects.add_scout_flare(

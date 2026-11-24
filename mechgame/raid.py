@@ -53,13 +53,13 @@ class RaidObjective:
         enemies = any(s.mechList for s in self.defender.squadsList)
         extracted = any(mech.team is self.player for mech in match.fledMechs)
         success = self.raided and ((not players and extracted) or not enemies)
-        if not success and players:
+        if players and enemies:
             return False
         match.matchOver = True
         match.winner = self.player if success else self.defender
         match.resultMessage = f"{self.title}: " + (
             "SUCCESS — base raided and force extracted or enemy cleared."
-            if success else "FAILED — raiding force lost or withdrew before completing the raid."
+            if success else "FAILED — raid objective not completed before the battle ended."
         )
         match.turnEnded = match.advTurn = False
         match.resolvePilotSurvival()

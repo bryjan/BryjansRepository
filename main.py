@@ -21,8 +21,8 @@ def main():
             map_preset=selected_settings.map_preset,
             **({"scenario": selected_settings.scenario} if selected_settings.scenario != "skirmish" else {}),
         ).run()
-        if not match.quitRequested and selected_settings.scenario != "raid_military_base":
-            return
+        # Finished battles display their after-action report, then return here
+        # so both ordinary and debug matches can be relaunched immediately.
 
 
 if __name__ == "__main__":

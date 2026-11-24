@@ -72,14 +72,13 @@ class RaidTests(unittest.TestCase):
         self.objective.begin_turn(self.match, squad)
         self.assertFalse(self.objective.raided)
 
-    def test_clear_enemy_requires_completed_raid(self):
+    def test_clearing_enemy_ends_match_even_if_raid_was_not_completed(self):
         for squad in self.enemy.squadsList:
             for mech in list(squad.mechList):
                 mech.destroy(self.match)
-        self.assertFalse(self.match._finish_if_decided())
-        self.objective.raided = True
         self.assertTrue(self.match._finish_if_decided())
-        self.assertIs(self.match.winner, self.player)
+        self.assertFalse(self.objective.raided)
+        self.assertIn("FAILED", self.match.resultMessage)
 
     def test_early_extraction_fails(self):
         for squad in self.player.squadsList:

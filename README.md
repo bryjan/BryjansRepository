@@ -25,7 +25,23 @@ and keep it there until that squad's next turn. Then extract every surviving
 player mech using `flee` at a border, or remove all enemy mechs from the map.
 Extracting before completing the raid fails the mission. Use `sq` to change
 player squads, `m` for map/debug controls, and `quit` to return to the menu.
-Test matches also return to the menu after success or failure for rapid retries.
+Battles end when a team has no active mechs left, whether destroyed or fled.
+The after-action screen shows damage dealt/received, destroyed mechs, pilot
+losses and mission objectives, then returns to the menu. Clearing defenders
+before completing the base hold ends the battle with that raid objective failed.
+
+In the squad menu (`sq`), use `'a'` to switch any friendly squad between AI and
+manual control. Use `'o'` to give move, defend, road patrol, attack, ambush,
+retreat, flee or hold orders; issuing an order enables AI control. Player orders
+are retained rather than replaced by the team's automatic planner. At least
+one manual squad keeps normal command access; if all squads are AI-controlled,
+their turns offer `'sq'` to resume control or issue new orders.
+
+Use `auto` (or `'v'` in the squad menu) to select a travel destination for the
+player squad's leader and formation. It pays normal movement costs, prefers
+economical routes, recharges normally and gives enemies their turns. Travel
+pauses on combat/contact, a blocked route, or arrival. `quit` still abandons
+the match without saving it or producing an after-action result.
 
 Display width and height describe the whole terminal frame, including the HUD,
 tactical map, right-hand information panel, and command panel. The default

@@ -63,8 +63,9 @@ class FireEffect(TerrainEffect):
     symbol = "*"
     color = "red"
 
-    def __init__(self, turns=3):
+    def __init__(self, turns=3, owner_team=None):
         self.turns_remaining = turns
+        self.owner_team = owner_team
 
     def _damage_entity(self, match_info, entity):
         """Apply the hazard to one random limb; blocked flames make no alert."""
@@ -73,7 +74,7 @@ class FireEffect(TerrainEffect):
         limb = match_info.rng.choice(entity.mechClass.limbList)
         # ``damage`` emits the critical fire report only if this hit actually
         # penetrates the chosen limb's armor into its hit points.
-        limb.damage(match_info, 8, "fire")
+        limb.damage(match_info, 8, "fire", attacker=self.owner_team)
 
     def on_enter(self, match_info, entity):
         self._damage_entity(match_info, entity)
@@ -113,7 +114,7 @@ class FireEffect(TerrainEffect):
         self._drift_smoke(match_info, cell)
         for neighbor in cell.nList:
             if not neighbor.terrain.fireproof and match_info.rng.random() < spread_chance:
-                add_fire(neighbor)
+                add_fire(neighbor, owner_team=self.owner_team)
 
         self.turns_remaining -= 1
         return self.turns_remaining > 0 and match_info.rng.random() >= extinguish_chance
@@ -157,9 +158,9 @@ def add_chaff(cell, turns=2):
     add_effect(cell, ChaffEffect(turns))
 
 
-def add_fire(cell, turns=3):
+def add_fire(cell, turns=3, owner_team=None):
     """Ignite a cell and immediately place the smoke its fire produces."""
-    add_effect(cell, FireEffect(turns))
+    add_effect(cell, FireEffect(turns, owner_team))
     add_smoke(cell, turns=min(2, max(1, turns)))
 
 
