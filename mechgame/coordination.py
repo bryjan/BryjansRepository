@@ -211,6 +211,10 @@ def prefer_ambush(match, team, squads):
     choices = []
     known = team.exploredTiles
     for squad in squads:
+        # Assigned patrols must keep circulating, and a fixed guard must keep
+        # its objective covered. Neither is an idle squad seeking an ambush.
+        if getattr(squad.currentGoal, "kind", "") in {"patrol", "patrol_map", "patrol_location", "defend_location"}:
+            continue
         if squad.inCombat:
             # Mere visual contact is allowed; recent damage or firing isn't.
             if any(mech.lastCombatSignal != "enemy in visual range" and mech.inCombat for mech in squad.mechList):

@@ -7,6 +7,7 @@ from unittest.mock import patch
 from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, start_menu
 from mechgame.raid import ensure_land_access
+from mechgame.ai import execute_squad_combat, execute_squad_movement
 
 
 class RaidTests(unittest.TestCase):
@@ -63,12 +64,52 @@ class RaidTests(unittest.TestCase):
         ]
         for squad, names in zip(self.enemy.squadsList, expected):
             self.assertEqual([m.mechClass.name for m in squad.mechList], names)
-            self.assertEqual(squad.currentGoal.kind, "defend_location")
+        self.assertEqual([s.currentGoal.kind for s in self.enemy.squadsList],
+                         ["defend_location", "patrol_location", "patrol_location"])
         self.assertEqual(len({tuple(e.pos) for e in self.match.entities}), 17)
         self.assertTrue(all(min(m.pos[0], m.pos[1], self.match.mapWidth - 1 - m.pos[0],
                                 self.match.mapHeight - 1 - m.pos[1]) <= 12
                             for s in self.player.squadsList for m in s.mechList))
         self.assertTrue(self.enemy.mapVisibility.show_all_terrain)
+
+    def test_garrison_sees_the_base_and_other_squads_patrol(self):
+        guard, *patrols = self.enemy.squadsList
+        guard.squadLead.getVisuals(self.match)
+        self.assertIn(tuple(guard.squadLead.pos), self.objective.base_tiles)
+        self.assertTrue(self.objective.base_tiles.intersection(
+            tuple(cell.pos) for cell in guard.squadLead.visibleCells))
+        guard_start = tuple(guard.squadLead.pos)
+        execute_squad_movement(self.match, guard)
+        self.assertEqual(tuple(guard.squadLead.pos), guard_start)
+        for squad in patrols:
+            self.assertTrue(squad.patrolRoute)
+            self.assertEqual(squad.movementBehavior, "road_patrol")
+            start = tuple(squad.squadLead.pos)
+            self.assertTrue(execute_squad_movement(self.match, squad))
+            self.assertNotEqual(tuple(squad.squadLead.pos), start)
+
+    def test_patrols_keep_travelling_through_real_turns_without_idle_ambushes(self):
+        # This seed puts mountain terrain near the deployment and a narrow
+        # approach road: previously one patrol never left its starting area.
+        match = Game(scenario="raid_military_base", rng=random.Random(3)).create_match()
+        guard, *patrols = match.teamList[1].squadsList
+        visited = {squad: {tuple(squad.squadLead.pos)} for squad in patrols}
+        match.pov.squad.roundRefresh(match)
+        with patch("builtins.print"):
+            for _ in range(8 * 5):
+                squad = match.pov.squad
+                if not squad.playerControlled:
+                    execute_squad_combat(match, squad)
+                    execute_squad_movement(match, squad)
+                    self.assertIsNone(squad.ambushLocation)
+                    if squad is guard:
+                        guard.squadLead.getVisuals(match)
+                        self.assertTrue(match.raidObjective.base_tiles.intersection(
+                            tuple(cell.pos) for cell in guard.squadLead.visibleCells))
+                    else:
+                        visited[squad].add(tuple(squad.squadLead.pos))
+                match.nextSquadTurn()
+        self.assertTrue(all(len(positions) >= 4 for positions in visited.values()))
 
     def test_initial_deployment_cannot_be_seen_or_detected_by_overdrive(self):
         for squad in self.enemy.squadsList:

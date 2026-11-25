@@ -1,4 +1,4 @@
-"""Bounded catch-up routing for followers separated from their squad leader."""
+"""Bounded routes for formation catch-up and joining assigned patrol roads."""
 
 import heapq
 import math
@@ -14,9 +14,29 @@ def catchup_route(match, squad, mech, leader_range):
     still use the shared movement validation and energy reserve rules.
     """
     from .ai import FORMATION_SPACING
-    start = tuple(mech.pos)
     leader = squad.squadLead
     teammates = [other.pos for other in squad.mechList if other is not mech]
+    return _find_route(
+        match, mech,
+        lambda point: (math.dist(point, leader.pos) <= leader_range
+                       and all(math.dist(point, other) >= FORMATION_SPACING for other in teammates)),
+        lambda point: max(0, math.dist(point, leader.pos) - leader_range) / math.sqrt(2),
+    )
+
+
+def road_approach_route(match, mech, road_tiles, max_step_energy):
+    """Join the assigned patrol road without getting trapped by a land obstacle."""
+    goals = set(road_tiles)
+    if not goals:
+        return []
+    return _find_route(match, mech, lambda point: point in goals,
+                       lambda point: min(math.dist(point, goal) for goal in goals) / math.sqrt(2),
+                       max_step_energy)
+
+
+def _find_route(match, mech, reached, heuristic, max_step_energy=None):
+    """Share bounded, knowledge-limited routing between formation and patrols."""
+    start = tuple(mech.pos)
     known_enemies = set([*mech.directlyVisibleEnemies, *mech.trackedEnemies])
     occupied = {tuple(other.pos) for other in match.entities if other is not mech
                 and (other.team is mech.team or other in known_enemies)}
@@ -28,8 +48,7 @@ def catchup_route(match, squad, mech, leader_range):
         if point in expanded:
             continue
         expanded.add(point)
-        if (math.dist(point, leader.pos) <= leader_range
-                and all(math.dist(point, other) >= FORMATION_SPACING for other in teammates)):
+        if reached(point):
             route = []
             while point != start:
                 route.append(list(point))
@@ -51,10 +70,11 @@ def catchup_route(match, squad, mech, leader_range):
                     continue
             else:
                 energy = 1
+            if max_step_energy is not None and energy > max_step_energy:
+                continue
             cost = costs[point] + 1 + max(0, energy)
             if cost < costs.get(candidate, float("inf")):
                 previous[candidate] = point
                 costs[candidate] = cost
-                heuristic = max(0, math.dist(candidate, leader.pos) - leader_range) / math.sqrt(2)
-                heapq.heappush(frontier, (cost + heuristic, candidate))
+                heapq.heappush(frontier, (cost + heuristic(candidate), candidate))
     return []

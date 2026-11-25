@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import math
 import heapq
 
-from .ai import SquadGoal
+from .ai import SquadGoal, start_road_patrol
 from .stamps import MilitaryBaseStamp
 from .world import MapGenerator
 
@@ -115,6 +115,51 @@ def ensure_land_access(match, start, goals):
     raise ValueError("Raid deployment has no traversable route to the base.")
 
 
+def _deploy_road_patrol(match, squad, center):
+    """Start patrols on local roads instead of marooning them in mountains.
+
+    Reserve rules intentionally prevent sustained mountain travel by light
+    patrols. Give them a usable road deployment rather than flattening a path
+    through generated terrain or relaxing those reserve rules.
+    """
+    occupied = {tuple(mech.pos) for mech in match.entities if mech.squad is not squad}
+    covered = {tile for other in squad.team.squadsList if other is not squad for tile in other.patrolRoute}
+    candidates = []
+    from .radar import entity_detection_threshold
+    for road in match.mapFeatures.roads:
+        positions = []
+        for point in sorted(set(road.tiles), key=lambda point: (math.dist(point, squad.squadLead.pos), point)):
+            if point in occupied or math.dist(point, center) > 22:
+                continue
+            if match.map[point[1]][point[0]].terrain.name not in {"road", "tunnel"}:
+                continue
+            if any(math.dist(point, previous) < 3 for previous in positions):
+                continue
+            mech = squad.mechList[len(positions)]
+            # Retain the scenario's hidden-entry guarantee when choosing
+            # road positions, including the guard's possible sensor burst.
+            if any(math.dist(point, enemy.pos) <= max(
+                    mech.visPower * 1.4,
+                    (mech.mechClass.radarPower * 1.4 - entity_detection_threshold(enemy.radarSig)) / 2)
+                   for enemy in match.entities if enemy.team is not squad.team):
+                continue
+            positions.append(point)
+            if len(positions) == len(squad.mechList):
+                break
+        if len(positions) == len(squad.mechList):
+            candidates.append((len(set(road.tiles) & covered),
+                               math.dist(positions[0], squad.squadLead.pos), road.route_id, positions))
+    if not candidates:
+        # Generated base access normally provides a route; keep the regular
+        # planner fallback for custom generators without usable local roads.
+        return start_road_patrol(match, squad)
+    _, _, route_id, positions = min(candidates)
+    for mech, position in zip(squad.mechList, positions):
+        mech.pos = list(position)
+        mech.turnStartPos = list(position)
+    return start_road_patrol(match, squad, route_id)
+
+
 def setup(match):
     """Place a guaranteed edge base and separated forces on a random map."""
     player, defender = match.teamList
@@ -143,6 +188,10 @@ def setup(match):
     defender_anchors = [(base_u + 4 + match.rng.randint(-2, 2),
                          base_v + 4 + (index - 1) * 10 + match.rng.randint(-1, 1))
                         for index in range(len(defender.squadsList))]
+    # Keep one garrison on the objective itself. The other squads cover its
+    # approaches on repeating patrols rather than all holding their spawn.
+    defender_anchors[0] = (base_u + 4, base_v + 4)
+    defender_anchors[1] = (base_u + 4, base_v - 10)
     stamp = MilitaryBaseStamp(8, 8)
     footprint = set(stamp.positions(origin))
     match.mapFeatures.military_bases = [base for base in match.mapFeatures.military_bases
@@ -182,8 +231,28 @@ def setup(match):
                 mech.pos = list(position)
                 mech.turnStartPos = list(position)
                 match.entities.append(mech)
-    # Use a conservative open-ground upper bound, including overdrive radar.
-    # Terrain only reduces these ranges, so no deployment scan is needed.
+    defender.mapVisibility.show_all_terrain = True
+    defender.mapVisibility.show_all_objectives = True
+    player.mapVisibility.show_all_objectives = True
+    match.playerSquad = player.squadsList[0]
+    match.pov = match.playerSquad.squadLead
+    match.raidObjective = RaidObjective(player, defender, frozenset(base.tiles))
+    for index, squad in enumerate(defender.squadsList):
+        holding = index == 0
+        kind = "defend_location" if holding else "patrol_location"
+        message = ("Hold the base with visual coverage of the objective." if holding
+                   else "Patrol roads serving the base and its approaches; repeat until contact.")
+        goal = SquadGoal(f"raid_defense_{index}", "raid_defense", kind, 100,
+                         (center,), message, objective_id="raid_base")
+        squad.currentGoal = goal
+        squad.currentGoals = [goal]
+        squad.goalHistory.append(goal)
+        squad.refreshCombatForce()
+        if not holding:
+            # Allocate sequentially so route scoring avoids the other patrol's
+            # coverage. Ordinary combat and retreat logic may interrupt it.
+            _deploy_road_patrol(match, squad, center)
+    # Validate final deployments after patrols have joined their roads.
     from .radar import entity_detection_threshold
     for guard in defender.squadsList:
         for enemy in guard.mechList:
@@ -193,20 +262,6 @@ def setup(match):
                     radar_range = max(0, (enemy.mechClass.radarPower * 1.4 - entity_detection_threshold(mech.radarSig)) / 2)
                     if distance <= max(enemy.visPower * 1.4, radar_range):
                         raise ValueError("Raid deployment would expose player mechs at the start.")
-    defender.mapVisibility.show_all_terrain = True
-    defender.mapVisibility.show_all_objectives = True
-    player.mapVisibility.show_all_objectives = True
-    match.playerSquad = player.squadsList[0]
-    match.pov = match.playerSquad.squadLead
-    match.raidObjective = RaidObjective(player, defender, frozenset(base.tiles))
-    for index, squad in enumerate(defender.squadsList):
-        post = project(*defender_anchors[index])
-        goal = SquadGoal(f"raid_defense_{index}", "raid_defense", "defend_location", 100,
-                         (post,), "Defend the military base and its approaches.")
-        squad.currentGoal = goal
-        squad.currentGoals = [goal]
-        squad.goalHistory.append(goal)
-        squad.refreshCombatForce()
     for squad in player.squadsList:
         squad.squadLead.report(match,
             f"Raid Military Base at {list(center)}. End a turn inside and stay until that squad's next turn. "

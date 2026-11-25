@@ -20,6 +20,9 @@ player deployment. The player controls the skirmish Lancer squad plus a
 sensor/two-mortar support squad. Defenders have terrain knowledge and base-defense
 orders: one squad has a Kestrel and two Bastions; another has a Kestrel and a
 mortar Lancer; the third has three standard Lancers and a sensor Lancer.
+The Kestrel/two-Bastion squad holds visual coverage of the base; the other two
+squads start on nearby roads and repeat patrol routes until contact. Assigned
+patrols and fixed guards are not silently reassigned to idle ambush positions.
 Player entry can be on any of the four edges, with varying positions for both
 player squads and the base. Terrain generation stays random and seeded runs
 remain reproducible. No road is forced from the player spawn to the base;

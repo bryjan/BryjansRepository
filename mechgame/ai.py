@@ -1294,6 +1294,7 @@ def _formation_status(position, leader_position, teammate_positions, leader_rang
 def _leader_needs_regroup(squad, leader_range):
     """Return whether any follower needs range or spacing correction."""
     leader = squad.squadLead
+    road_patrol = _road_patrol_active(squad) and bool(squad.patrolRoute)
     for mech in squad.mechList:
         if mech is leader:
             continue
@@ -1301,7 +1302,9 @@ def _leader_needs_regroup(squad, leader_range):
         within_range, spaced, _, _ = _formation_status(
             mech.pos, leader.pos, teammates, leader_range,
         )
-        if not within_range or not spaced:
+        # Road patrols may file close together on narrow roads. Applying
+        # off-road spacing here can leave the leader waiting indefinitely.
+        if not within_range or (not spaced and not road_patrol):
             return True
     return False
 
@@ -1369,6 +1372,25 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
     if not _squad_ready_to_advance(squad):
         return []
     moved = []
+    if roadway_only and squad.patrolRoute and tuple(leader.pos) not in squad.patrolRoute:
+        from .formation import road_approach_route
+        # A nearby road may be disconnected from the assigned patrol. Route
+        # to that patrol itself, allowing economical detours around water.
+        route = road_approach_route(
+            match_info, leader, squad.patrolRoute,
+            leader.mechClass.energyMax - _energy_floor(leader, squad.movementMode),
+        )
+        for position in route:
+            if _leader_needs_regroup(squad, leader_range):
+                break
+            energy, reason = leader.moveCostTo(match_info, position)
+            if reason or leader.energy - energy < _energy_floor(leader, squad.movementMode):
+                break
+            if not leader.moveTo(match_info, position, announce=False):
+                break
+            moved.append(leader)
+        return moved
+    visited = {tuple(leader.pos)}
     while not _leader_needs_regroup(squad, leader_range):
         destination = _leader_destination(match_info, squad)
         if roadway_only and not _is_roadway(match_info, leader.pos):
@@ -1381,6 +1403,7 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
             for position, energy_cost in _legal_steps(
                 match_info, leader, squad.movementMode, roadway_only, squad.patrolRoute,
             )
+            if tuple(position) not in visited
         ]
         if not steps:
             break
@@ -1403,6 +1426,7 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
             _, _, position = min(wiggle_steps, key=lambda option: (option[0], option[1], option[2]))
         if not leader.moveTo(match_info, position, announce=False):
             break
+        visited.add(tuple(position))
         moved.append(leader)
     return moved
 
