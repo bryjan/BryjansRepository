@@ -5,6 +5,7 @@ import math
 import heapq
 
 from .ai import SquadGoal, start_road_patrol
+from .patrols import recorded_road_walk
 from .stamps import MilitaryBaseStamp
 from .world import MapGenerator
 
@@ -115,7 +116,7 @@ def ensure_land_access(match, start, goals):
     raise ValueError("Raid deployment has no traversable route to the base.")
 
 
-def _deploy_road_patrol(match, squad, center):
+def _deploy_road_patrol(match, squad):
     """Start patrols on local roads instead of marooning them in mountains.
 
     Reserve rules intentionally prevent sustained mountain travel by light
@@ -127,9 +128,10 @@ def _deploy_road_patrol(match, squad, center):
     candidates = []
     from .radar import entity_detection_threshold
     for road in match.mapFeatures.roads:
+        route = recorded_road_walk(match, road, squad.squadLead.pos)
         positions = []
-        for point in sorted(set(road.tiles), key=lambda point: (math.dist(point, squad.squadLead.pos), point)):
-            if point in occupied or math.dist(point, center) > 22:
+        for point in sorted(set(route), key=lambda point: (math.dist(point, squad.squadLead.pos), point)):
+            if point in occupied:
                 continue
             if match.map[point[1]][point[0]].terrain.name not in {"road", "tunnel"}:
                 continue
@@ -147,8 +149,13 @@ def _deploy_road_patrol(match, squad, center):
             if len(positions) == len(squad.mechList):
                 break
         if len(positions) == len(squad.mechList):
-            candidates.append((len(set(road.tiles) & covered),
-                               math.dist(positions[0], squad.squadLead.pos), road.route_id, positions))
+            # Prefer a route that leaves the compound over a short perimeter
+            # circuit, even when both patrols must share part of a main road.
+            span = max(max(p[axis] for p in route) - min(p[axis] for p in route) for axis in (0, 1))
+            overlap = len(set(route) & covered) / len(set(route))
+            candidates.append((span < 20,
+                               math.dist(positions[0], squad.squadLead.pos) + 12 * overlap,
+                               road.route_id, positions))
     if not candidates:
         # Generated base access normally provides a route; keep the regular
         # planner fallback for custom generators without usable local roads.
@@ -251,7 +258,7 @@ def setup(match):
         if not holding:
             # Allocate sequentially so route scoring avoids the other patrol's
             # coverage. Ordinary combat and retreat logic may interrupt it.
-            _deploy_road_patrol(match, squad, center)
+            _deploy_road_patrol(match, squad)
     # Validate final deployments after patrols have joined their roads.
     from .radar import entity_detection_threshold
     for guard in defender.squadsList:

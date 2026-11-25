@@ -29,7 +29,8 @@ def enemy_orders(match):
                 f"Combat assessment: {squad.engagementAssessment} | Avoid: {squad.avoidContact}",
             ])
             if squad.patrolRoute:
-                lines.append(f"Patrol: {squad.patrolRouteId}, waypoint {squad.patrolRouteIndex}, direction {squad.patrolRouteDirection}")
+                lines.append(f"Patrol: {squad.patrolRouteId}, waypoint {squad.patrolRouteIndex + 1}/{len(squad.patrolRoute)} "
+                             f"at {squad.patrolRoute[squad.patrolRouteIndex]}, direction {squad.patrolRouteDirection}")
             if squad.ambushLocation is not None:
                 lines.append(f"Ambush: {squad.ambushLocation}, triggered={squad.ambushTriggered}, linked squads={len(squad.ambushGroup)}")
             if squad.combinedAttack is not None:

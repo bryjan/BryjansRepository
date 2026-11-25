@@ -14,6 +14,7 @@ from . import ambush
 from . import coordination
 from . import recon
 from .formation import MAX_TEAMMATE_DISTANCE, formation_radius
+from .patrols import recorded_road_walk
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
@@ -344,15 +345,6 @@ def _road_patrol_active(squad):
     }
 
 
-def _recorded_road_tiles(match_info, route):
-    """Keep only still-usable tiles from one generated and recorded route."""
-    tiles = []
-    for tile in route.tiles:
-        if _is_roadway(match_info, tile) and (not tiles or tiles[-1] != tile):
-            tiles.append(tile)
-    return tuple(tiles)
-
-
 def _route_distance(route_tiles, locations):
     """Return the nearest Euclidean distance between one route and locations."""
     return min(
@@ -401,7 +393,7 @@ def start_road_patrol(match_info, squad, route_id=None):
     """
     routes = getattr(match_info.mapFeatures, "roads", ())
     candidates = [
-        (route, _recorded_road_tiles(match_info, route))
+        (route, recorded_road_walk(match_info, route, squad.squadLead.pos))
         for route in routes
         if route_id is None or route.route_id == route_id
     ]
@@ -455,13 +447,12 @@ def _patrol_destination(match_info, squad, leader):
 
     if tuple(leader.pos) == route[index]:
         index = advance(index)
-    # An unrelated friendly patrol may be travelling the opposite direction.
-    # Skip its occupied waypoint so this leader can use the roadside shoulder
-    # to pass it instead of waiting forever on a single-lane road.
+    # A follower or another patrol may occupy the next waypoint. Skip that
+    # cell so the SL can pass on the shoulder rather than waiting forever.
     checked = set()
     while index not in checked and any(
         entity.team is leader.team
-        and entity.squad is not squad
+        and entity is not leader
         and entity.pos == list(route[index])
         for entity in match_info.entities
     ):
@@ -1514,13 +1505,16 @@ def execute_squad_movement(match_info, squad=None):
     moved = _execute_squad_movement(match_info, squad)
     if not squad.playerControlled:
         end = tuple(squad.squadLead.pos) if squad.squadLead else None
-        reason = "advanced" if moved else "holding/blocked"
+        reason = ("advanced" if start != end else "no net SL movement") if moved else "holding/blocked"
         if not moved and squad.mechList and not _squad_ready_to_advance(squad):
             reason = "waiting for energy reserves"
         elif not moved and squad.squadLead and _leader_needs_regroup(squad, formation_radius(squad.squadLead)):
             reason = "regrouping/spacing"
         squad.logAI(match_info, f"Movement: {reason}; {squad.movementMode}/{squad.movementBehavior}; "
                     f"SL {start} -> {end}; {len(set(moved))} mech(s) moved.")
+        if squad.patrolRoute:
+            squad.logAI(match_info, f"Patrol waypoint {squad.patrolRouteIndex + 1}/{len(squad.patrolRoute)} "
+                        f"at {squad.patrolRoute[squad.patrolRouteIndex]}; direction {squad.patrolRouteDirection}.")
     return moved
 
 

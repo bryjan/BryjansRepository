@@ -288,7 +288,9 @@ class Squad:
                 index,
             ),
         ) if self.squadLead else 0
-        self.patrolRouteDirection = -1 if self.patrolRouteIndex == len(self.patrolRoute) - 1 else 1
+        # Start toward the longer remaining leg rather than immediately
+        # shuttling into a nearby dead end beside the deployment/base.
+        self.patrolRouteDirection = -1 if self.patrolRouteIndex > (len(self.patrolRoute) - 1) / 2 else 1
         self.setMovementPolicy(mode="patrol", behavior="road_patrol")
 
     def stopRoadPatrol(self):

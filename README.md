@@ -23,6 +23,10 @@ mortar Lancer; the third has three standard Lancers and a sensor Lancer.
 The Kestrel/two-Bastion squad holds visual coverage of the base; the other two
 squads start on nearby roads and repeat patrol routes until contact. Assigned
 patrols and fixed guards are not silently reassigned to idle ambush positions.
+Patrols prefer longer approach roads over compound perimeter loops. Their
+stored routes use adjacent connected road cells: gaps split a route, and
+stamped perimeter/highway footprints are ordered into walkable out-and-back
+paths. Debug logs show the current patrol waypoint as well as SL movement.
 Player entry can be on any of the four edges, with varying positions for both
 player squads and the base. Terrain generation stays random and seeded runs
 remain reproducible. No road is forced from the player spawn to the base;

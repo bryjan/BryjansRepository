@@ -1,6 +1,7 @@
 """Raid debug deployment, menu selection and end-to-end mission outcomes."""
 
 import random
+import math
 import unittest
 from unittest.mock import patch
 
@@ -89,14 +90,23 @@ class RaidTests(unittest.TestCase):
             self.assertNotEqual(tuple(squad.squadLead.pos), start)
 
     def test_patrols_keep_travelling_through_real_turns_without_idle_ambushes(self):
-        # This seed puts mountain terrain near the deployment and a narrow
-        # approach road: previously one patrol never left its starting area.
-        match = Game(scenario="raid_military_base", rng=random.Random(3)).create_match()
+        for seed in (0, 1, 8):
+            with self.subTest(seed=seed):
+                self._assert_patrol_progress(seed)
+
+    def _assert_patrol_progress(self, seed):
+        # Cover road gaps, unordered perimeters and short dead ends. Counting
+        # distinct positions alone previously accepted tiny shuffles.
+        match = Game(scenario="raid_military_base", rng=random.Random(seed)).create_match()
         guard, *patrols = match.teamList[1].squadsList
+        starts = {squad: tuple(squad.squadLead.pos) for squad in patrols}
         visited = {squad: {tuple(squad.squadLead.pos)} for squad in patrols}
+        for squad in patrols:
+            for first, second in zip(squad.patrolRoute, squad.patrolRoute[1:]):
+                self.assertEqual(max(abs(first[0] - second[0]), abs(first[1] - second[1])), 1)
         match.pov.squad.roundRefresh(match)
         with patch("builtins.print"):
-            for _ in range(8 * 5):
+            for _ in range(20 * 5):
                 squad = match.pov.squad
                 if not squad.playerControlled:
                     execute_squad_combat(match, squad)
@@ -109,7 +119,8 @@ class RaidTests(unittest.TestCase):
                     else:
                         visited[squad].add(tuple(squad.squadLead.pos))
                 match.nextSquadTurn()
-        self.assertTrue(all(len(positions) >= 4 for positions in visited.values()))
+        for squad, positions in visited.items():
+            self.assertGreaterEqual(max(math.dist(starts[squad], point) for point in positions), 10)
 
     def test_initial_deployment_cannot_be_seen_or_detected_by_overdrive(self):
         for squad in self.enemy.squadsList:
