@@ -271,7 +271,7 @@ def _command_lines(width, command_text=None):
     if command_text is None:
         command_text = (
             "Commands | 'f' Fire | 'r' Toggle Radar | 'ab' Abilities | 'sq' Squad | "
-            "'obj' Objectives | 'o' Options | 'n' Next | '?' Help | 'end' End Turn"
+            "'obj' Objectives | 'o' Options | 'n' Next | '5' Wait | '?' Help | 'end' End Turn"
         )
     # Separators may land at a wrap boundary; trimming both edges prevents a
     # separator from visually merging with the panel's actual border.

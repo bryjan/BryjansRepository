@@ -172,12 +172,13 @@ def abilityMenu(matchInfo):
     if ability.requiresDirection:
         pv.printPOV(
             matchInfo, *mech.pos,
-            command_text="Dash direction: 'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' | 'x' cancel",
+            command_text="Dash direction: 'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' or numpad '1'-'9' except '5' | 'x' cancel",
             right_panel=("HULL ABILITIES", entries),
         )
         direction = input(
-            "Dash direction ('q', 'w', 'e', 'a', 's', 'd', 'z', or 'c'; 'x' to cancel): "
+            "Dash direction (movement keys or numpad; 'x' to cancel): "
         ).strip().lower()
         if direction == "x":
             return
+        direction = mech.NUMPAD_DIRECTIONS.get(direction, direction)
     ability.use(matchInfo, mech, direction)

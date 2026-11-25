@@ -183,6 +183,8 @@ def helpCommand(matchInfo):
     """Show a concise reference for every command accepted at the main prompt."""
     print("Main commands:")
     print("'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' — move in the matching direction.")
+    print("Numpad (Num Lock on): '7' '8' '9' / '4' '6' / '1' '2' '3' — move; '8' is up, '2' is down.")
+    print("'5' or 'wait' — wait in place for 1 AP, no MP or energy; auto-travel followers can catch up.")
     print("'f' — fire the selected weapon at the nearest tracked contact; menus offer more targeting choices.")
     print("'fire' — choose the default weapon used by 'f'.")
     print("'r' or 'radar' — toggle continuous active radar; it has an energy cost each turn.")
@@ -198,7 +200,7 @@ def helpCommand(matchInfo):
     print("'sq' or 'squad' — show squad readiness, roster, and switching options.")
     print("Squad menu: 'a' AI/manual control; 'o' give a friendly AI squad orders; 'v' automatic travel.")
     print("AI Orders: 'g' Fire Mission opens the fullest artillery unit's launcher menu; 'u' switches units. Shots execute on its squad turn.")
-    print("'auto' — toggle automatic followers after manual squad-leader movement; follows roads and warns about energy/stragglers.")
+    print("'auto' — toggle automatic followers after squad-leader movement or waiting, and before ending the turn; follows roads and warns about energy/stragglers.")
     print("'rep1' — show unread reports. 'rep' — open the full report log.")
     print("'o' or 'options' — change display options, including tactical width and height.")
     print("'n' or 'next' — switch to another mech in the active squad without ending its turn.")

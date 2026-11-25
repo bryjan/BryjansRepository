@@ -378,6 +378,11 @@ class Entity: #a character on the map
         "q": (-1, 1), "w": (0, 1), "e": (1, 1), "a": (-1, 0),
         "s": (0, -1), "d": (1, 0), "z": (-1, -1), "c": (1, -1),
     }
+    # Keep aliases separate so pathfinding still visits eight unique neighbors.
+    NUMPAD_DIRECTIONS = {
+        "7": "q", "8": "w", "9": "e", "4": "a",
+        "6": "d", "1": "z", "2": "s", "3": "c",
+    }
 
     def moveCostTo(self, matchInfo, targetPos):
         """Return a legal adjacent step's energy cost, or its failure reason.
@@ -450,12 +455,29 @@ class Entity: #a character on the map
 
     def moveMech(self, matchInfo, direction):
         """Translate a player direction key into the shared one-step action."""
+        direction = self.NUMPAD_DIRECTIONS.get(direction, direction)
         offset = self._DIRECTION_OFFSETS.get(direction)
         if offset is None:
             print("Not a valid movement input.")
             return False
         targetPos = [self.pos[0] + offset[0], self.pos[1] + offset[1]]
         return self.moveTo(matchInfo, targetPos)
+
+    def wait(self, matchInfo):
+        """Spend one AP in place while automatic followers catch up.
+
+        Waiting uses no MP or energy and does not advance the match round:
+        regeneration, shells and effects still advance through normal turns.
+        """
+        if self.ap <= 0:
+            print("No action points remain. Use 'end' to finish the squad turn.")
+            return False
+        self.ap -= 1
+        matchInfo.advTurn = True
+        if self is self.squad.squadLead:
+            from .travel import follow
+            follow(matchInfo, self.squad)
+        return True
 
     def _spend_radar_energy(self):
         """Spend the configured radar scan cost when the reserve can cover it."""

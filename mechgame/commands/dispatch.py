@@ -36,8 +36,10 @@ def receive_input(matchInfo):
             return optionsMenu(matchInfo)
         case "n" | "next":
             return matchInfo.nextMechinTeam()
-        case "q" | "w" | "e" | "a" | "s" | "d" | "z" | "c":
+        case "q" | "w" | "e" | "a" | "s" | "d" | "z" | "c" | "7" | "8" | "9" | "4" | "6" | "1" | "2" | "3":
             return matchInfo.pov.moveMech(matchInfo, player_input)
+        case "5" | "wait":
+            return matchInfo.pov.wait(matchInfo)
         case "r" | "radar":
             return radarToggle(matchInfo)
         case "p":
@@ -63,6 +65,10 @@ def receive_input(matchInfo):
             return True
         case "end":
             # This is the sole command that hands control to the next squad.
+            # Give lagging followers their unused movement even if the SL
+            # stood still or has already spent all its own action points.
+            from ..travel import follow
+            follow(matchInfo, matchInfo.pov.squad)
             matchInfo.turnEnded = True
         case "look" | "l":
             return lookAt(matchInfo)

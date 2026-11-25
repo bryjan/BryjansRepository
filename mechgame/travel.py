@@ -91,7 +91,7 @@ def _follow_road(match, squad, mech, roads):
 
 
 def follow(match, squad):
-    """After a manual SL move, run one normal AI follower pass in this turn."""
+    """Use available follower actions after SL movement, waiting or ending turn."""
     from .ai import _is_roadway, _move_follower
     if not squad.autoTravelEnabled or not squad.playerControlled or not squad.mechList:
         return []

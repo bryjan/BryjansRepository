@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from mechgame.runner import Game
 from mechgame.formation import formation_radius
+from mechgame.commands import dispatch
+from mechgame.commands.navigation import abilityMenu
 
 
 class AutoTravelTests(unittest.TestCase):
@@ -96,6 +98,72 @@ class AutoTravelTests(unittest.TestCase):
                 self.assertTrue(self.leader.moveTo(self.match, [21 + turn, 10]))
         self.assertGreater(follower.pos[0], 5)
         self.assertIs(self.match.map[follower.pos[1]][follower.pos[0]].terrain, self.match.road)
+
+    def test_wait_keeps_leader_still_and_lets_lagging_follower_move(self):
+        follower = self.squad.mechList[1]
+        self.squad.mechList = [self.leader, follower]
+        self.match.entities = list(self.squad.mechList)
+        self.match.pov = self.leader
+        self.leader.pos, follower.pos = [20, 10], [9, 10]
+        ap, mp, energy, round_number = self.leader.ap, self.leader.mp, self.leader.energy, self.match.matchRound
+        with patch("builtins.input", return_value="5"), patch("builtins.print"):
+            self.assertTrue(dispatch.receive_input(self.match))
+        self.assertEqual(self.leader.pos, [20, 10])
+        self.assertEqual((self.leader.ap, self.leader.mp, self.leader.energy), (ap - 1, mp, energy))
+        self.assertGreater(follower.pos[0], 9)
+        self.assertEqual(self.match.matchRound, round_number)
+        self.assertFalse(self.match.turnEnded)
+
+    def test_end_lets_followers_catch_up_even_when_leader_has_no_ap(self):
+        follower = self.squad.mechList[1]
+        self.squad.mechList = [self.leader, follower]
+        self.match.entities = list(self.squad.mechList)
+        self.match.pov = self.leader
+        self.leader.pos, follower.pos = [20, 10], [9, 10]
+        self.leader.ap = 0
+        with patch("builtins.input", return_value="end"), patch("builtins.print"):
+            dispatch.receive_input(self.match)
+        self.assertEqual(self.leader.pos, [20, 10])
+        self.assertEqual(self.leader.ap, 0)
+        self.assertGreater(follower.pos[0], 9)
+        self.assertTrue(self.match.turnEnded)
+
+    def test_wait_without_auto_travel_and_without_ap(self):
+        self.squad.autoTravelEnabled = False
+        positions = [list(mech.pos) for mech in self.squad.mechList]
+        self.assertTrue(self.leader.wait(self.match))
+        self.assertEqual([mech.pos for mech in self.squad.mechList], positions)
+        self.leader.ap = 0
+        with patch("builtins.print"):
+            self.assertFalse(self.leader.wait(self.match))
+        self.assertEqual(self.leader.ap, 0)
+
+    def test_numpad_directions_use_the_same_movement_rules(self):
+        self.match.entities = [self.leader]
+        self.match.pov = self.leader
+        self.squad.autoTravelEnabled = False
+        for key, delta in {"7": (-1, 1), "8": (0, 1), "9": (1, 1), "4": (-1, 0),
+                           "6": (1, 0), "1": (-1, -1), "2": (0, -1), "3": (1, -1)}.items():
+            with self.subTest(key=key):
+                self.leader.pos = [20, 20]
+                self.leader.ap = self.leader.mechClass.apMax
+                self.leader.mp = self.leader.mechClass.mpMax
+                self.leader.energy = self.leader.mechClass.energyMax
+                with patch("builtins.input", return_value=key):
+                    self.assertTrue(dispatch.receive_input(self.match))
+                self.assertEqual(self.leader.pos, [20 + delta[0], 20 + delta[1]])
+                self.assertEqual(self.leader.ap, self.leader.mechClass.apMax - 1)
+                self.assertEqual(self.leader.mp, self.leader.mechClass.mpMax - 1)
+                self.assertEqual(self.leader.energy, self.leader.mechClass.energyMax - 1)
+
+    def test_dash_menu_accepts_numpad_direction(self):
+        self.match.pov = self.leader
+        dash = self.leader.mechClass.hull.abilities[0]
+        with patch("builtins.input", side_effect=["1", "8"]), patch(
+            "mechgame.commands.navigation.pv.printPOV"
+        ), patch.object(dash, "use") as use:
+            abilityMenu(self.match)
+        use.assert_called_once_with(self.match, self.leader, "w")
 
 
 if __name__ == "__main__":
