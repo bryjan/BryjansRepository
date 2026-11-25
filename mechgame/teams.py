@@ -96,6 +96,7 @@ class Squad:
         self.supplies = 0
         self.effectiveness = 100
         self.reportLog = []
+        self.aiLog = []
         # Force values use the cross-class balance rule: a mech is worth
         # roughly three combat-ready mechs one size class below it.
         self.combatReadyCount = 0
@@ -137,6 +138,13 @@ class Squad:
                 entity.radarOn = entity.radarPulseActive = False
             entity.roundRefresh(matchInfo)
         self.refreshCombatForce()
+
+    def logAI(self, matchInfo, message):
+        """Keep a bounded decision history for the read-only AI debugger."""
+        entry = (matchInfo.matchRound, message)
+        if not self.aiLog or self.aiLog[-1] != entry:
+            self.aiLog.append(entry)
+            self.aiLog = self.aiLog[-200:]
 
     @staticmethod
     def _combat_force_for_size(size):

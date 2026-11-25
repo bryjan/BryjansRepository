@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, start_menu
+from mechgame.raid import ensure_land_access
 
 
 class RaidTests(unittest.TestCase):
@@ -22,6 +23,36 @@ class RaidTests(unittest.TestCase):
         with patch("builtins.input", return_value="s"), patch("builtins.print"):
             self.assertEqual(start_menu(settings).scenario, "skirmish")
 
+    def test_deployments_vary_but_repeat_with_the_same_seed(self):
+        positions = {tuple(self.match.pov.pos)}
+        bases = {self.objective.base_tiles}
+        for seed in (0, 1):
+            match = Game(scenario="raid_military_base", rng=random.Random(seed)).create_match()
+            positions.add(tuple(match.pov.pos))
+            bases.add(match.raidObjective.base_tiles)
+            self.assertFalse(any(route.kind == "raid_access" for route in match.mapFeatures.roads))
+        self.assertEqual(len(positions), 3)
+        self.assertEqual(len(bases), 3)
+        repeat = Game(scenario="raid_military_base", rng=random.Random(7)).create_match()
+        self.assertEqual(tuple(repeat.pov.pos), tuple(self.match.pov.pos))
+        self.assertEqual(repeat.raidObjective.base_tiles, self.objective.base_tiles)
+
+    def test_water_only_crossings_preserve_natural_land_approaches(self):
+        for row in self.match.map[1:-1]:
+            for cell in row[1:-1]:
+                cell.terrain = self.match.plains
+        self.match.mapFeatures.roads.clear()
+        ensure_land_access(self.match, (5, 20), [(30, 20)])
+        self.assertEqual(self.match.mapFeatures.roads, [])
+        for y in range(1, self.match.mapHeight - 1):
+            self.match.map[y][20].terrain = self.match.water
+        ensure_land_access(self.match, (5, 20), [(30, 20)])
+        crossings = [route for route in self.match.mapFeatures.roads if route.kind == "raid_bridge"]
+        self.assertEqual(len(crossings), 1)
+        self.assertEqual(len(crossings[0].tiles), 1)
+        self.assertTrue(all(self.match.map[y][x].terrain is self.match.road for x, y in crossings[0].tiles))
+        self.assertIs(self.match.map[20][5].terrain, self.match.plains)
+
     def test_rosters_positions_and_enemy_orders(self):
         self.assertEqual([len(s.mechList) for s in self.player.squadsList], [5, 3])
         self.assertEqual([len(s.mechList) for s in self.enemy.squadsList], [3, 2, 4])
@@ -34,7 +65,9 @@ class RaidTests(unittest.TestCase):
             self.assertEqual([m.mechClass.name for m in squad.mechList], names)
             self.assertEqual(squad.currentGoal.kind, "defend_location")
         self.assertEqual(len({tuple(e.pos) for e in self.match.entities}), 17)
-        self.assertTrue(all(m.pos[0] <= 8 for s in self.player.squadsList for m in s.mechList))
+        self.assertTrue(all(min(m.pos[0], m.pos[1], self.match.mapWidth - 1 - m.pos[0],
+                                self.match.mapHeight - 1 - m.pos[1]) <= 12
+                            for s in self.player.squadsList for m in s.mechList))
         self.assertTrue(self.enemy.mapVisibility.show_all_terrain)
 
     def test_initial_deployment_cannot_be_seen_or_detected_by_overdrive(self):

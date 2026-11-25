@@ -15,11 +15,15 @@ python main.py
 Playable maps are a minimum of **40×40** tiles. The start menu offers `'s'` to
 launch the demo skirmish and `'o'` for complete display size and map generation.
 Choose `'t'` for the **Raid Military Base** test match. It uses a random map
-at least 100×100, with an edge-side base and a distant, initially undetected
+at least 100×100, with a randomized edge-side base and a distant, initially undetected
 player deployment. The player controls the skirmish Lancer squad plus a
 sensor/two-mortar support squad. Defenders have terrain knowledge and base-defense
 orders: one squad has a Kestrel and two Bastions; another has a Kestrel and a
 mortar Lancer; the third has three standard Lancers and a sensor Lancer.
+Player entry can be on any of the four edges, with varying positions for both
+player squads and the base. Terrain generation stays random and seeded runs
+remain reproducible. No road is forced from the player spawn to the base;
+setup preserves natural approaches and adds only essential water crossings.
 
 To raid the base, end a squad turn with a mech inside the marked compound
 and keep it there until that squad's next turn. Then extract every surviving
@@ -38,6 +42,34 @@ Select an entry for objective rules, progress, coordinates, or support details.
 Artillery/smoke requests include distance, suitable ammunition, range, scatter,
 flight time and costs. Requests retain their reported positions, expire after
 two rounds without renewal, and can be dismissed. Use `'n'` / `'p'` to page.
+
+Open `debug` (or map → `'d'`) for inspection controls. Choose `'o'` for enemy
+team/squad orders, goals, patrol/ambush/attack state and unit resources; choose
+`'l'` for enemy AI decisions, order history and reports. These paginated views
+intentionally expose debug information without changing fog, enemy report read
+flags or the AI's own knowledge. Each squad retains its last 200 decision entries.
+
+## Map size and profiling
+
+Run `python -m scripts.benchmark_maps --sizes 100 200 300` for a repeatable
+quiet-raid benchmark. It measures generation, vision, a radar rebuild, overview
+rendering to memory, and one round of updates/AI with the normal 17-mech roster.
+
+Example local measurements (seed 7; hardware and terrain affect results):
+
+| Map | Tiles | Generation | Quiet round | Radar rebuild |
+| --- | ---: | ---: | ---: | ---: |
+| 100×100 | 10,000 | 1.1 s | 0.30 s | 48 ms |
+| 200×200 | 40,000 | 8.2 s | 1.01 s | 195 ms |
+| 300×300 | 90,000 | 35.0 s | 1.87 s | 405 ms |
+
+200×200 is a reasonable next test size; 300×300 is usable but has noticeable
+startup/turn delays in the current implementation. Larger populations, multiple
+active radars, combat and terrain effects add work. There is no fixed upper map
+limit, but maps above this tested range need profiling rather than a performance
+guarantee. Generation spends most of its time scanning candidate placements for
+military bases and city blocks; runtime still has several whole-map visibility,
+radar-clear and effect scans. Those are the main targets before much larger maps.
 
 In the squad menu (`sq`), use `'a'` to switch any friendly squad between AI and
 manual control. Use `'o'` to give move, defend, road patrol, attack, ambush,

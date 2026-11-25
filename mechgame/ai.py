@@ -1005,6 +1005,17 @@ def _fire_artillery_if_ordered(match_info, squad, mech):
 
 
 def execute_squad_combat(match_info, squad=None):
+    """Execute combat and retain its resulting assessment for debug inspection."""
+    squad = squad or match_info.pov.squad
+    fired = _execute_squad_combat(match_info, squad)
+    if not squad.playerControlled:
+        squad.logAI(match_info, f"Combat: {squad.combatPosture}; fired {len(fired)} mech(s); "
+                    f"assessment {squad.engagementAssessment}; damage given/received "
+                    f"{squad.damageGiven:.0f}/{squad.damageReceived:.0f}; avoid={squad.avoidContact}.")
+    return fired
+
+
+def _execute_squad_combat(match_info, squad=None):
     """Run one bounded, visibility-limited combat pass for a non-player squad.
 
     Direct weapons fire at visual threats whenever a shot can land. Mechs with
@@ -1466,6 +1477,23 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
 
 
 def execute_squad_movement(match_info, squad=None):
+    """Execute movement and log progress or the most likely hold reason."""
+    squad = squad or match_info.pov.squad
+    start = tuple(squad.squadLead.pos) if squad.squadLead else None
+    moved = _execute_squad_movement(match_info, squad)
+    if not squad.playerControlled:
+        end = tuple(squad.squadLead.pos) if squad.squadLead else None
+        reason = "advanced" if moved else "holding/blocked"
+        if not moved and squad.mechList and not _squad_ready_to_advance(squad):
+            reason = "waiting for energy reserves"
+        elif not moved and squad.squadLead and _leader_needs_regroup(squad, max(10, squad.squadLead.visPower)):
+            reason = "regrouping/spacing"
+        squad.logAI(match_info, f"Movement: {reason}; {squad.movementMode}/{squad.movementBehavior}; "
+                    f"SL {start} -> {end}; {len(set(moved))} mech(s) moved.")
+    return moved
+
+
+def _execute_squad_movement(match_info, squad=None):
     """Perform visibility-limited AI movement under squad reserve policies.
 
     Leaders hold to correct both the visual tether (at least 10 tiles) and

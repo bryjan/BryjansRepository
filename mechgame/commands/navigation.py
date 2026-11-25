@@ -59,10 +59,12 @@ def debugMapMenu(matchInfo):
             f"'t' Tactical markers: {tactical_state}",
             f"'f' Fog of war: {fog_state}",
             f"'v' Reveal unseen units: {reveal_state}",
+            "'o' Enemy squad orders",
+            "'l' Enemy AI logs and reports",
         ]
         pv.print_overview(
             matchInfo,
-            command_text="Debug: 't' markers | 'f' fog | 'v' reveal all | 'x' return to map",
+            command_text="Debug: 't' markers | 'f' fog | 'v' reveal all | 'o' enemy orders | 'l' enemy logs | 'x' return to map",
             right_panel=("MAP DEBUG", entries),
         )
         choice = input("Map debug: ").strip().lower()
@@ -77,7 +79,11 @@ def debugMapMenu(matchInfo):
         if choice == "v":
             visibility.debug_reveal_all = not visibility.debug_reveal_all
             continue
-        print("Choose 't', 'f', 'v', or 'x'.")
+        if choice in {"o", "l"}:
+            from .debug import inspect_enemy
+            inspect_enemy(matchInfo, logs=choice == "l")
+            continue
+        print("Choose 't', 'f', 'v', 'o', 'l', or 'x'.")
 
 
 def radarMenu(matchInfo):

@@ -15,6 +15,9 @@ def receive_input(matchInfo):
             return matchInfo.request_quit()
         case "?":
             return helpCommand(matchInfo)
+        case "debug":
+            from .navigation import debugMapMenu
+            return debugMapMenu(matchInfo)
         case "rep":
             return reportMenu(matchInfo)
         case "rep1":

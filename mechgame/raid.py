@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 import math
+import heapq
 
 from .ai import SquadGoal
 from .stamps import MilitaryBaseStamp
@@ -66,10 +67,82 @@ class RaidObjective:
         return True
 
 
+def ensure_land_access(match, start, goals):
+    """Preserve natural routes; bridge the minimum water only if it blocks access."""
+    start, goals = tuple(start), set(goals)
+    costs, previous = {start: (0, 0)}, {}
+    frontier = [(0, 0, start)]
+    while frontier:
+        water, steps, point = heapq.heappop(frontier)
+        if costs[point] != (water, steps):
+            continue
+        if point in goals:
+            route = []
+            while point != start:
+                route.append(point)
+                point = previous[point]
+            bridges, segment = [], []
+            for x, y in reversed(route):
+                cell = match.map[y][x]
+                if cell.terrain.requireFloat:
+                    cell.terrain = match.road
+                    segment.append(cell)
+                elif segment:
+                    bridges.append(segment)
+                    segment = []
+            if segment:
+                bridges.append(segment)
+            for bridge in bridges:
+                match.mapFeatures.add_road("raid_bridge", bridge)
+                match.mapFeatures.add_tactical_location(
+                    f"raid_bridge_{len(match.mapFeatures.roads)}", "River crossing", "bridge",
+                    bridge, marker_tiles=[bridge[0], bridge[-1]],
+                )
+            match.mapFeatures.refresh_bridges()
+            return
+        x, y = point
+        for dx, dy in ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)):
+            candidate = (x + dx, y + dy)
+            if not (0 < candidate[0] < match.mapWidth - 1 and 0 < candidate[1] < match.mapHeight - 1):
+                continue
+            tile = match.map[candidate[1]][candidate[0]].terrain
+            if not tile.passable:
+                continue
+            cost = (water + int(tile.requireFloat), steps + 1)
+            if cost < costs.get(candidate, (float("inf"), float("inf"))):
+                costs[candidate], previous[candidate] = cost, point
+                heapq.heappush(frontier, (*cost, candidate))
+    raise ValueError("Raid deployment has no traversable route to the base.")
+
+
 def setup(match):
     """Place a guaranteed edge base and separated forces on a random map."""
     player, defender = match.teamList
-    origin = (match.mapWidth - 16, match.mapHeight // 2 - 4)
+    # Work in an entry-to-base coordinate frame, then rotate/reflect it onto
+    # any map edge. Both lateral positions and distance from the edges vary.
+    edge = match.rng.randrange(4)
+    span_u = match.mapWidth if edge < 2 else match.mapHeight
+    span_v = match.mapHeight if edge < 2 else match.mapWidth
+
+    def project(u, v):
+        if edge == 0:
+            return (u, v)
+        if edge == 1:
+            return (match.mapWidth - 1 - u, v)
+        if edge == 2:
+            return (v, u)
+        return (v, match.mapHeight - 1 - u)
+
+    base_u = match.rng.randint(span_u - 26, span_u - 14)
+    base_v = match.rng.randint(18, span_v - 26)
+    entry_v = match.rng.randint(15, span_v - 16)
+    corners = [project(base_u, base_v), project(base_u + 7, base_v + 7)]
+    origin = (min(point[0] for point in corners), min(point[1] for point in corners))
+    player_anchors = [(match.rng.randint(4, 9), entry_v - 6),
+                      (match.rng.randint(4, 9), entry_v + 6)]
+    defender_anchors = [(base_u + 4 + match.rng.randint(-2, 2),
+                         base_v + 4 + (index - 1) * 10 + match.rng.randint(-1, 1))
+                        for index in range(len(defender.squadsList))]
     stamp = MilitaryBaseStamp(8, 8)
     footprint = set(stamp.positions(origin))
     match.mapFeatures.military_bases = [base for base in match.mapFeatures.military_bases
@@ -83,30 +156,23 @@ def setup(match):
     base = generator.add_military_base(match.map, match.road, match.suburb, origin=origin, stamp=stamp)
     if base is None:
         raise ValueError("Could not place the raid base.")
-    center = (origin[0] + 4, origin[1] + 4)
+    center = project(base_u + 4, base_v + 4)
     # Clear a compact entry zone so neither player squad starts isolated in
     # a pond or behind an impassable patch, regardless of the chosen preset.
-    for y in range(center[1] - 10, center[1] + 11):
-        for x in range(1, 10):
+    for v in range(entry_v - 10, entry_v + 11):
+        for u in range(1, 13):
+            x, y = project(u, v)
             match.map[y][x].terrain = match.plains
-    # A narrow access route guarantees that water/mountains cannot seal the
-    # player out. It is recorded so road patrol and future route AI can use it.
-    access = []
-    for x in range(2, origin[0] + 1):
-        cell = match.map[center[1]][x]
-        cell.terrain = match.road
-        access.append(cell)
-    match.mapFeatures.add_road("raid_access", access)
-    match.mapFeatures.refresh_bridges()
+    # Do not lay a road from the player's deployment to the objective. Keep
+    # a natural land approach, adding only an essential water crossing.
+    ensure_land_access(match, project(6, entry_v), base.tiles)
     match.mapFeatures.add_objective("raid_base", "Raid Military Base", "raid_military_base", base.tiles)
-    match.mapFeatures.add_tactical_location("raid_base_approach", "Base entrance", "base_entrance", ((origin[0], center[1]),))
+    match.mapFeatures.add_tactical_location("raid_base_approach", "Base entrance", "base_entrance", (project(base_u, base_v + 4),))
     occupied = set()
     for side, team in enumerate((player, defender)):
         for index, squad in enumerate(team.squadsList):
-            anchor = (5, center[1] - 6 + index * 10) if side == 0 else (
-                center[0], center[1] + (index - 1) * 10,
-            )
-            positions = [(anchor[0] + dx, anchor[1] + dy)
+            anchor = player_anchors[index] if side == 0 else defender_anchors[index]
+            positions = [project(anchor[0] + dx, anchor[1] + dy)
                          for dx, dy in ((0, 0), (-3, -3), (3, 3), (-3, 3), (3, -3))]
             for mech, position in zip(squad.mechList, positions):
                 if position in occupied:
@@ -134,7 +200,7 @@ def setup(match):
     match.pov = match.playerSquad.squadLead
     match.raidObjective = RaidObjective(player, defender, frozenset(base.tiles))
     for index, squad in enumerate(defender.squadsList):
-        post = (center[0], center[1] + (index - 1) * 10)
+        post = project(*defender_anchors[index])
         goal = SquadGoal(f"raid_defense_{index}", "raid_defense", "defend_location", 100,
                          (post,), "Defend the military base and its approaches.")
         squad.currentGoal = goal
