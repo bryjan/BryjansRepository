@@ -288,14 +288,15 @@ class MatchFlowTests(unittest.TestCase):
         for index, entity in enumerate(match.teamList[0].squadsList[0].mechList):
             entity.pos = [35 + (index % 2), 35 + (index // 2)]
         leader.pos = [10, 10]
-        first_follower.pos = [26, 10]
+        # The tighter five-tile teammate tether can be regained in one burst.
+        first_follower.pos = [18, 10]
         second_follower.pos = [7, 13]
         match.issueTeamObjective(match.teamList[1], "defend", 80, (30, 10), "Advance.")
         first_follower.energy = math.ceil(first_follower.mechClass.energyMax * .90)
 
         execute_squad_movement(match, squad)
         self.assertLessEqual(
-            math.dist(first_follower.pos, leader.pos), max(10, leader.visPower),
+            math.dist(first_follower.pos, leader.pos), 5,
         )
         self.assertLess(first_follower.energy, math.ceil(first_follower.mechClass.energyMax * .90))
 

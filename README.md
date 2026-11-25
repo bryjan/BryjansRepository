@@ -116,7 +116,11 @@ squad leader manually; after each move the other mechs use normal formation
 rules, AP, MP and energy reserves to follow. When the leader is on a road or
 tunnel, followers join that road and use road-following without minimum spacing.
 Warnings appear when any mech drops below 50% energy or a follower lags beyond
-the leader's normal formation range (at least 10 tiles). You still choose when
+the leader's fixed 10-tile formation range. Each mech also stays within five
+tiles of its nearest teammate, retaining three-tile minimum spacing off-road.
+Followers already in formation can hold position;
+road columns advance front to back and retry after a teammate clears a cell.
+You still choose when
 to end the turn. Toggle `auto` again to disable following. `quit` abandons the
 match without saving it or producing an after-action result.
 

@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 import math
 
+from .formation import formation_radius
+
 
 @dataclass
 class CombinedAttack:
@@ -135,7 +137,7 @@ def update(match, team):
         if order.state == "staging":
             ready = all(
                 math.dist(s.squadLead.pos, order.staging_positions[s]) <= 2
-                and all(math.dist(mech.pos, s.squadLead.pos) <= max(10, s.squadLead.visPower)
+                and all(math.dist(mech.pos, s.squadLead.pos) <= formation_radius(s.squadLead)
                         and mech.energy >= mech.mechClass.energyMax * .9 for mech in s.mechList)
                 for s in live_squads
             )

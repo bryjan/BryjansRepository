@@ -4,6 +4,13 @@ import heapq
 import math
 
 MAX_CATCHUP_SEARCH = 2500
+MAX_LEADER_DISTANCE = 10
+MAX_TEAMMATE_DISTANCE = 5
+
+
+def formation_radius(leader):
+    """Use a fixed formation tether, independent of sensor range or boosts."""
+    return MAX_LEADER_DISTANCE
 
 
 def catchup_route(match, squad, mech, leader_range):
@@ -19,6 +26,7 @@ def catchup_route(match, squad, mech, leader_range):
     return _find_route(
         match, mech,
         lambda point: (math.dist(point, leader.pos) <= leader_range
+                       and min(math.dist(point, other) for other in teammates) <= MAX_TEAMMATE_DISTANCE
                        and all(math.dist(point, other) >= FORMATION_SPACING for other in teammates)),
         lambda point: max(0, math.dist(point, leader.pos) - leader_range) / math.sqrt(2),
     )

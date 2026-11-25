@@ -27,9 +27,9 @@ class FormationTests(unittest.TestCase):
         follower.pos = [5, 10]
         starting_ap, starting_energy = follower.ap, follower.energy
         for _ in range(4):
-            self.leader.pos = [follower.pos[0] + 11, 10]
+            self.leader.pos = [follower.pos[0] + 6, 10]
             self.assertTrue(_move_follower(self.match, self.squad, follower, 10, False))
-            self.assertLessEqual(math.dist(follower.pos, self.leader.pos), 10)
+            self.assertLessEqual(math.dist(follower.pos, self.leader.pos), 5)
         self.assertEqual(follower.ap, starting_ap - 4)
         self.assertEqual(follower.energy, starting_energy - 4)
         self.assertTrue(_can_begin_movement(follower, "move"))

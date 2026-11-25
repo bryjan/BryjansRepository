@@ -13,6 +13,7 @@ from . import artillery
 from . import ambush
 from . import coordination
 from . import recon
+from .formation import MAX_TEAMMATE_DISTANCE, formation_radius
 
 __all__ = [
     "SquadGoal", "TeamGoal", "assign_team_goals", "assign_team_goals_to_squads",
@@ -1285,7 +1286,7 @@ def _formation_status(position, leader_position, teammate_positions, leader_rang
     )
     return (
         leader_distance <= leader_range,
-        nearest_teammate >= FORMATION_SPACING,
+        FORMATION_SPACING <= nearest_teammate <= MAX_TEAMMATE_DISTANCE,
         leader_distance,
         nearest_teammate,
     )
@@ -1299,12 +1300,12 @@ def _leader_needs_regroup(squad, leader_range):
         if mech is leader:
             continue
         teammates = [other.pos for other in squad.mechList if other is not mech]
-        within_range, spaced, _, _ = _formation_status(
+        within_range, spaced, _, nearest = _formation_status(
             mech.pos, leader.pos, teammates, leader_range,
         )
         # Road patrols may file close together on narrow roads. Applying
         # off-road spacing here can leave the leader waiting indefinitely.
-        if not within_range or (not spaced and not road_patrol):
+        if not within_range or nearest > MAX_TEAMMATE_DISTANCE or (not spaced and not road_patrol):
             return True
     return False
 
@@ -1444,7 +1445,13 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
     # follower is catching up, so the formation does not pile up at the lead.
     if not _can_begin_movement(mech, squad.movementMode):
         return moved
-    if math.dist(mech.pos, leader.pos) > leader_range:
+    if roadway_only and _is_roadway(match_info, leader.pos):
+        # Share the column rules with player auto-travel: road followers
+        # close without off-road spacing and stay on the connected road.
+        from .travel import _follow_road, _road_distances
+        return _follow_road(match_info, squad, mech, _road_distances(match_info, leader))
+    nearest = min(math.dist(mech.pos, other.pos) for other in squad.mechList if other is not mech)
+    if math.dist(mech.pos, leader.pos) > leader_range or nearest > MAX_TEAMMATE_DISTANCE:
         from .formation import catchup_route
         route = catchup_route(match_info, squad, mech, leader_range)
         for position in route:
@@ -1490,7 +1497,7 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
                 key=lambda candidate: (
                     candidate[0][0],
                     -max(0, candidate[0][2] - leader_range),
-                    min(FORMATION_SPACING, candidate[0][3]),
+                    -max(0, FORMATION_SPACING - candidate[0][3], candidate[0][3] - MAX_TEAMMATE_DISTANCE),
                     -candidate[1], -candidate[0][2],
                 ),
             )
@@ -1510,7 +1517,7 @@ def execute_squad_movement(match_info, squad=None):
         reason = "advanced" if moved else "holding/blocked"
         if not moved and squad.mechList and not _squad_ready_to_advance(squad):
             reason = "waiting for energy reserves"
-        elif not moved and squad.squadLead and _leader_needs_regroup(squad, max(10, squad.squadLead.visPower)):
+        elif not moved and squad.squadLead and _leader_needs_regroup(squad, formation_radius(squad.squadLead)):
             reason = "regrouping/spacing"
         squad.logAI(match_info, f"Movement: {reason}; {squad.movementMode}/{squad.movementBehavior}; "
                     f"SL {start} -> {end}; {len(set(moved))} mech(s) moved.")
@@ -1520,8 +1527,9 @@ def execute_squad_movement(match_info, squad=None):
 def _execute_squad_movement(match_info, squad=None):
     """Perform visibility-limited AI movement under squad reserve policies.
 
-    Leaders hold to correct both the visual tether (at least 10 tiles) and
-    three-tile unit spacing. Followers keep spacing even while another unit
+    Leaders hold to keep followers within 10 tiles and each mech within five
+    tiles of a teammate, retaining three-tile off-road spacing. Followers
+    keep spacing even while another unit
     is regrouping. After regrouping, the leader waits for every member to
     reach the mode's burst ceiling before advancing. Patrol/defense squads
     follow a recorded road route, reversing at its endpoint, until combat or
@@ -1541,7 +1549,7 @@ def _execute_squad_movement(match_info, squad=None):
 
     coordination.update(match_info, squad.team)
 
-    leader_range = max(MIN_LEADER_VISUAL_RANGE, squad.squadLead.visPower)
+    leader_range = formation_radius(squad.squadLead)
     roadway_only = _road_patrol_active(squad)
     if roadway_only:
         _ensure_road_patrol(match_info, squad)
