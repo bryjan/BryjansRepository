@@ -54,11 +54,20 @@ def items(match, squad):
     if raid is not None and squad.team is raid.player:
         xs, ys = zip(*raid.base_tiles)
         center = (round(sum(xs) / len(xs)), round(sum(ys) / len(ys)))
-        result.append(ObjectiveItem("Raid Military Base", "Completed" if raid.raided else "Failed" if match.matchOver else "In progress", (
-            f"Base marker: green 'M' on the map at {list(center)}.",
+        occupants = raid.occupants(match)
+        holding = any(mech in raid.held_since for mech in occupants)
+        status = ("Completed" if raid.raided else "Failed" if match.matchOver else
+                  "Holding" if holding else "Inside — end turn" if occupants else "In progress")
+        distance = min(math.dist(match.pov.pos, point) for point in raid.base_tiles)
+        roster = ", ".join(f"{mech.pilot.display_name} at {mech.pos}" for mech in occupants) or "None"
+        result.append(ObjectiveItem("Raid Military Base", status, (
+            f"Objective marker: yellow 'R' on the map at {list(center)}. Other green 'M' bases do not count.",
             f"Footprint: X {min(xs)}–{max(xs)}, Y {min(ys)}–{max(ys)}.",
-            raid.status(),
-            "End a squad turn with a mech inside the base. Keep it inside and alive until that same squad's next turn.",
+            "Zoomed-out map cells cover several tiles; use these bounds to confirm entry.",
+            f"Active mech: {'inside objective base' if tuple(match.pov.pos) in raid.base_tiles else 'outside objective base'}; distance {distance:.1f} tiles.",
+            f"Friendly mechs inside: {roster}.",
+            raid.status(match),
+            "End a friendly squad turn with a mech inside the base. Keep it inside and alive through the enemy response until the next friendly round.",
             "Leaving the base interrupts that mech's hold. The first completed hold raids the base for the whole team.",
         )))
         extracted = not any(s.mechList for s in raid.player.squadsList) and any(m.team is raid.player for m in match.fledMechs)

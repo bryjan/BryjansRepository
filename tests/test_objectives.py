@@ -26,7 +26,7 @@ class ObjectiveTests(unittest.TestCase):
         self.squad.team.mapVisibility.show_all_objectives = True
         with patch("mechgame.ui.tactical.termcolor.colored", return_value="base") as color, patch("builtins.print") as output, patch.object(enemy, "displayObject") as enemy_symbol:
             tactical._display_overview_chunk(self.match, [[cell]])
-        color.assert_called_once_with("M", "green")
+        color.assert_called_once_with("R", "yellow")
         output.assert_called_once_with("base", end=" ")
         enemy_symbol.assert_not_called()
         self.assertNotIn((30, 30), self.squad.team.exploredTiles)

@@ -9,6 +9,7 @@ from mechgame.runner import Game
 from mechgame.ui.menu import DisplaySettings, start_menu
 from mechgame.raid import ensure_land_access
 from mechgame.ai import execute_squad_combat, execute_squad_movement
+from mechgame.objectives import items
 
 
 class RaidTests(unittest.TestCase):
@@ -158,8 +159,69 @@ class RaidTests(unittest.TestCase):
         mech.pos = [10, 10]
         self.objective.moved(mech)
         mech.pos = list(next(iter(self.objective.base_tiles)))
+        self.match.matchRound += 1
         self.objective.begin_turn(self.match, squad)
         self.assertFalse(self.objective.raided)
+
+    def test_switching_squads_before_end_records_the_occupying_team_mech(self):
+        occupying, selected = self.player.squadsList
+        mech = occupying.squadLead
+        mech.pos = list(next(iter(self.objective.base_tiles)))
+        self.match.pov = selected.squadLead
+        self.assertEqual(items(self.match, selected)[0].status, "Inside — end turn")
+        self.match.nextSquadTurn()
+        self.assertIn(mech, self.objective.held_since)
+        self.assertEqual(items(self.match, selected)[0].status, "Holding")
+        self.assertFalse(self.objective.raided)
+        for _ in range(3):
+            self.match.nextSquadTurn()
+        self.assertTrue(self.objective.raided)
+        self.assertEqual(items(self.match, selected)[0].status, "Completed")
+
+    def test_friendly_handoffs_in_same_round_do_not_complete_the_hold(self):
+        first, second = self.player.squadsList
+        first.squadLead.pos = list(next(iter(self.objective.base_tiles)))
+        self.objective.end_turn(self.match, first)
+        self.objective.begin_turn(self.match, second)
+        self.assertFalse(self.objective.raided)
+        self.objective.end_turn(self.match, second)
+        self.match.matchRound += 1
+        self.objective.begin_turn(self.match, first)
+        self.assertTrue(self.objective.raided)
+
+    def test_other_base_does_not_count_and_details_explain_exact_location(self):
+        other = next(base for base in self.match.mapFeatures.military_bases
+                     if not set(base.tiles).intersection(self.objective.base_tiles))
+        squad = self.player.squadsList[0]
+        squad.squadLead.pos = list(other.tiles[0])
+        self.match.pov = squad.squadLead
+        self.objective.end_turn(self.match, squad)
+        self.match.matchRound += 1
+        self.objective.begin_turn(self.match, squad)
+        self.assertFalse(self.objective.raided)
+        details = " ".join(items(self.match, squad)[0].details)
+        self.assertIn("yellow 'R'", details)
+        self.assertIn("Other green 'M' bases do not count", details)
+        self.assertIn("outside objective base", details)
+
+    def test_hold_completes_on_a_different_friendly_squads_next_round(self):
+        first, second = self.player.squadsList
+        first.squadLead.pos = list(next(iter(self.objective.base_tiles)))
+        self.objective.end_turn(self.match, first)
+        self.match.matchRound += 1
+        self.objective.begin_turn(self.match, second)
+        self.assertTrue(self.objective.raided)
+
+    def test_destroyed_occupant_cannot_complete_the_hold(self):
+        squad = self.player.squadsList[0]
+        mech = squad.squadLead
+        mech.pos = list(next(iter(self.objective.base_tiles)))
+        self.objective.end_turn(self.match, squad)
+        mech.destroy(self.match)
+        self.match.matchRound += 1
+        self.objective.begin_turn(self.match, squad)
+        self.assertFalse(self.objective.raided)
+        self.assertNotIn(mech, self.objective.held_since)
 
     def test_clearing_enemy_ends_match_even_if_raid_was_not_completed(self):
         for squad in self.enemy.squadsList:

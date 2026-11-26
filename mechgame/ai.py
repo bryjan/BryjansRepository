@@ -13,7 +13,7 @@ from . import artillery
 from . import ambush
 from . import coordination
 from . import recon
-from .formation import MAX_TEAMMATE_DISTANCE, formation_radius
+from .formation import MAX_TEAMMATE_DISTANCE, formation_area, formation_radius
 from .patrols import recorded_road_walk
 
 __all__ = [
@@ -1283,7 +1283,7 @@ def _formation_status(position, leader_position, teammate_positions, leader_rang
     )
 
 
-def _leader_needs_regroup(squad, leader_range):
+def _leader_needs_regroup(squad, leader_range, match_info=None):
     """Return whether any follower needs range or spacing correction."""
     leader = squad.squadLead
     road_patrol = _road_patrol_active(squad) and bool(squad.patrolRoute)
@@ -1297,6 +1297,8 @@ def _leader_needs_regroup(squad, leader_range):
         # Road patrols may file close together on narrow roads. Applying
         # off-road spacing here can leave the leader waiting indefinitely.
         if not within_range or nearest > MAX_TEAMMATE_DISTANCE or (not spaced and not road_patrol):
+            return True
+        if match_info is not None and tuple(mech.pos) not in formation_area(match_info, mech, leader_range):
             return True
     return False
 
@@ -1364,6 +1366,27 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
     if not _squad_ready_to_advance(squad):
         return []
     moved = []
+    if not roadway_only:
+        from .formation import destination_route
+        destination = _leader_destination(match_info, squad)
+        if destination is None or _leader_needs_regroup(squad, leader_range, match_info):
+            return moved
+        route = destination_route(
+            match_info, leader, destination,
+            leader.mechClass.energyMax - _energy_floor(leader, squad.movementMode),
+        )
+        for position in route:
+            if _leader_needs_regroup(squad, leader_range, match_info):
+                break
+            energy, reason = leader.moveCostTo(match_info, position)
+            if reason or leader.energy - energy < _energy_floor(leader, squad.movementMode):
+                break
+            if not leader.moveTo(match_info, position, announce=False):
+                break
+            moved.append(leader)
+            if leader.destroyed:
+                break
+        return moved
     if roadway_only and squad.patrolRoute and tuple(leader.pos) not in squad.patrolRoute:
         from .formation import road_approach_route
         # A nearby road may be disconnected from the assigned patrol. Route
@@ -1373,7 +1396,7 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
             leader.mechClass.energyMax - _energy_floor(leader, squad.movementMode),
         )
         for position in route:
-            if _leader_needs_regroup(squad, leader_range):
+            if _leader_needs_regroup(squad, leader_range, match_info):
                 break
             energy, reason = leader.moveCostTo(match_info, position)
             if reason or leader.energy - energy < _energy_floor(leader, squad.movementMode):
@@ -1383,7 +1406,7 @@ def _move_leader(match_info, squad, leader_range, roadway_only):
             moved.append(leader)
         return moved
     visited = {tuple(leader.pos)}
-    while not _leader_needs_regroup(squad, leader_range):
+    while not _leader_needs_regroup(squad, leader_range, match_info):
         destination = _leader_destination(match_info, squad)
         if roadway_only and not _is_roadway(match_info, leader.pos):
             destination = _nearest_roadway(match_info, leader.pos)
@@ -1442,9 +1465,10 @@ def _move_follower(match_info, squad, mech, leader_range, roadway_only):
         from .travel import _follow_road, _road_distances
         return _follow_road(match_info, squad, mech, _road_distances(match_info, leader))
     nearest = min(math.dist(mech.pos, other.pos) for other in squad.mechList if other is not mech)
-    if math.dist(mech.pos, leader.pos) > leader_range or nearest > MAX_TEAMMATE_DISTANCE:
+    area = formation_area(match_info, mech, leader_range)
+    if tuple(mech.pos) not in area or nearest > MAX_TEAMMATE_DISTANCE:
         from .formation import catchup_route
-        route = catchup_route(match_info, squad, mech, leader_range)
+        route = catchup_route(match_info, squad, mech, leader_range, area)
         for position in route:
             energy, reason = mech.moveCostTo(match_info, position)
             if reason or mech.energy - energy < _energy_floor(mech, squad.movementMode):
@@ -1508,7 +1532,7 @@ def execute_squad_movement(match_info, squad=None):
         reason = ("advanced" if start != end else "no net SL movement") if moved else "holding/blocked"
         if not moved and squad.mechList and not _squad_ready_to_advance(squad):
             reason = "waiting for energy reserves"
-        elif not moved and squad.squadLead and _leader_needs_regroup(squad, formation_radius(squad.squadLead)):
+        elif not moved and squad.squadLead and _leader_needs_regroup(squad, formation_radius(squad.squadLead), match_info):
             reason = "regrouping/spacing"
         squad.logAI(match_info, f"Movement: {reason}; {squad.movementMode}/{squad.movementBehavior}; "
                     f"SL {start} -> {end}; {len(set(moved))} mech(s) moved.")

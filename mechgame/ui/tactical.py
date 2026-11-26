@@ -233,7 +233,7 @@ def _side_panel_lines(matchInfo, height, width=SIDE_PANEL_WIDTH):
     mission_lines = []
     if getattr(matchInfo, "raidObjective", None) is not None:
         mission_lines = _panel_text_lines("Raid Military Base", width)
-        mission_lines.extend(_panel_text_lines(matchInfo.raidObjective.status(), width))
+        mission_lines.extend(_panel_text_lines(matchInfo.raidObjective.status(matchInfo), width))
         mission_lines.append("+" + "-" * width + "+")
         height -= len(mission_lines)
     contacts = radar.tracked_contacts(observer)
@@ -381,7 +381,8 @@ def _display_overview_chunk(matchInfo, chunk):
                       if chunk_tiles.intersection(objective.tiles)
                       and (visibility.show_all_objectives or visibility.debug_reveal_all
                            or visible_tiles.intersection(objective.tiles))), None)
-    objective_symbol = "M" if objective is not None and "base" in objective.kind else "O"
+    objective_symbol = ("R" if objective is not None and objective.kind == "raid_military_base"
+                        else "M" if objective is not None and "base" in objective.kind else "O")
 
     # A completely undiscovered chunk conveys no terrain, units, bases, or
     # effects. The question mark intentionally makes this distinct from a

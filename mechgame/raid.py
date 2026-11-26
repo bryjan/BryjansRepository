@@ -15,39 +15,53 @@ class RaidObjective:
     player: object
     defender: object
     base_tiles: frozenset
-    held_by: dict = field(default_factory=dict)
+    held_since: dict = field(default_factory=dict)
     raided: bool = False
     title: str = "Raid Military Base"
 
-    def status(self):
+    def status(self, match=None):
         if self.raided:
             return "Raid complete: extract or clear enemies."
-        if self.held_by:
-            return "Holding base: survive until this squad's next turn."
+        if self.held_since:
+            return "Holding base: survive the enemy response until the next friendly round."
+        if match is not None and self.occupants(match):
+            return "Inside objective base: end a squad turn to begin the hold."
         return "Enter the marked base and hold for one turn."
 
+    def occupants(self, match):
+        """Return live friendly mechs inside this objective's exact footprint."""
+        return [mech for mech in match.entities if mech.team is self.player
+                and not mech.destroyed and tuple(mech.pos) in self.base_tiles]
+
+    def _refresh_holds(self, match):
+        present = set(self.occupants(match))
+        for mech in list(self.held_since):
+            if mech not in present:
+                self.held_since.pop(mech)
+        return present
+
     def end_turn(self, match, squad):
-        """Start the one-turn hold when a player ends inside the base."""
+        """Record team occupancy even if the player switched squads before end."""
         if squad.team is self.player and not self.raided:
-            for mech in squad.mechList:
-                if tuple(mech.pos) in self.base_tiles:
-                    self.held_by[mech] = squad
+            for mech in self._refresh_holds(match):
+                self.held_since.setdefault(mech, match.matchRound)
 
     def begin_turn(self, match, squad):
-        """Surviving in the base through the enemy response completes the raid."""
+        """Complete after the enemy response, independently of the current POV."""
         if self.raided:
             return
-        for mech, owner in list(self.held_by.items()):
-            if mech not in match.entities or tuple(mech.pos) not in self.base_tiles:
-                self.held_by.pop(mech, None)
-            elif owner is squad:
+        self._refresh_holds(match)
+        if squad.team is self.player:
+            for mech, start_round in self.held_since.items():
+                if match.matchRound <= start_round:
+                    continue
                 self.raided = True
                 mech.report(match, "Base raid complete! Extract surviving mechs or clear the enemy from the map.", critical=True)
                 break
 
     def moved(self, mech):
         if tuple(mech.pos) not in self.base_tiles:
-            self.held_by.pop(mech, None)
+            self.held_since.pop(mech, None)
 
     def finish_if_decided(self, match):
         """Extraction requires at least one intact return; elimination alone loses."""
@@ -271,7 +285,7 @@ def setup(match):
                         raise ValueError("Raid deployment would expose player mechs at the start.")
     for squad in player.squadsList:
         squad.squadLead.report(match,
-            f"Raid Military Base at {list(center)}. End a turn inside and stay until that squad's next turn. "
+            f"Raid Military Base: yellow 'R' at {list(center)}. End a turn inside and hold through the enemy response. "
             "Then extract all surviving mechs using 'flee', or clear all enemies. "
             "Use 'sq' to switch squads; 'm' opens the map and debug controls. 'quit' returns to the test menu.",
             critical=True)

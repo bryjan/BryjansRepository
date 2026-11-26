@@ -33,7 +33,8 @@ remain reproducible. No road is forced from the player spawn to the base;
 setup preserves natural approaches and adds only essential water crossings.
 
 To raid the base, end a squad turn with a mech inside the marked compound
-and keep it there until that squad's next turn. Then extract every surviving
+and keep it there through the enemy response until the next friendly round.
+Switching player squads does not interrupt the team's hold. Then extract every surviving
 player mech using `flee` at a border, or remove all enemy mechs from the map.
 Extracting before completing the raid fails the mission. Use `sq` to change
 player squads, `m` for map/debug controls, and `quit` to return to the menu.
@@ -42,8 +43,10 @@ The after-action screen shows damage dealt/received, destroyed mechs, pilot
 losses and mission objectives, then returns to the menu. Clearing defenders
 before completing the base hold ends the battle with that raid objective failed.
 
-The briefed raid base appears as a green `M` on the map through fog without
-revealing nearby terrain or enemies. Open `obj` / `objectives`, or choose `'o'`
+The briefed raid base appears as a yellow `R` on the map through fog without
+revealing nearby terrain or enemies. Other military bases remain green `M`
+and do not count for the raid. Objective details list the exact footprint and
+friendly occupants. Open `obj` / `objectives`, or choose `'o'`
 in the map menu, for main goals and requests addressed to your active squad.
 Select an entry for objective rules, progress, coordinates, or support details.
 Artillery/smoke requests include distance, suitable ammunition, range, scatter,
@@ -122,6 +125,10 @@ tunnel, followers join that road and use road-following without minimum spacing.
 Warnings appear when any mech drops below 50% energy or a follower lags beyond
 the leader's fixed 10-tile formation range. Each mech also stays within five
 tiles of its nearest teammate, retaining three-tile minimum spacing off-road.
+Formation cells must also connect to the leader over traversable ground;
+standing nearby on the opposite riverbank does not count. AI move orders use
+terrain-aware routes and can detour away from a destination to reach a bridge,
+while retaining movement energy reserves and respecting explored-map knowledge.
 Followers already in formation can hold position;
 road columns advance front to back and retry after a teammate clears a cell.
 You still choose when
