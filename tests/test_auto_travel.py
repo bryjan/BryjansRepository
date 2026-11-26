@@ -109,7 +109,7 @@ class AutoTravelTests(unittest.TestCase):
         with patch("builtins.input", return_value="5"), patch("builtins.print"):
             self.assertTrue(dispatch.receive_input(self.match))
         self.assertEqual(self.leader.pos, [20, 10])
-        self.assertEqual((self.leader.ap, self.leader.mp, self.leader.energy), (ap - 1, mp, energy))
+        self.assertEqual((self.leader.ap, self.leader.mp, self.leader.energy), (ap, mp, energy))
         self.assertGreater(follower.pos[0], 9)
         self.assertEqual(self.match.matchRound, round_number)
         self.assertFalse(self.match.turnEnded)
@@ -135,8 +135,22 @@ class AutoTravelTests(unittest.TestCase):
         self.assertEqual([mech.pos for mech in self.squad.mechList], positions)
         self.leader.ap = 0
         with patch("builtins.print"):
-            self.assertFalse(self.leader.wait(self.match))
+            self.assertTrue(self.leader.wait(self.match))
         self.assertEqual(self.leader.ap, 0)
+
+    def test_wait_with_no_leader_ap_still_allows_follower_actions(self):
+        follower = self.squad.mechList[1]
+        self.squad.mechList = [self.leader, follower]
+        self.match.entities = list(self.squad.mechList)
+        self.leader.pos, follower.pos = [20, 10], [9, 10]
+        self.leader.ap = 0
+        with patch("builtins.print"):
+            self.assertTrue(self.leader.wait(self.match))
+        self.assertEqual(self.leader.ap, 0)
+        self.assertEqual(self.leader.pos, [20, 10])
+        self.assertGreater(follower.pos[0], 9)
+        self.assertLess(follower.ap, follower.mechClass.apMax)
+        self.assertFalse(self.match.turnEnded)
 
     def test_numpad_directions_use_the_same_movement_rules(self):
         self.match.entities = [self.leader]

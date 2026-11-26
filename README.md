@@ -130,7 +130,7 @@ match without saving it or producing an after-action result.
 
 Movement also accepts numpad digits with Num Lock on: `7 8 9` for up-left,
 up, up-right; `4 6` for left/right; `1 2 3` for down-left, down, down-right.
-Use `5` or `wait` to stay in place for one AP without spending MP or energy.
+Use `5` or `wait` to stay in place without spending AP, MP or energy.
 Automatic followers also move when the leader waits and before `end`, so a
 stationary or exhausted leader can let lagging mechs catch up. Waiting does
 not regenerate energy or advance artillery/effect timers; those use normal rounds.

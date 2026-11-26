@@ -464,15 +464,11 @@ class Entity: #a character on the map
         return self.moveTo(matchInfo, targetPos)
 
     def wait(self, matchInfo):
-        """Spend one AP in place while automatic followers catch up.
+        """Stay in place for free while automatic followers catch up.
 
-        Waiting uses no MP or energy and does not advance the match round:
+        Waiting uses no AP, MP or energy and does not advance the match round:
         regeneration, shells and effects still advance through normal turns.
         """
-        if self.ap <= 0:
-            print("No action points remain. Use 'end' to finish the squad turn.")
-            return False
-        self.ap -= 1
         matchInfo.advTurn = True
         if self is self.squad.squadLead:
             from .travel import follow

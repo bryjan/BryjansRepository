@@ -184,7 +184,7 @@ def helpCommand(matchInfo):
     print("Main commands:")
     print("'q' 'w' 'e' 'a' 's' 'd' 'z' 'c' — move in the matching direction.")
     print("Numpad (Num Lock on): '7' '8' '9' / '4' '6' / '1' '2' '3' — move; '8' is up, '2' is down.")
-    print("'5' or 'wait' — wait in place for 1 AP, no MP or energy; auto-travel followers can catch up.")
+    print("'5' or 'wait' — wait in place for free (no AP, MP or energy); auto-travel followers can catch up.")
     print("'f' — fire the selected weapon at the nearest tracked contact; menus offer more targeting choices.")
     print("'fire' — choose the default weapon used by 'f'.")
     print("'r' or 'radar' — toggle continuous active radar; it has an energy cost each turn.")
