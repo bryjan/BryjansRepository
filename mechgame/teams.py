@@ -57,6 +57,8 @@ class Squad:
         # The leader refreshes these from observed contacts before each AI
         # combat pass. They are tactical memory, not hidden enemy knowledge.
         self.artilleryCallTarget = None
+        self.artilleryCallPosition = None
+        self.artilleryCallSource = None
         self.artilleryCallTurns = 0
         self.smokeCallPosition = None
         self.smokeCallTurns = 0

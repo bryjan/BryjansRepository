@@ -42,6 +42,14 @@ a critical report and an objective-menu request, retaining manual control.
 Busy attackers, withdrawing squads and the fixed base guard are not diverted.
 Unrenewed reinforcement orders expire after two rounds and release the helper
 back to its standing orders.
+
+Fire support is renewed every combat turn while the caller faces roughly
+equal force or assesses the engagement as unclear/losing, including during
+retreat. Any friendly artillery with suitable ammunition and range can answer;
+there is no half-ammunition cutoff. Calls stop when combat ends or becomes
+favorable. Lost visual/radar contact retains only the last reported target
+position. Smoke screens retain priority, and lead/friendly-blast checks still
+apply. Player recipients receive one critical warning per active call.
 Player entry can be on any of the four edges, with varying positions for both
 player squads and the base. Terrain generation stays random and seeded runs
 remain reproducible. No road is forced from the player spawn to the base;

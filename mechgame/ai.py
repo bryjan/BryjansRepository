@@ -14,6 +14,8 @@ from . import ambush
 from . import coordination
 from . import recon
 from . import reinforcements
+from . import fire_support
+from . import radar
 from .formation import MAX_TEAMMATE_DISTANCE, formation_area, formation_radius
 from .patrols import recorded_road_walk
 
@@ -554,18 +556,6 @@ def _squad_resources_high(squad):
     return average_integrity >= 60 and average_ammo >= 50
 
 
-def _squad_has_artillery_reserves(squad):
-    """Return whether an artillery squad has at least half its shell pool."""
-    reserves = [
-        ammo.charges / ammo.maxCharges
-        for mech in squad.mechList
-        for weapon in mech.mechClass.gunList if weapon.isLauncher
-        for ammo in weapon.ammoTypes
-        if ammo.charges is not None and ammo.maxCharges
-    ]
-    return bool(reserves) and sum(reserves) / len(reserves) >= .50
-
-
 def _review_engagement(match_info, squad, contacts):
     """Review two turns of damage with intentional leader uncertainty."""
     if not contacts or not squad.inCombat:
@@ -611,30 +601,8 @@ def request_reinforcement(match_info, requesting_squad, recipient_squad):
 
 
 def _issue_artillery_call(match_info, squad):
-    """Call high-reserve artillery only during an unclear engagement."""
-    squad.artilleryCallTarget = None
-    squad.artilleryCallTurns = 0
-    if squad.engagementAssessment != "unclear":
-        return
-    target = getattr(squad, "strongestObservedThreat", None)
-    if target is None:
-        return
-    nearby = _nearby_friendly_squads(squad)
-    eligible = [candidate for candidate in nearby if _squad_has_artillery_reserves(candidate)]
-    if not eligible:
-        return
-    for artillery_squad in eligible:
-        artillery_squad.artilleryCallTarget = target
-        artillery_squad.artilleryCallTurns = 1
-        from .objectives import request_support
-        from .radar import contact_details
-        detail = contact_details(squad.squadLead, match_info, target)
-        request_support(match_info, squad, artillery_squad, "Artillery", detail["position"],
-                        f"Support an unclear engagement. Target: {detail['classification']}. Check lead and friendly blast safety before firing.", target)
-        _notify_player_support_request(
-            match_info, artillery_squad,
-            f"Artillery request from {squad.name} squad: engage {target.name}.",
-        )
+    """Keep supporting equal/losing engagements, including during retreat."""
+    fire_support.update(match_info, squad)
 
 
 def _can_smoke_position(match_info, mech, weapon, position):
@@ -949,12 +917,15 @@ def _artillery_position_is_safe(match_info, shooter, weapon, position):
     )
 
 
-def _artillery_target_position(match_info, shooter, weapon, target):
+def _artillery_target_position(match_info, shooter, weapon, target, fallback_position=None):
     """Prefer a safe lead, then the target cell; hold fire if both are unsafe."""
-    lead = artillery.predict_launcher_lead(match_info, weapon, target, shooter)
+    visible = radar.team_has_visual_contact(shooter, target)
+    known = visible or target in shooter.team.radarContacts
+    lead = artillery.predict_launcher_lead(match_info, weapon, target, shooter) if known or fallback_position is None else None
     if lead is not None and _artillery_position_is_safe(match_info, shooter, weapon, lead):
         return lead
-    target_position = list(target.pos)
+    target_position = (list(fallback_position) if not known and fallback_position is not None
+                       else list(target.pos) if visible else radar.contact_position(shooter, target))
     if _artillery_position_is_safe(match_info, shooter, weapon, target_position):
         return target_position
     return None
@@ -967,6 +938,8 @@ def _fire_artillery_if_ordered(match_info, squad, mech):
     )
     for weapon in mech.mechClass.gunList:
         if not weapon.isLauncher:
+            continue
+        if weapon.hp <= 0 or weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
             continue
         if weapon.apCost > mech.ap or weapon.energyCost > mech.energy:
             continue
@@ -985,9 +958,13 @@ def _fire_artillery_if_ordered(match_info, squad, mech):
         target = squad.artilleryCallTarget
         if target is None or target.destroyed:
             continue
-        position = _artillery_target_position(match_info, mech, weapon, target)
-        if position is not None and weapon.launchAt(match_info, position, shooter=mech):
-            return True
+        for index, ammo in enumerate(weapon.ammoTypes):
+            if ammo.payload not in {"explosive", "incendiary"} or ammo.charges == 0:
+                continue
+            weapon.select_ammo(index)
+            position = _artillery_target_position(match_info, mech, weapon, target, squad.artilleryCallPosition)
+            if position is not None and weapon.launchAt(match_info, position, shooter=mech):
+                return True
     return False
 
 
@@ -1028,10 +1005,12 @@ def _execute_squad_combat(match_info, squad=None):
     if not squad.playerControlled:
         coordination.plan(match_info, squad.team)
         if coordination.waiting(squad):
+            _issue_artillery_call(match_info, squad)
             return []
     if not squad.playerControlled:
         ambush.update(match_info, squad)
         if ambush.waiting(squad) and not squad.fleeOrdered and squad.combatPosture != "retreat":
+            _issue_artillery_call(match_info, squad)
             return []
     if not squad.playerControlled:
         retreating = squad.combatPosture == "retreat" or squad.fleeOrdered
@@ -1047,34 +1026,34 @@ def _execute_squad_combat(match_info, squad=None):
         if not squad.playerControlled:
             reinforcements.consider(match_info, squad, list(dict.fromkeys(
                 target for mech in squad.mechList for target in _known_targets(mech))))
+            _issue_artillery_call(match_info, squad)
         return []
     if urgent:
         reinforcements.consider(match_info, squad, list(dict.fromkeys(
             target for mech in squad.mechList for target in _known_targets(mech))))
+        _issue_artillery_call(match_info, squad)
         return []
     plotted_shooters.update(recon.scout_fire(match_info, squad))
 
     contacts = list(dict.fromkeys(
         target for mech in squad.mechList for target in _known_targets(mech)
     ))
-    incoming_artillery_call = (
-        squad.artilleryCallTarget if squad.artilleryCallTurns > 0 else None
-    )
+    incoming_artillery_call = None
     if squad.manualOrder and squad.manualAttackTarget in contacts:
         incoming_artillery_call = squad.manualAttackTarget
     squad.assignedTargets = {}
     _assess_enemy_force(match_info, squad, contacts)
     _review_engagement(match_info, squad, contacts)
     reinforcements.consider(match_info, squad, contacts)
+    _issue_artillery_call(match_info, squad)
     if squad.avoidContact:
         squad.primaryTarget = None
         return []
 
     if incoming_artillery_call is not None:
         squad.artilleryCallTarget = incoming_artillery_call
+        squad.artilleryCallSource = squad.artilleryCallPosition = None
         squad.artilleryCallTurns = 1
-    else:
-        _issue_artillery_call(match_info, squad)
 
     _assign_anti_heavy_focus(squad, contacts)
     primary_target = _select_primary_target(squad)
@@ -1126,7 +1105,7 @@ def _execute_squad_combat(match_info, squad=None):
     if squad.artilleryCallTurns:
         squad.artilleryCallTurns -= 1
         if squad.artilleryCallTurns == 0:
-            squad.artilleryCallTarget = None
+            fire_support.clear_shot(squad)
     if squad.smokeCallTurns:
         squad.smokeCallTurns -= 1
         if squad.smokeCallTurns == 0:

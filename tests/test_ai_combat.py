@@ -535,7 +535,7 @@ class AiCombatTests(unittest.TestCase):
                 if reach is not None:
                     self.assertLessEqual(math.dist(mech.pos, target.pos), reach)
 
-    def test_artillery_launches_after_an_unclear_two_turn_review(self):
+    def test_artillery_launches_on_equal_force_before_damage_review(self):
         squad = self.player_squad
         squad.playerControlled = False
         mortar = next(
@@ -563,7 +563,8 @@ class AiCombatTests(unittest.TestCase):
         mortar.noteCombat("enemy in visual range")
 
         execute_squad_combat(self.match, squad)
-        self.assertEqual(self.match.pendingImpacts, [])
+        self.assertTrue(self.match.pendingImpacts)
+        self.assertEqual(squad.engagementAssessment, "unassessed")
         execute_squad_combat(self.match, squad)
         self.assertTrue(self.match.pendingImpacts)
 
