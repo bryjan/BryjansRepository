@@ -4,10 +4,20 @@ from dataclasses import dataclass, field
 import math
 import heapq
 
-from .ai import SquadGoal, start_road_patrol
+from .ai import SquadGoal, TeamGoal, start_road_patrol
 from .patrols import recorded_road_walk
 from .stamps import MilitaryBaseStamp
 from .world import MapGenerator
+
+BASE_DEFENSE_RADIUS = 20
+BASE_DEFENSE_PRIORITY = 150  # Initial patrol/hold orders use 100.
+ATTACK_GOALS = {"attack", "attack_military_base", "eliminate_enemies"}
+
+
+def _defense_order_key(goal):
+    """Raid order categories take precedence over caller-supplied numbers."""
+    rank = 2 if goal.kind in ATTACK_GOALS else 1 if goal.kind == "return_to_defend" else 0
+    return (-rank, -goal.priority, goal.goal_id)
 
 
 @dataclass
@@ -18,6 +28,67 @@ class RaidObjective:
     held_since: dict = field(default_factory=dict)
     raided: bool = False
     title: str = "Raid Military Base"
+    defense_alert: bool = False
+
+    def update_defense(self, match, team):
+        """Recall the garrison after a shared visual sighting near the base.
+
+        The alarm stays active after contact is lost. Return/defend outranks
+        patrol, while committed attacks and emergency withdrawal still run.
+        Radar-only contacts and unseen enemy positions never raise the alarm.
+        """
+        if team is not self.defender:
+            return
+        if not self.defense_alert:
+            self.defense_alert = any(
+                mech.team is self.player and tuple(mech.pos) in team.sharedVisibleTiles
+                and min(math.dist(mech.pos, point) for point in self.base_tiles) <= BASE_DEFENSE_RADIUS
+                for mech in match.entities
+            )
+            if not self.defense_alert:
+                return
+            team.reportLog.append(["Raid defense alarm: attackers spotted near the base. "
+                                   "Return and defend after higher-priority attacks.", True, False])
+            order = TeamGoal("raid_defense_alarm", "return_to_defend", BASE_DEFENSE_PRIORITY,
+                             tuple(sorted(self.base_tiles)),
+                             "Attackers visually confirmed near the base: recall all garrisons after attack orders.",
+                             objective_id="raid_base")
+            team.currentGoals.append(order)
+            team.currentGoals.sort(key=_defense_order_key)
+            team.currentGoal = team.currentGoals[0]
+            team.goalHistory.append(order)
+        for index, squad in enumerate(team.squadsList):
+            if squad.playerControlled or not squad.mechList:
+                continue
+            goal_id = f"raid_recall_{index}"
+            recall = next((goal for goal in squad.currentGoals if goal.goal_id == goal_id), None)
+            if recall is None:
+                recall = SquadGoal(goal_id, "raid_defense_alarm", "return_to_defend", BASE_DEFENSE_PRIORITY,
+                                   tuple(sorted(self.base_tiles)),
+                                   "Attackers spotted near the objective: return and defend the base. "
+                                   "Complete higher-priority attack orders first.", objective_id="raid_base")
+                squad.currentGoals.append(recall)
+                squad.goalHistory.append(recall)
+                squad.logAI(match, "Order received: return and defend base; above patrol, below attack.")
+            # Attack is a higher order category even if its caller supplied a
+            # lower numeric priority. Retain the recall in the pending queue.
+            squad.currentGoals.sort(key=_defense_order_key)
+            previous = squad.currentGoal
+            squad.currentGoal = squad.currentGoals[0]
+            if squad.currentGoal.kind == "return_to_defend" and previous is not squad.currentGoal:
+                squad.stopRoadPatrol()
+                squad.investigationPosition = None
+                squad.setMovementPolicy(mode="move", behavior="formation")
+                attacking = (squad.combatPosture == "attack"
+                             or squad.combinedAttack is not None
+                             or squad.ambushTriggered)
+                if not attacking:
+                    squad.ambushLocation = None
+                    squad.ambushGroup = ()
+                    squad.primaryTarget = None
+                    for mech in squad.mechList:
+                        mech.approachTarget = mech.approachWeapon = None
+            squad._refreshOperationalFlags()
 
     def status(self, match=None):
         if self.raided:

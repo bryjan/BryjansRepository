@@ -215,7 +215,7 @@ def prefer_ambush(match, team, squads):
     for squad in squads:
         # Assigned patrols must keep circulating, and a fixed guard must keep
         # its objective covered. Neither is an idle squad seeking an ambush.
-        if getattr(squad.currentGoal, "kind", "") in {"patrol", "patrol_map", "patrol_location", "defend_location"}:
+        if getattr(squad.currentGoal, "kind", "") in {"patrol", "patrol_map", "patrol_location", "defend_location", "return_to_defend"}:
             continue
         if squad.inCombat:
             # Mere visual contact is allowed; recent damage or firing isn't.

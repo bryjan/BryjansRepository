@@ -27,6 +27,11 @@ Patrols prefer longer approach roads over compound perimeter loops. Their
 stored routes use adjacent connected road cells: gaps split a route, and
 stamped perimeter/highway footprints are ordered into walkable out-and-back
 paths. Debug logs show the current patrol waypoint as well as SL movement.
+If defenders visually spot attackers within 20 tiles of the objective base's
+footprint, every AI garrison receives a return-and-defend order. It outranks
+patrolling, queues behind committed attacks, and remains in force after losing
+contact. Radar-only contacts do not raise this alarm; emergency withdrawal is
+still allowed. Enemy orders and logs show the recall through the debug menu.
 Player entry can be on any of the four edges, with varying positions for both
 player squads and the base. Terrain generation stays random and seeded runs
 remain reproducible. No road is forced from the player spawn to the base;

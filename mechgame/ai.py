@@ -300,6 +300,8 @@ def _leader_destination(match_info, squad):
                 squad.manualAttackPosition = coordination.observed_fix(match_info, squad.team, squad.manualAttackTarget)[0]
             return squad.manualAttackPosition
         return _nearest_location(leader.pos, squad.currentGoal.locations)
+    if getattr(squad.currentGoal, "kind", "") == "return_to_defend" and not _attack_ordered(squad):
+        return _nearest_location(leader.pos, squad.currentGoal.locations)
     if squad.investigationPosition is not None:
         return squad.investigationPosition
     patrol_destination = (
@@ -340,6 +342,8 @@ def _road_patrol_active(squad):
     if squad.combinedAttack is not None or squad.investigationPosition is not None:
         return False
     goal_kind = getattr(squad.currentGoal, "kind", "")
+    if goal_kind in {"attack", "attack_military_base", "return_to_defend"} or squad.combatPosture == "attack":
+        return False
     return squad.movementBehavior == "road_patrol" or goal_kind in {
         "patrol", "patrol_map", "patrol_location", "defend",
     }
@@ -1018,6 +1022,8 @@ def _execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    if match_info.raidObjective is not None:
+        match_info.raidObjective.update_defense(match_info, squad.team)
     if not squad.playerControlled:
         recon.prepare(match_info, squad)
     urgent = recon.emergency(match_info, squad)
@@ -1305,6 +1311,8 @@ def _leader_needs_regroup(squad, leader_range, match_info=None):
 
 def _move_into_weapon_range(match_info, mech, movement_mode):
     """Close over successive turns until the chosen weapon is effective."""
+    if getattr(mech.squad.currentGoal, "kind", "") == "return_to_defend" and not _attack_ordered(mech.squad):
+        return []
     target = getattr(mech, "approachTarget", None)
     weapon = getattr(mech, "approachWeapon", None)
     if (
@@ -1557,6 +1565,8 @@ def _execute_squad_movement(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
         return []
+    if match_info.raidObjective is not None:
+        match_info.raidObjective.update_defense(match_info, squad.team)
 
     if squad.fleeOrdered or squad.shouldLeaveBattlefield:
         return execute_squad_flee(match_info, squad)
