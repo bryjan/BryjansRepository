@@ -124,7 +124,7 @@ def prepare(match, squad):
     # Explicit player orders retain priority except immediate evasion.
     if squad.manualOrder:
         return
-    if getattr(squad.currentGoal, "kind", "") == "return_to_defend":
+    if getattr(squad.currentGoal, "kind", "") in {"return_to_defend", "reinforce"}:
         # A recall is more urgent than investigating a sound or stale area.
         # Immediate evasive movement is still handled separately.
         return

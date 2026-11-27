@@ -32,6 +32,16 @@ footprint, every AI garrison receives a return-and-defend order. It outranks
 patrolling, queues behind committed attacks, and remains in force after losing
 contact. Radar-only contacts do not raise this alarm; emergency withdrawal is
 still allowed. Enemy orders and logs show the recall through the debug menu.
+
+AI squads also request one available friendly combat squad when their combat
+assessment is unfavorable, or local observed enemy force reaches 90% of their
+own combat-force rating. The caller keeps its normal retreat/avoidance behavior.
+AI helpers move to the caller's reported position; repeated calls update that
+position instead of recruiting another squad. Player-controlled recipients get
+a critical report and an objective-menu request, retaining manual control.
+Busy attackers, withdrawing squads and the fixed base guard are not diverted.
+Unrenewed reinforcement orders expire after two rounds and release the helper
+back to its standing orders.
 Player entry can be on any of the four edges, with varying positions for both
 player squads and the base. Terrain generation stays random and seeded runs
 remain reproducible. No road is forced from the player spawn to the base;

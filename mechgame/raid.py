@@ -11,7 +11,7 @@ from .world import MapGenerator
 
 BASE_DEFENSE_RADIUS = 20
 BASE_DEFENSE_PRIORITY = 150  # Initial patrol/hold orders use 100.
-ATTACK_GOALS = {"attack", "attack_military_base", "eliminate_enemies"}
+ATTACK_GOALS = {"attack", "attack_military_base", "eliminate_enemies", "reinforce"}
 
 
 def _defense_order_key(goal):

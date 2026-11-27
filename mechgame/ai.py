@@ -13,6 +13,7 @@ from . import artillery
 from . import ambush
 from . import coordination
 from . import recon
+from . import reinforcements
 from .formation import MAX_TEAMMATE_DISTANCE, formation_area, formation_radius
 from .patrols import recorded_road_walk
 
@@ -300,6 +301,8 @@ def _leader_destination(match_info, squad):
                 squad.manualAttackPosition = coordination.observed_fix(match_info, squad.team, squad.manualAttackTarget)[0]
             return squad.manualAttackPosition
         return _nearest_location(leader.pos, squad.currentGoal.locations)
+    if getattr(squad.currentGoal, "kind", "") == "reinforce":
+        return _nearest_location(leader.pos, squad.currentGoal.locations)
     if getattr(squad.currentGoal, "kind", "") == "return_to_defend" and not _attack_ordered(squad):
         return _nearest_location(leader.pos, squad.currentGoal.locations)
     if squad.investigationPosition is not None:
@@ -342,7 +345,7 @@ def _road_patrol_active(squad):
     if squad.combinedAttack is not None or squad.investigationPosition is not None:
         return False
     goal_kind = getattr(squad.currentGoal, "kind", "")
-    if goal_kind in {"attack", "attack_military_base", "return_to_defend"} or squad.combatPosture == "attack":
+    if goal_kind in {"attack", "attack_military_base", "return_to_defend", "reinforce"} or squad.combatPosture == "attack":
         return False
     return squad.movementBehavior == "road_patrol" or goal_kind in {
         "patrol", "patrol_map", "patrol_location", "defend",
@@ -603,20 +606,8 @@ def _notify_player_support_request(match_info, recipient, message):
 
 
 def request_reinforcement(match_info, requesting_squad, recipient_squad):
-    """Record a future reinforcement request and notify a player recipient.
-
-    Reinforcement movement is intentionally a later planner feature; the
-    request record and player-facing critical report are ready for it now.
-    """
-    recipient_squad.reinforcementRequest = requesting_squad
-    from .objectives import request_support
-    if requesting_squad.squadLead is not None:
-        request_support(match_info, requesting_squad, recipient_squad, "Reinforcements",
-                        requesting_squad.squadLead.pos, "Move to support this friendly squad at its reported location.")
-    _notify_player_support_request(
-        match_info, recipient_squad,
-        f"Reinforcement request from {requesting_squad.name} squad.",
-    )
+    """Send a reinforcement request; AI recipients move, players get a report."""
+    return reinforcements.request(match_info, requesting_squad, recipient_squad)
 
 
 def _issue_artillery_call(match_info, squad):
@@ -719,7 +710,7 @@ def _attack_ordered(squad):
     ) or (
         squad.ambushLocation is not None and squad.ambushTriggered
     ) or goal_kind in {
-        "attack", "attack_military_base", "eliminate_enemies",
+        "attack", "attack_military_base", "eliminate_enemies", "reinforce",
     }
 
 
@@ -1022,6 +1013,7 @@ def _execute_squad_combat(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if not squad.mechList:
         return []
+    reinforcements.prepare(match_info, squad)
     if match_info.raidObjective is not None:
         match_info.raidObjective.update_defense(match_info, squad.team)
     if not squad.playerControlled:
@@ -1052,8 +1044,13 @@ def _execute_squad_combat(match_info, squad=None):
     if squad.combatPosture == "retreat" and squad.inCombat:
         _issue_retreat_smoke_call(match_info, squad)
     if squad.playerControlled or _fire_suppressed(squad):
+        if not squad.playerControlled:
+            reinforcements.consider(match_info, squad, list(dict.fromkeys(
+                target for mech in squad.mechList for target in _known_targets(mech))))
         return []
     if urgent:
+        reinforcements.consider(match_info, squad, list(dict.fromkeys(
+            target for mech in squad.mechList for target in _known_targets(mech))))
         return []
     plotted_shooters.update(recon.scout_fire(match_info, squad))
 
@@ -1068,6 +1065,7 @@ def _execute_squad_combat(match_info, squad=None):
     squad.assignedTargets = {}
     _assess_enemy_force(match_info, squad, contacts)
     _review_engagement(match_info, squad, contacts)
+    reinforcements.consider(match_info, squad, contacts)
     if squad.avoidContact:
         squad.primaryTarget = None
         return []
@@ -1565,6 +1563,7 @@ def _execute_squad_movement(match_info, squad=None):
     squad = squad or match_info.pov.squad
     if squad.playerControlled or not squad.mechList or squad.squadLead is None:
         return []
+    reinforcements.prepare(match_info, squad)
     if match_info.raidObjective is not None:
         match_info.raidObjective.update_defense(match_info, squad.team)
 
